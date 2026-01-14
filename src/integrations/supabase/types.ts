@@ -107,6 +107,7 @@ export type Database = {
           about_photo_url: string | null
           briefing_data: Json
           content_data: Json
+          cpf: string | null
           created_at: string | null
           custom_domain: string | null
           design_settings: Json
@@ -132,6 +133,7 @@ export type Database = {
           about_photo_url?: string | null
           briefing_data?: Json
           content_data?: Json
+          cpf?: string | null
           created_at?: string | null
           custom_domain?: string | null
           design_settings?: Json
@@ -157,6 +159,7 @@ export type Database = {
           about_photo_url?: string | null
           briefing_data?: Json
           content_data?: Json
+          cpf?: string | null
           created_at?: string | null
           custom_domain?: string | null
           design_settings?: Json
