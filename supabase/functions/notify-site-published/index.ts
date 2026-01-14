@@ -106,11 +106,15 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (emailResponse?.error) {
-      console.error("Falha ao enviar email de site publicado:", emailResponse);
+      // Log the error but don't fail the request - site was published successfully
+      console.warn("Email de notificação não enviado (modo teste Resend):", emailResponse.error);
       return new Response(
-        JSON.stringify({ error: "Falha ao enviar email de notificação" }),
+        JSON.stringify({ 
+          success: true, 
+          warning: "Site publicado, mas email não enviado (configure domínio no Resend)" 
+        }),
         {
-          status: 500,
+          status: 200,
           headers: { "Content-Type": "application/json", ...corsHeaders },
         },
       );
