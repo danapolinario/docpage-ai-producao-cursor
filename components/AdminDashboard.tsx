@@ -1,0 +1,321 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  getAllLandingPages, 
+  updateLandingPageStatus, 
+  getAdminStats, 
+  LandingPageWithUser,
+  LandingPageStatus 
+} from '../services/admin';
+import { signOut } from '../services/auth';
+
+interface Props {
+  onLogout: () => void;
+}
+
+const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  draft: { label: 'Rascunho', color: 'text-gray-600', bg: 'bg-gray-100' },
+  published: { label: 'Publicado', color: 'text-green-700', bg: 'bg-green-100' },
+};
+
+export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
+  const [landingPages, setLandingPages] = useState<LandingPageWithUser[]>([]);
+  const [stats, setStats] = useState({ total: 0, published: 0, pending: 0, draft: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [pages, statsData] = await Promise.all([
+        getAllLandingPages(),
+        getAdminStats()
+      ]);
+      setLandingPages(pages);
+      setStats(statsData);
+      setError(null);
+    } catch (err: any) {
+      console.error('Error loading admin data:', err);
+      setError(err.message || 'Erro ao carregar dados');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleStatusChange = async (pageId: string, newStatus: LandingPageStatus) => {
+    try {
+      setUpdatingId(pageId);
+      await updateLandingPageStatus(pageId, newStatus);
+      await loadData(); // Reload data
+    } catch (err: any) {
+      console.error('Error updating status:', err);
+      setError(err.message || 'Erro ao atualizar status');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    onLogout();
+  };
+
+  // Get URL for landing page
+  const getLandingPageUrl = (subdomain: string) => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/${subdomain}`;
+  };
+
+  // Filter and search
+  const filteredPages = landingPages.filter(page => {
+    const matchesStatus = filterStatus === 'all' || page.status === filterStatus;
+    const matchesSearch = 
+      page.subdomain.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      page.briefing_data?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      page.briefing_data?.contactEmail?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600">Carregando painel admin...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      {/* Header */}
+      <header className="bg-slate-900 text-white shadow-lg">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-gradient-to-tr from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">Painel Administrativo</h1>
+              <p className="text-slate-400 text-sm">Gerenciamento de Landing Pages</p>
+            </div>
+          </div>
+          
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors text-sm"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Sair
+          </button>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <span>{error}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium">Total</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium">Em Publicação</p>
+                <p className="text-3xl font-bold text-amber-600">{stats.pending}</p>
+              </div>
+              <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium">Publicados</p>
+                <p className="text-3xl font-bold text-green-600">{stats.published}</p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium">Rascunhos</p>
+                <p className="text-3xl font-bold text-gray-600">{stats.draft}</p>
+              </div>
+              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por domínio, nome ou email..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              />
+            </div>
+            <div className="w-full md:w-48">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              >
+                <option value="all">Todos</option>
+                <option value="draft">Rascunho</option>
+                <option value="published">Publicado</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={loadData}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Atualizar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Landing Pages Table */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-gray-100">
+                <tr>
+                  <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Domínio</th>
+                  <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário</th>
+                  <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Criado em</th>
+                  <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredPages.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                      {searchTerm || filterStatus !== 'all' 
+                        ? 'Nenhuma landing page encontrada com os filtros aplicados.'
+                        : 'Nenhuma landing page cadastrada ainda.'}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPages.map((page) => (
+                    <tr key={page.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="font-medium text-gray-900">{page.subdomain}</p>
+                          <p className="text-xs text-gray-500">{getLandingPageUrl(page.subdomain)}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="font-medium text-gray-900">{page.briefing_data?.name || 'N/A'}</p>
+                          <p className="text-xs text-gray-500">{page.briefing_data?.contactEmail || 'N/A'}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_LABELS[page.status]?.bg || 'bg-gray-100'} ${STATUS_LABELS[page.status]?.color || 'text-gray-600'}`}>
+                          {STATUS_LABELS[page.status]?.label || page.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {new Date(page.created_at).toLocaleDateString('pt-BR')}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          {page.status !== 'published' && (
+                            <button
+                              onClick={() => handleStatusChange(page.id, 'published')}
+                              disabled={updatingId === page.id}
+                              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              {updatingId === page.id ? 'Publicando...' : 'Publicar'}
+                            </button>
+                          )}
+                          {page.status === 'published' && (
+                            <button
+                              onClick={() => handleStatusChange(page.id, 'draft')}
+                              disabled={updatingId === page.id}
+                              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              {updatingId === page.id ? 'Alterando...' : 'Despublicar'}
+                            </button>
+                          )}
+                          <a
+                            href={`/${page.subdomain}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg transition-colors"
+                          >
+                            Ver
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};

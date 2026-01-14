@@ -1,0 +1,17 @@
+project_id = "mnlxowybdilhrnajqwon"
+
+[functions.send-otp]
+verify_jwt = false
+
+[functions.verify-otp]
+verify_jwt = false
+
+[functions.admin-login]
+verify_jwt = false
+
+[functions.photo-enhance]
+verify_jwt = false
+
+[functions.generate-content]
+verify_jwt = false
+
