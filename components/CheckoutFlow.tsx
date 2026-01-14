@@ -373,6 +373,7 @@ export const CheckoutFlow: React.FC<Props> = ({
     if (!pendingSuccess) return;
     
     setIsLoading(true);
+    setError(null);
     
     try {
       // Salvar CPF na landing page diretamente via Supabase
@@ -382,15 +383,17 @@ export const CheckoutFlow: React.FC<Props> = ({
         .eq('id', pendingSuccess.landingPageId);
       
       if (updateError) {
-        throw updateError;
+        console.error('Erro ao atualizar CPF no banco:', updateError);
+        throw new Error('Erro ao salvar CPF. Tente novamente.');
       }
       
       // Fechar modal e redirecionar
+      setIsLoading(false);
       setShowSuccessModal(false);
       onSuccess(pendingSuccess);
     } catch (err: any) {
       console.error('Erro ao salvar CPF:', err);
-      setError('Erro ao salvar CPF. Tente novamente.');
+      setError(err.message || 'Erro ao salvar CPF. Tente novamente.');
       setIsLoading(false);
     }
   };
