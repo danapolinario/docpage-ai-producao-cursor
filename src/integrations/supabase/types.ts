@@ -14,13 +14,183 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      analytics_events: {
+        Row: {
+          city: string | null
+          country: string | null
+          created_at: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+          ip_address: unknown
+          landing_page_id: string
+          referrer: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          ip_address?: unknown
+          landing_page_id: string
+          referrer?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown
+          landing_page_id?: string
+          referrer?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_events_landing_page_id_fkey"
+            columns: ["landing_page_id"]
+            isOneToOne: false
+            referencedRelation: "landing_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_domains: {
+        Row: {
+          created_at: string | null
+          dns_configured: boolean | null
+          domain: string
+          id: string
+          landing_page_id: string
+          ssl_status: string | null
+          updated_at: string | null
+          verified: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          dns_configured?: boolean | null
+          domain: string
+          id?: string
+          landing_page_id: string
+          ssl_status?: string | null
+          updated_at?: string | null
+          verified?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          dns_configured?: boolean | null
+          domain?: string
+          id?: string
+          landing_page_id?: string
+          ssl_status?: string | null
+          updated_at?: string | null
+          verified?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_domains_landing_page_id_fkey"
+            columns: ["landing_page_id"]
+            isOneToOne: false
+            referencedRelation: "landing_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      landing_pages: {
+        Row: {
+          about_photo_url: string | null
+          briefing_data: Json
+          content_data: Json
+          created_at: string | null
+          custom_domain: string | null
+          design_settings: Json
+          id: string
+          last_viewed_at: string | null
+          layout_variant: number
+          meta_description: string | null
+          meta_keywords: string[] | null
+          meta_title: string | null
+          og_image_url: string | null
+          photo_url: string | null
+          published_at: string | null
+          schema_markup: Json | null
+          section_visibility: Json
+          slug: string
+          status: string | null
+          subdomain: string
+          updated_at: string | null
+          user_id: string
+          view_count: number | null
+        }
+        Insert: {
+          about_photo_url?: string | null
+          briefing_data?: Json
+          content_data?: Json
+          created_at?: string | null
+          custom_domain?: string | null
+          design_settings?: Json
+          id?: string
+          last_viewed_at?: string | null
+          layout_variant?: number
+          meta_description?: string | null
+          meta_keywords?: string[] | null
+          meta_title?: string | null
+          og_image_url?: string | null
+          photo_url?: string | null
+          published_at?: string | null
+          schema_markup?: Json | null
+          section_visibility?: Json
+          slug: string
+          status?: string | null
+          subdomain: string
+          updated_at?: string | null
+          user_id: string
+          view_count?: number | null
+        }
+        Update: {
+          about_photo_url?: string | null
+          briefing_data?: Json
+          content_data?: Json
+          created_at?: string | null
+          custom_domain?: string | null
+          design_settings?: Json
+          id?: string
+          last_viewed_at?: string | null
+          layout_variant?: number
+          meta_description?: string | null
+          meta_keywords?: string[] | null
+          meta_title?: string | null
+          og_image_url?: string | null
+          photo_url?: string | null
+          published_at?: string | null
+          schema_markup?: Json | null
+          section_visibility?: Json
+          slug?: string
+          status?: string | null
+          subdomain?: string
+          updated_at?: string | null
+          user_id?: string
+          view_count?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_subdomain_available: {
+        Args: { check_subdomain: string }
+        Returns: boolean
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       [_ in never]: never
