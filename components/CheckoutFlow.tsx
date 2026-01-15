@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plan, BriefingData, LandingPageContent, DesignSettings } from '../types';
 import { processCompletePaymentFlow } from '../services/payment-flow';
 import { sendOTP, verifyCode, resendOTP } from '../services/auth';
-import { checkSubdomainAvailability, updateLandingPage } from '../services/landing-pages';
+import { checkDomainAvailability, updateLandingPage } from '../services/landing-pages';
 import SuccessModal from './SuccessModal';
 import { supabase } from '../lib/supabase';
 
@@ -218,10 +218,10 @@ export const CheckoutFlow: React.FC<Props> = ({
     }
   };
 
-  // Step 2: Verificar domínio
+  // Step 2: Verificar domínio via RDAP (Registro.br)
   const handleCheckDomain = async () => {
-    if (!domain || domain.length < 3) {
-      setDomainError('Digite um domínio válido (mínimo 3 caracteres)');
+    if (!domain || domain.length < 2) {
+      setDomainError('Digite um domínio válido (mínimo 2 caracteres)');
       return;
     }
 
@@ -230,34 +230,34 @@ export const CheckoutFlow: React.FC<Props> = ({
     setIsDomainAvailable(null);
 
     try {
-      // Normalizar subdomínio (remover www, extensões, caracteres especiais)
-      const subdomain = domain
+      // Normalizar nome do domínio (remover www, extensões, caracteres especiais)
+      const domainName = domain
         .replace(/^www\./, '')
-        .replace(/\.(com|com\.br|med\.br)$/, '')
+        .replace(/\.(com|com\.br|med\.br|br)$/, '')
         .toLowerCase()
         .trim()
         .replace(/[^a-z0-9-]/g, '-') // Substitui caracteres especiais por hífen
         .replace(/-+/g, '-') // Remove hífens duplicados
         .replace(/^-|-$/g, ''); // Remove hífens do início/fim
 
-      // Verificar se subdomínio é válido
-      if (subdomain.length < 3) {
-        setDomainError('Domínio muito curto. Use pelo menos 3 caracteres.');
+      // Verificar se domínio é válido
+      if (domainName.length < 2) {
+        setDomainError('Domínio muito curto. Use pelo menos 2 caracteres.');
         setIsDomainAvailable(false);
         setIsCheckingDomain(false);
         return;
       }
 
-      // Verificar disponibilidade real
-      const availability = await checkSubdomainAvailability(subdomain);
+      // Verificar disponibilidade via RDAP do Registro.br
+      const availability = await checkDomainAvailability(domainName);
 
       if (availability.available) {
         setIsDomainAvailable(true);
-        setSelectedDomain(subdomain); // Guarda apenas o subdomínio (sem extensão)
+        setSelectedDomain(domainName); // Guarda o nome do domínio
         // Não avança automaticamente - usuário deve clicar em "Continuar"
       } else {
         setIsDomainAvailable(false);
-        setDomainError(availability.error || 'Este domínio não está disponível. Tente outro.');
+        setDomainError(availability.error || 'Este domínio já está registrado. Tente outro nome.');
       }
     } catch (err: any) {
       setDomainError(err.message || 'Erro ao verificar domínio. Por favor, tente novamente.');
