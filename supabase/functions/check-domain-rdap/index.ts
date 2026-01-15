@@ -100,6 +100,54 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Status 403 pode ser rate limiting - tentar DNS como fallback
+    if (rdapResponse.status === 403) {
+      console.log(`RDAP retornou 403 para ${fullDomain}, usando DNS lookup como fallback`);
+      
+      try {
+        // Tentar resolver DNS - se resolver, domínio existe
+        const dnsResponse = await fetch(`https://dns.google/resolve?name=${fullDomain}&type=A`);
+        const dnsData = await dnsResponse.json();
+        
+        if (dnsData.Answer && dnsData.Answer.length > 0) {
+          // DNS resolveu = domínio existe
+          console.log(`DNS encontrou ${fullDomain} - domínio NÃO disponível`);
+          return new Response(
+            JSON.stringify({ 
+              available: false, 
+              domain: domainName,
+              fullDomain: fullDomain,
+              error: "Este domínio já está registrado. Por favor, escolha outro nome." 
+            }),
+            { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          );
+        }
+        
+        // DNS não resolveu - provavelmente disponível
+        console.log(`DNS não encontrou ${fullDomain} - provavelmente DISPONÍVEL`);
+        return new Response(
+          JSON.stringify({ 
+            available: true, 
+            domain: domainName,
+            fullDomain: fullDomain,
+            message: "Domínio provavelmente disponível! Confirme no Registro.br" 
+          }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      } catch (dnsError) {
+        console.log(`Erro no DNS lookup, assumindo disponível:`, dnsError);
+        return new Response(
+          JSON.stringify({ 
+            available: true, 
+            domain: domainName,
+            fullDomain: fullDomain,
+            message: "Domínio provavelmente disponível! Confirme no Registro.br" 
+          }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+    }
+
     // Outros status - tratar como erro
     console.error(`RDAP retornou status inesperado: ${rdapResponse.status}`);
     return new Response(
