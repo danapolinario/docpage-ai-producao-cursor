@@ -59,6 +59,13 @@ export type Database = {
             referencedRelation: "landing_pages"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "analytics_events_landing_page_id_fkey"
+            columns: ["landing_page_id"]
+            isOneToOne: false
+            referencedRelation: "landing_pages_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       custom_domains: {
@@ -98,6 +105,13 @@ export type Database = {
             columns: ["landing_page_id"]
             isOneToOne: false
             referencedRelation: "landing_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_domains_landing_page_id_fkey"
+            columns: ["landing_page_id"]
+            isOneToOne: false
+            referencedRelation: "landing_pages_public"
             referencedColumns: ["id"]
           },
         ]
@@ -239,13 +253,88 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      landing_pages_public: {
+        Row: {
+          about_photo_url: string | null
+          briefing_data: Json | null
+          content_data: Json | null
+          created_at: string | null
+          custom_domain: string | null
+          design_settings: Json | null
+          id: string | null
+          last_viewed_at: string | null
+          layout_variant: number | null
+          meta_description: string | null
+          meta_keywords: string[] | null
+          meta_title: string | null
+          og_image_url: string | null
+          photo_url: string | null
+          published_at: string | null
+          schema_markup: Json | null
+          section_visibility: Json | null
+          slug: string | null
+          status: string | null
+          subdomain: string | null
+          updated_at: string | null
+          view_count: number | null
+        }
+        Insert: {
+          about_photo_url?: string | null
+          briefing_data?: Json | null
+          content_data?: Json | null
+          created_at?: string | null
+          custom_domain?: string | null
+          design_settings?: Json | null
+          id?: string | null
+          last_viewed_at?: string | null
+          layout_variant?: number | null
+          meta_description?: string | null
+          meta_keywords?: string[] | null
+          meta_title?: string | null
+          og_image_url?: string | null
+          photo_url?: string | null
+          published_at?: string | null
+          schema_markup?: Json | null
+          section_visibility?: Json | null
+          slug?: string | null
+          status?: string | null
+          subdomain?: string | null
+          updated_at?: string | null
+          view_count?: number | null
+        }
+        Update: {
+          about_photo_url?: string | null
+          briefing_data?: Json | null
+          content_data?: Json | null
+          created_at?: string | null
+          custom_domain?: string | null
+          design_settings?: Json | null
+          id?: string | null
+          last_viewed_at?: string | null
+          layout_variant?: number | null
+          meta_description?: string | null
+          meta_keywords?: string[] | null
+          meta_title?: string | null
+          og_image_url?: string | null
+          photo_url?: string | null
+          published_at?: string | null
+          schema_markup?: Json | null
+          section_visibility?: Json | null
+          slug?: string | null
+          status?: string | null
+          subdomain?: string | null
+          updated_at?: string | null
+          view_count?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_subdomain_available: {
         Args: { check_subdomain: string }
         Returns: boolean
       }
+      cleanup_old_analytics: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
