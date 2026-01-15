@@ -31,7 +31,71 @@ export interface LandingPageRow {
 }
 
 /**
- * Verificar disponibilidade de subdomínio
+ * Verificar disponibilidade de domínio usando RDAP do Registro.br
+ */
+export async function checkDomainAvailability(
+  domain: string
+): Promise<{ available: boolean; error?: string; fullDomain?: string }> {
+  // Validação básica
+  const domainName = domain.toLowerCase().trim();
+  
+  if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(domainName)) {
+    return { 
+      available: false, 
+      error: 'Formato de domínio inválido. Use apenas letras, números e hífens.' 
+    };
+  }
+
+  if (domainName.length < 2 || domainName.length > 63) {
+    return { 
+      available: false, 
+      error: 'Domínio deve ter entre 2 e 63 caracteres.' 
+    };
+  }
+
+  // Palavras reservadas
+  const reserved = [
+    'www', 'api', 'admin', 'app', 'mail', 'ftp', 'localhost',
+    'test', 'staging', 'dev', 'development', 'production'
+  ];
+  
+  if (reserved.includes(domainName)) {
+    return { 
+      available: false, 
+      error: 'Este domínio está reservado' 
+    };
+  }
+
+  try {
+    // Chamar Edge Function para verificar via RDAP
+    const { data, error } = await supabase.functions.invoke('check-domain-rdap', {
+      body: { domain: domainName }
+    });
+
+    if (error) {
+      console.error('Erro ao chamar check-domain-rdap:', error);
+      return { 
+        available: false, 
+        error: 'Erro ao verificar disponibilidade. Tente novamente.' 
+      };
+    }
+
+    return {
+      available: data.available === true,
+      error: data.error,
+      fullDomain: data.fullDomain
+    };
+  } catch (err: any) {
+    console.error('Erro ao verificar domínio:', err);
+    return { 
+      available: false, 
+      error: 'Erro ao verificar disponibilidade. Tente novamente.' 
+    };
+  }
+}
+
+/**
+ * Verificar disponibilidade de subdomínio (uso interno - verifica na tabela landing_pages)
  */
 export async function checkSubdomainAvailability(
   subdomain: string
@@ -51,62 +115,28 @@ export async function checkSubdomainAvailability(
     };
   }
 
-  // Palavras reservadas
-  const reserved = [
-    'www', 'api', 'admin', 'app', 'mail', 'ftp', 'localhost',
-    'test', 'staging', 'dev', 'development', 'production'
-  ];
-  
-  if (reserved.includes(subdomain.toLowerCase())) {
-    return { 
-      available: false, 
-      error: 'Este subdomínio está reservado' 
-    };
-  }
-
-  // Verificar se já existe usando função SQL (permite verificação pública)
+  // Verificar se já existe usando função SQL
   try {
     const { data: result, error } = await supabase.rpc('check_subdomain_available', {
       check_subdomain: subdomain.toLowerCase()
     });
 
     if (error) {
-      // Se a função não existir, tentar método direto (pode falhar com RLS)
-      const { data: existing, error: queryError } = await supabase
+      const { data: existing } = await supabase
         .from('landing_pages')
         .select('id')
         .eq('subdomain', subdomain.toLowerCase())
         .maybeSingle();
 
-      if (queryError && queryError.code !== 'PGRST116' && queryError.code !== 'PGRST103') {
-        return { 
-          available: false, 
-          error: 'Erro ao verificar disponibilidade' 
-        };
-      }
-
-      // Se não encontrou (PGRST116 ou data null), está disponível
       return { available: !existing };
     }
 
-    // Função retorna true se disponível, false se não
     return { available: result === true };
   } catch (err: any) {
-    // Fallback: tentar método direto
-    const { data: existing, error: queryError } = await supabase
-      .from('landing_pages')
-      .select('id')
-      .eq('subdomain', subdomain.toLowerCase())
-      .maybeSingle();
-
-    if (queryError && queryError.code !== 'PGRST116' && queryError.code !== 'PGRST103') {
-      return { 
-        available: false, 
-        error: 'Erro ao verificar disponibilidade' 
-      };
-    }
-
-    return { available: !existing };
+    return { 
+      available: false, 
+      error: 'Erro ao verificar disponibilidade' 
+    };
   }
 }
 
