@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Preview } from './Preview';
+import { SEOHead } from './SEOHead';
 import { DesignSettings, SectionVisibility, LandingPageContent, LayoutVariant, BriefingData } from '../types';
 import { trackPageView } from '../services/analytics';
 
@@ -16,6 +17,11 @@ interface LandingPageData {
   photo_url: string | null;
   about_photo_url: string | null;
   status: string;
+  // SEO fields
+  meta_title?: string | null;
+  meta_description?: string | null;
+  meta_keywords?: string[] | null;
+  og_image_url?: string | null;
 }
 
 export const LandingPageViewer: React.FC = () => {
@@ -127,6 +133,17 @@ export const LandingPageViewer: React.FC = () => {
 
   return (
     <div className="min-h-screen">
+      {/* Dynamic SEO Head - injects meta tags, OG tags, and Schema.org markup */}
+      <SEOHead
+        briefing={landingPage.briefing_data}
+        content={landingPage.content_data}
+        subdomain={landingPage.subdomain}
+        photoUrl={landingPage.photo_url}
+        ogImageUrl={landingPage.og_image_url}
+        metaTitle={landingPage.meta_title}
+        metaDescription={landingPage.meta_description}
+        metaKeywords={landingPage.meta_keywords}
+      />
       <Preview
         content={landingPage.content_data}
         design={landingPage.design_settings}

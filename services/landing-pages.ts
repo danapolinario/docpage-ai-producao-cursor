@@ -384,12 +384,205 @@ export async function updateLandingPage(
 }
 
 /**
- * Publicar landing page
+ * Gerar OG Image para compartilhamento em redes sociais
+ */
+export async function generateOGImage(
+  briefing: BriefingData,
+  subdomain: string,
+  photoUrl?: string | null
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-og-image', {
+      body: {
+        name: briefing.name,
+        specialty: briefing.specialty,
+        crm: briefing.crm,
+        crmState: briefing.crmState,
+        photoUrl: photoUrl,
+        subdomain: subdomain
+      }
+    });
+
+    if (error) {
+      console.error('Erro ao gerar OG image:', error);
+      return null;
+    }
+
+    return data.imageUrl || null;
+  } catch (err) {
+    console.error('Erro ao chamar generate-og-image:', err);
+    return null;
+  }
+}
+
+/**
+ * Gerar Schema.org markup para médico
+ */
+export function generateSchemaMarkup(
+  briefing: BriefingData,
+  content: LandingPageContent,
+  subdomain: string,
+  photoUrl?: string | null
+): object {
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://docpageai.lovable.app';
+  const pageUrl = `${baseUrl}/${subdomain}`;
+  
+  return {
+    "@context": "https://schema.org",
+    "@type": "Physician",
+    "name": briefing.name,
+    "description": content.subheadline || `Especialista em ${briefing.specialty}`,
+    "image": photoUrl || undefined,
+    "url": pageUrl,
+    "medicalSpecialty": {
+      "@type": "MedicalSpecialty",
+      "name": briefing.specialty
+    },
+    "telephone": briefing.contactPhone || content.contactPhone,
+    "email": briefing.contactEmail || content.contactEmail,
+    "address": briefing.addresses?.length > 0 ? {
+      "@type": "PostalAddress",
+      "streetAddress": briefing.addresses[0],
+      "addressCountry": "BR"
+    } : undefined,
+    "identifier": {
+      "@type": "PropertyValue",
+      "name": "CRM",
+      "value": `${briefing.crm}/${briefing.crmState}`
+    },
+    "priceRange": "$$",
+    "areaServed": {
+      "@type": "State",
+      "name": briefing.crmState
+    },
+    "availableService": content.services?.map(service => ({
+      "@type": "MedicalProcedure",
+      "name": service.title,
+      "description": service.description
+    })),
+    "review": content.testimonials?.map(testimonial => ({
+      "@type": "Review",
+      "author": {
+        "@type": "Person",
+        "name": testimonial.name
+      },
+      "reviewBody": testimonial.text,
+      "reviewRating": {
+        "@type": "Rating",
+        "ratingValue": "5",
+        "bestRating": "5"
+      }
+    })),
+    "potentialAction": {
+      "@type": "ReserveAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": pageUrl,
+        "actionPlatform": [
+          "http://schema.org/DesktopWebPlatform",
+          "http://schema.org/MobileWebPlatform"
+        ]
+      },
+      "result": {
+        "@type": "Reservation",
+        "name": "Consulta Médica"
+      }
+    }
+  };
+}
+
+/**
+ * Gerar metadados SEO otimizados
+ */
+export function generateSEOMetadata(
+  briefing: BriefingData,
+  content: LandingPageContent
+): { title: string; description: string; keywords: string[] } {
+  // Title otimizado (máximo 60 caracteres para Google)
+  const baseTitle = `${briefing.name} - ${briefing.specialty}`;
+  const title = baseTitle.length > 50 
+    ? `${baseTitle.substring(0, 47)}...` 
+    : `${baseTitle} | Agende`;
+  
+  // Description otimizada (máximo 160 caracteres)
+  const rawDescription = content.subheadline || 
+    `Dr(a). ${briefing.name}, especialista em ${briefing.specialty}. CRM/${briefing.crmState} ${briefing.crm}. Agende sua consulta online.`;
+  const description = rawDescription.length > 160 
+    ? rawDescription.substring(0, 157) + '...' 
+    : rawDescription;
+  
+  // Keywords relevantes
+  const keywords = [
+    briefing.name,
+    briefing.specialty,
+    `médico ${briefing.specialty.toLowerCase()}`,
+    `${briefing.specialty.toLowerCase()} ${briefing.crmState}`,
+    'consulta médica',
+    'agendar consulta',
+    'médico online',
+    `CRM ${briefing.crmState}`,
+    ...(briefing.mainServices?.split(',').map(s => s.trim()) || []),
+    ...(briefing.addresses?.map(addr => {
+      // Extrair cidade do endereço
+      const parts = addr.split(',');
+      return parts.length > 1 ? parts[parts.length - 1].trim().split('-')[0].trim() : '';
+    }).filter(Boolean) || [])
+  ].filter((k, i, arr) => k && arr.indexOf(k) === i); // Remove duplicatas e vazios
+  
+  return { title, description, keywords };
+}
+
+/**
+ * Publicar landing page com geração de SEO completo
  */
 export async function publishLandingPage(id: string): Promise<LandingPageRow> {
+  // Primeiro, buscar dados atuais da landing page para gerar SEO
+  const { data: currentPage, error: fetchError } = await supabase
+    .from('landing_pages')
+    .select('*')
+    .eq('id', id)
+    .single();
+  
+  if (fetchError || !currentPage) {
+    throw new Error('Landing page não encontrada');
+  }
+  
+  // Gerar metadados SEO
+  const seoMeta = generateSEOMetadata(
+    currentPage.briefing_data as BriefingData,
+    currentPage.content_data as LandingPageContent
+  );
+  
+  // Gerar Schema.org markup
+  const schemaMarkup = generateSchemaMarkup(
+    currentPage.briefing_data as BriefingData,
+    currentPage.content_data as LandingPageContent,
+    currentPage.subdomain,
+    currentPage.photo_url
+  );
+  
+  // Tentar gerar OG image (não bloqueia publicação se falhar)
+  let ogImageUrl = currentPage.og_image_url;
+  if (!ogImageUrl) {
+    try {
+      ogImageUrl = await generateOGImage(
+        currentPage.briefing_data as BriefingData,
+        currentPage.subdomain,
+        currentPage.photo_url
+      );
+    } catch (err) {
+      console.warn('Não foi possível gerar OG image, continuando sem ela:', err);
+    }
+  }
+  
   return updateLandingPage(id, {
     status: 'published',
     published_at: new Date().toISOString(),
+    meta_title: seoMeta.title,
+    meta_description: seoMeta.description,
+    meta_keywords: seoMeta.keywords,
+    schema_markup: schemaMarkup,
+    og_image_url: ogImageUrl,
   });
 }
 
