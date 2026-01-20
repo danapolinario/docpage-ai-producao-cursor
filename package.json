@@ -5,8 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "install": "npm install --legacy-peer-deps",
-    "postinstall": "npm install --legacy-peer-deps",
     "dev:ssr": "tsx watch server/index.ts",
     "build": "vite build",
     "vercel-build": "npm run build",
