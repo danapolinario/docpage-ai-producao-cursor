@@ -19,6 +19,13 @@ export const DashboardPage: React.FC = () => {
   const [landingPageId, setLandingPageId] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
 
+  // Track dashboard view - SEMPRE chamar antes de qualquer return condicional
+  useEffect(() => {
+    if (dashboardData && landingPageId) {
+      trackDashboardView();
+    }
+  }, [dashboardData, landingPageId]);
+
   // Verificar autenticação ao carregar
   useEffect(() => {
     const checkAuth = async () => {
@@ -164,8 +171,63 @@ export const DashboardPage: React.FC = () => {
   }
 
   // Renderizar Dashboard com dados carregados
+  // Validar que todos os dados necessários estão presentes
+  if (!dashboardData?.landingPage) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
+          <div className="mb-6">
+            <svg className="w-16 h-16 mx-auto text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-4">Erro ao Carregar Dashboard</h2>
+          <p className="text-slate-600 mb-6">
+            Não foi possível carregar os dados da landing page. Tente novamente.
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+          >
+            Voltar para Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const landingPage = dashboardData.landingPage;
   const domainInfo = dashboardData.domainInfo;
+
+  // Validar dados obrigatórios
+  if (!landingPage.briefing_data || !landingPage.content_data || !landingPage.design_settings) {
+    console.error('DashboardPage: Dados incompletos da landing page:', {
+      hasBriefing: !!landingPage.briefing_data,
+      hasContent: !!landingPage.content_data,
+      hasDesign: !!landingPage.design_settings,
+    });
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
+          <div className="mb-6">
+            <svg className="w-16 h-16 mx-auto text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-4">Dados Incompletos</h2>
+          <p className="text-slate-600 mb-6">
+            A landing page não possui todos os dados necessários. Por favor, edite a landing page primeiro.
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+          >
+            Editar Landing Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Criar plano padrão (Starter) - pode ser melhorado no futuro para buscar do banco
   const defaultPlan: Plan = {
@@ -186,14 +248,9 @@ export const DashboardPage: React.FC = () => {
     color: 'border-slate-200'
   };
 
-  // Track dashboard view
-  useEffect(() => {
-    trackDashboardView();
-  }, []);
-
   return (
     <Dashboard
-      doctorName={landingPage.briefing_data?.name || 'Médico'}
+      doctorName={landingPage.briefing_data.name || 'Médico'}
       domain={domainInfo?.customDomain || domainInfo?.domain || 'seu-dominio.com.br'}
       plan={defaultPlan}
       content={landingPage.content_data}
@@ -205,12 +262,12 @@ export const DashboardPage: React.FC = () => {
         testimonials: true,
         footer: true,
       }}
-      photoUrl={landingPage.photo_url}
-      aboutPhotoUrl={landingPage.about_photo_url}
+      photoUrl={landingPage.photo_url || null}
+      aboutPhotoUrl={landingPage.about_photo_url || null}
       briefing={landingPage.briefing_data}
       layoutVariant={(landingPage.layout_variant || 1) as any}
       onEditSite={() => navigate('/')}
-      landingPageId={landingPageId}
+      landingPageId={landingPageId || undefined}
     />
   );
 };
