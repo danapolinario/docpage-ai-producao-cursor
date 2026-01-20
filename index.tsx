@@ -1,9 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
+import { initGoogleAnalytics } from './services/google-analytics';
 import App from './App';
 import { AdminPage } from './components/AdminPage';
 import { LandingPageViewer } from './components/LandingPageViewer';
+
+// Inicializar Google Analytics
+initGoogleAnalytics();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -13,12 +18,14 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="/:subdomain" element={<LandingPageViewer />} />
-        <Route path="/" element={<App />} />
-      </Routes>
-    </BrowserRouter>
+    <HelmetProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/:subdomain" element={<LandingPageViewer />} />
+          <Route path="/" element={<App />} />
+        </Routes>
+      </BrowserRouter>
+    </HelmetProvider>
   </React.StrictMode>
 );

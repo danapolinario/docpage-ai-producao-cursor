@@ -39,7 +39,24 @@ export const NewSaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onSw
       <nav className="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 transition-all duration-300 supports-[backdrop-filter]:bg-white/60">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.reload()}>
-            <div className="w-8 h-8 bg-gradient-to-br from-[#0A4D8C] to-[#00A86B] rounded-lg shadow-lg shadow-blue-900/10"></div>
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-500 rounded-lg shadow-lg shadow-blue-900/20 flex items-center justify-center relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-purple-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <svg className="w-4 h-4 relative z-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <circle cx="8" cy="8" r="1.5" fill="currentColor" opacity="0.9" />
+                <circle cx="16" cy="8" r="1.5" fill="currentColor" opacity="0.9" />
+                <circle cx="12" cy="16" r="1.5" fill="currentColor" opacity="0.9" />
+                <path d="M8 8 L12 16 M16 8 L12 16 M8 8 L16 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
+                <circle cx="6" cy="6" r="0.5" fill="currentColor" opacity="0.7">
+                  <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="18" cy="6" r="0.5" fill="currentColor" opacity="0.7">
+                  <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" begin="0.5s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="12" cy="18" r="0.5" fill="currentColor" opacity="0.7">
+                  <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" begin="1s" repeatCount="indefinite" />
+                </circle>
+              </svg>
+            </div>
             <span className="font-bold text-xl tracking-tight text-[#0A4D8C]">DocPage AI</span>
           </div>
 

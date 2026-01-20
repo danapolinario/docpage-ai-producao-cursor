@@ -14,6 +14,23 @@ import { AppState, BriefingData, ThemeType, DesignSettings, SectionVisibility, L
 import { generateLandingPageContent, enhancePhoto, generateOfficePhoto, refineLandingPage, sanitizeContent } from './services/gemini';
 import { isAuthenticated, getCurrentUser, onAuthStateChange, signOut } from './services/auth';
 import { createLandingPage, updateLandingPage, publishLandingPage, generateSubdomain, getMyLandingPages } from './services/landing-pages';
+import {
+  initGoogleAnalytics,
+  trackBriefingStart,
+  trackBriefingComplete,
+  trackStyleSelect,
+  trackPhotoUpload,
+  trackPhotoEnhance,
+  trackPreviewView,
+  trackContentEdit,
+  trackPricingView,
+  trackPlanSelect,
+  trackCheckoutStart,
+  trackCheckoutStep,
+  trackPaymentComplete,
+  trackDashboardView,
+  trackPageView as trackGAPageView,
+} from './services/google-analytics';
 
 const INITIAL_DESIGN: DesignSettings = {
   colorPalette: 'blue',
@@ -112,6 +129,13 @@ const App: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [hasAppliedRecommendedTheme, setHasAppliedRecommendedTheme] = useState(false);
 
+  // Inicializar Google Analytics
+  useEffect(() => {
+    initGoogleAnalytics();
+    // Track página inicial
+    trackGAPageView('/', 'DocPage AI - Landing Pages para Médicos');
+  }, []);
+
   // Verificar autenticação ao carregar (sem bloquear o acesso)
   useEffect(() => {
     const checkAuth = async () => {
@@ -139,6 +163,25 @@ const App: React.FC = () => {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Track step changes
+  useEffect(() => {
+    if (state.step === 0) {
+      trackBriefingStart();
+    } else if (state.step === 1) {
+      trackGAPageView('/step/content', 'Configuração de Conteúdo');
+    } else if (state.step === 2) {
+      trackGAPageView('/step/photo', 'Upload de Foto');
+    } else if (state.step === 3) {
+      trackGAPageView('/step/visual', 'Configuração Visual');
+    } else if (state.step === 4) {
+      trackPreviewView();
+      trackGAPageView('/step/editor', 'Editor de Conteúdo');
+    } else if (state.step === 5) {
+      trackPricingView();
+      trackGAPageView('/step/pricing', 'Planos e Preços');
+    }
+  }, [state.step]);
 
   // Salvamento automático removido - landing page só será salva após assinatura e pagamento
 
@@ -197,12 +240,15 @@ const App: React.FC = () => {
   }, [state.step, state.briefing.specialty, hasAppliedRecommendedTheme, updateTheme]);
 
   const updatePhoto = (url: string) => {
-    // Fotos ficam em base64 temporariamente até o pagamento
+    // Quando uma foto é feita upload, apenas salva a foto original
+    // A foto do consultório será gerada apenas quando clicar em "Gerar Landing Page"
+    trackPhotoUpload();
     setState(prev => ({ ...prev, photoUrl: url, aboutPhotoUrl: null, isPhotoAIEnhanced: false }));
   };
 
   const handleUpdateContent = (key: keyof LandingPageContent, value: any) => {
     if (!state.generatedContent) return;
+    trackContentEdit(key);
     setState(prev => ({
       ...prev,
       generatedContent: { ...prev.generatedContent!, [key]: value }
@@ -210,6 +256,9 @@ const App: React.FC = () => {
   };
 
   const handleUpdateDesign = (key: keyof DesignSettings, value: any) => {
+    if (key === 'colorPalette' || key === 'fontPairing' || key === 'photoStyle') {
+      trackStyleSelect(`${key}:${value}`);
+    }
     setState(prev => ({
       ...prev,
       designSettings: { ...prev.designSettings, [key]: value }
@@ -228,18 +277,21 @@ const App: React.FC = () => {
   };
 
   const handleEnhancePhoto = async (originalUrl: string) => {
-    setState(prev => ({ ...prev, isLoading: true, loadingMessage: 'IA está criando suas fotos (Perfil + Consultório)...' }));
+    trackPhotoEnhance();
+    setState(prev => ({ ...prev, isLoading: true, loadingMessage: 'IA está criando suas fotos (Perfil Profissional + Consultório)...' }));
     try {
+      // 1. Melhora a foto de perfil para uma foto profissional de médico/médica com trajes médicos
+      // 2. Gera a foto do consultório com o médico ambientado
       const [enhancedUrl, officeUrl] = await Promise.all([
-        enhancePhoto(originalUrl),
-        generateOfficePhoto(originalUrl)
+        enhancePhoto(originalUrl),  // Foto profissional de perfil
+        generateOfficePhoto(originalUrl)  // Foto ambientada no consultório
       ]);
 
       // Fotos ficam em base64 temporariamente até o pagamento
       setState(prev => ({ 
         ...prev, 
-        photoUrl: enhancedUrl,
-        aboutPhotoUrl: officeUrl, 
+        photoUrl: enhancedUrl,  // Foto profissional de perfil (substitui a original no preview)
+        aboutPhotoUrl: officeUrl,  // Foto do consultório (exibida abaixo)
         isPhotoAIEnhanced: true, 
         isLoading: false 
       }));
@@ -250,8 +302,10 @@ const App: React.FC = () => {
   };
 
   const handleGenerateContentOnly = async () => {
-    setState(prev => ({ ...prev, isLoading: true, loadingMessage: 'Escrevendo o conteúdo da sua Landing Page...' }));
+    trackGAPageView('/step/content/generate', 'Gerando Conteúdo');
+    setState(prev => ({ ...prev, isLoading: true, loadingMessage: 'Gerando conteúdo e foto do consultório...' }));
     try {
+      // Gera o conteúdo da landing page
       const content = await generateLandingPageContent(state.briefing);
       
       const contentWithContact = {
@@ -263,9 +317,22 @@ const App: React.FC = () => {
 
       const sanitizedContent = sanitizeContent(contentWithContact);
 
+      // Se houver foto de perfil mas não houver foto do consultório, gera a foto do consultório
+      let officePhotoUrl = state.aboutPhotoUrl;
+      if (state.photoUrl && !state.aboutPhotoUrl) {
+        try {
+          setState(prev => ({ ...prev, loadingMessage: 'Gerando foto ambientada no consultório...' }));
+          officePhotoUrl = await generateOfficePhoto(state.photoUrl);
+        } catch (error) {
+          console.error('Erro ao gerar foto do consultório:', error);
+          // Continua mesmo se falhar a geração da foto do consultório
+        }
+      }
+
       setState(prev => ({ 
         ...prev, 
         generatedContent: sanitizedContent,
+        aboutPhotoUrl: officePhotoUrl || prev.aboutPhotoUrl,
         isLoading: false 
       }));
     } catch (e) {
@@ -276,37 +343,14 @@ const App: React.FC = () => {
 
   const handleContentApproved = () => {
      // Move to Photo Step
+     trackGAPageView('/step/photo', 'Upload de Foto');
      setState(prev => ({ ...prev, step: 2 }));
   };
 
-  const handlePhotoStepNext = async () => {
-    // Check if Office Photo needs to be generated (user skipped enhancement)
-    if (!state.aboutPhotoUrl && state.photoUrl) {
-       setState(prev => ({ ...prev, isLoading: true, loadingMessage: 'Gerando foto ambientada no consultório...' }));
-       try {
-          const officeUrl = await generateOfficePhoto(state.photoUrl);
-          
-          // Proceed to next step with the new photo
-          finalizePhotoStep(officeUrl);
-       } catch (error) {
-          console.error("Failed to generate lazy office photo:", error);
-          // Proceed even if it fails, maybe use a placeholder logic inside components
-          finalizePhotoStep(null);
-       }
-    } else {
-       finalizePhotoStep(null);
-    }
-  };
-
-  const finalizePhotoStep = (newOfficeUrl: string | null) => {
+  const handlePhotoStepNext = () => {
+    // A foto do consultório será gerada apenas quando clicar em "Gerar Landing Page"
     setState(prev => {
       let nextState = { ...prev, isLoading: false, step: 3 };
-      
-      if (newOfficeUrl) {
-        nextState.aboutPhotoUrl = newOfficeUrl;
-        // We consider it enhanced now regarding context, though profile might be raw
-        nextState.isPhotoAIEnhanced = true; 
-      }
 
       // Initialize with a random layout if not set
       if (prev.layoutVariant === 1) {
@@ -321,6 +365,7 @@ const App: React.FC = () => {
   const handleVisualConfigNext = () => {
      // Move to Editor
      setIsSidebarOpen(false); // Force Sidebar close
+     trackPreviewView();
      setState(prev => ({ ...prev, step: 4 }));
   };
 
@@ -690,7 +735,24 @@ const App: React.FC = () => {
       <header className={`bg-white border-b border-gray-200 z-50 flex-none h-16`}>
         <div className="max-w-7xl mx-auto px-4 w-full h-full flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer group" onClick={handleGoHome}>
-            <div className="w-8 h-8 bg-gradient-to-tr from-blue-600 to-purple-500 rounded-lg shadow-sm group-hover:scale-105 transition-transform"></div>
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-500 rounded-lg shadow-lg shadow-blue-900/20 flex items-center justify-center relative overflow-hidden group-hover:scale-105 transition-transform">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-purple-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <svg className="w-4 h-4 relative z-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <circle cx="8" cy="8" r="1.5" fill="currentColor" opacity="0.9" />
+                <circle cx="16" cy="8" r="1.5" fill="currentColor" opacity="0.9" />
+                <circle cx="12" cy="16" r="1.5" fill="currentColor" opacity="0.9" />
+                <path d="M8 8 L12 16 M16 8 L12 16 M8 8 L16 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
+                <circle cx="6" cy="6" r="0.5" fill="currentColor" opacity="0.7">
+                  <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="18" cy="6" r="0.5" fill="currentColor" opacity="0.7">
+                  <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" begin="0.5s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="12" cy="18" r="0.5" fill="currentColor" opacity="0.7">
+                  <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" begin="1s" repeatCount="indefinite" />
+                </circle>
+              </svg>
+            </div>
             <span className="font-bold text-xl tracking-tight text-gray-800 hidden md:block group-hover:text-blue-600 transition-colors">DocPage AI</span>
           </div>
           

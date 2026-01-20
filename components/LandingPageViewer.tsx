@@ -17,6 +17,7 @@ interface LandingPageData {
   photo_url: string | null;
   about_photo_url: string | null;
   status: string;
+  custom_domain: string | null;
   // SEO fields
   meta_title?: string | null;
   meta_description?: string | null;
@@ -26,11 +27,20 @@ interface LandingPageData {
 
 export const LandingPageViewer: React.FC = () => {
   const { subdomain } = useParams<{ subdomain: string }>();
-  const [landingPage, setLandingPage] = useState<LandingPageData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [landingPage, setLandingPage] = useState<LandingPageData | null>(
+    // Tentar usar dados do SSR se disponíveis
+    (window as any).__LANDING_PAGE_DATA__ || null
+  );
+  const [loading, setLoading] = useState(!(window as any).__LANDING_PAGE_DATA__);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Se já temos dados do SSR, não precisa fazer fetch
+    if ((window as any).__LANDING_PAGE_DATA__) {
+      setLoading(false);
+      return;
+    }
+
     const fetchLandingPage = async () => {
       if (!subdomain) {
         setError('Subdomínio não especificado');
@@ -74,6 +84,7 @@ export const LandingPageViewer: React.FC = () => {
       trackPageView(landingPage.id, {
         user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
         referrer: typeof document !== 'undefined' ? document.referrer || undefined : undefined,
+        subdomain: landingPage.subdomain,
       });
     } catch (err) {
       console.error('Erro ao registrar page_view:', err);
@@ -139,10 +150,12 @@ export const LandingPageViewer: React.FC = () => {
         content={landingPage.content_data}
         subdomain={landingPage.subdomain}
         photoUrl={landingPage.photo_url}
+        aboutPhotoUrl={landingPage.about_photo_url}
         ogImageUrl={landingPage.og_image_url}
         metaTitle={landingPage.meta_title}
         metaDescription={landingPage.meta_description}
         metaKeywords={landingPage.meta_keywords}
+        customDomain={landingPage.custom_domain}
       />
       <Preview
         content={landingPage.content_data}

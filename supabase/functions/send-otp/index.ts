@@ -3,7 +3,8 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,8 +56,17 @@ const handler = async (req: Request): Promise<Response> => {
       .substring(0, 100) || rawEmail.split("@")[0];
 
     // Conectar ao Supabase para armazenar o código
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não configurados");
+      return new Response(
+        JSON.stringify({ error: "Configuração do Supabase ausente. Verifique as variáveis de ambiente." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Simple rate limiting: prevent requesting a new code too frequently per email
@@ -102,9 +112,30 @@ const handler = async (req: Request): Promise<Response> => {
       );
 
     if (dbError) {
-      console.error("Erro ao salvar OTP:", dbError);
+      console.error("Erro ao salvar OTP no banco:", dbError);
+      console.error("Detalhes do erro:", JSON.stringify(dbError, null, 2));
       return new Response(
-        JSON.stringify({ error: "Erro ao gerar código" }),
+        JSON.stringify({ 
+          error: "Erro ao gerar código",
+          details: dbError.message || "Erro ao salvar código no banco de dados. Verifique se a tabela otp_codes existe."
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Verificar se Resend está configurado
+    if (!resend || !RESEND_API_KEY) {
+      console.error("RESEND_API_KEY não configurada");
+      // Remover o OTP recém-criado para não deixar código órfão
+      await supabase
+        .from("otp_codes")
+        .delete()
+        .eq("email", rawEmail);
+      
+      return new Response(
+        JSON.stringify({
+          error: "RESEND_API_KEY não configurada. Configure esta variável no Supabase (Settings > Edge Functions > Secrets).",
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -148,28 +179,46 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     // Resend retorna { data, error }
+    console.log("Resposta completa do Resend:", JSON.stringify(emailResponse, null, 2));
+    
     if (emailResponse?.error) {
-      console.error("Falha ao enviar email:", emailResponse);
-
+      console.error("Falha ao enviar email:", emailResponse.error);
+      
       // Remover o OTP recém-criado para não deixar código órfão
       await supabase
         .from("otp_codes")
         .delete()
         .eq("email", rawEmail);
 
+      const errorMessage = emailResponse.error.message || JSON.stringify(emailResponse.error);
+      
       return new Response(
         JSON.stringify({
-          error:
-            "Envio de email bloqueado pelo provedor (modo teste). Para enviar OTP para qualquer destinatário, verifique um domínio no Resend e use um remetente desse domínio.",
+          error: `Erro ao enviar email: ${errorMessage}. Verifique se o email está verificado no Resend ou configure um domínio.`,
         }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    console.log("Email enviado:", emailResponse);
+    // Verificar se realmente foi enviado
+    const emailId = emailResponse?.data?.id;
+    if (!emailId) {
+      console.warn("Resend retornou sucesso mas sem ID de email. Pode estar em modo teste.");
+      console.warn("Resposta completa:", JSON.stringify(emailResponse, null, 2));
+    }
+
+    console.log("Email enviado com sucesso. ID:", emailId);
+    console.log("Destinatário:", rawEmail);
+    console.log("Código OTP gerado:", otpCode);
 
     return new Response(
-      JSON.stringify({ success: true, message: "Código enviado para " + rawEmail }),
+      JSON.stringify({ 
+        success: true, 
+        message: "Código enviado para " + rawEmail,
+        emailId: emailId,
+        // Em modo teste do Resend, só envia para emails verificados
+        warning: emailId ? undefined : "Email pode não ter sido entregue. Verifique sua caixa de entrada e spam. Em modo teste do Resend, emails só são enviados para endereços verificados na sua conta."
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error: any) {

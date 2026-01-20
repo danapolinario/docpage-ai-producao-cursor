@@ -1,16 +1,27 @@
-import React, { useState } from 'react';
-import { X, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, CheckCircle2, Loader2 } from 'lucide-react';
 
 interface SuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (cpf: string) => void;
   isLoading?: boolean;
+  isRedirecting?: boolean;
 }
 
-export default function SuccessModal({ isOpen, onClose, onSubmit, isLoading = false }: SuccessModalProps) {
+export default function SuccessModal({ isOpen, onClose, onSubmit, isLoading = false, isRedirecting = false }: SuccessModalProps) {
   const [cpf, setCpf] = useState('');
   const [error, setError] = useState('');
+  const [cpfSubmitted, setCpfSubmitted] = useState(false);
+
+  // Resetar estado quando modal abrir
+  useEffect(() => {
+    if (isOpen) {
+      setCpfSubmitted(false);
+      setCpf('');
+      setError('');
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -77,6 +88,7 @@ export default function SuccessModal({ isOpen, onClose, onSubmit, isLoading = fa
     
     // Remove formatação antes de enviar
     const cleanCPF = cpf.replace(/\D/g, '');
+    setCpfSubmitted(true);
     onSubmit(cleanCPF);
   };
 
@@ -99,47 +111,66 @@ export default function SuccessModal({ isOpen, onClose, onSubmit, isLoading = fa
         </div>
 
         {/* Corpo do modal */}
-        <form onSubmit={handleSubmit} className="px-6 py-6">
-          <div className="mb-6">
-            <p className="text-gray-700 text-sm leading-relaxed mb-4">
-              Para finalizar, precisamos do seu <span className="font-semibold">CPF</span> para que o domínio escolhido fique registrado em seu nome.
+        {cpfSubmitted || isRedirecting ? (
+          <div className="px-6 py-8 text-center">
+            <div className="flex justify-center mb-4">
+              <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              CPF salvo com sucesso!
+            </h3>
+            <p className="text-gray-600 text-sm mb-4">
+              Redirecionando para o dashboard...
             </p>
-            
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              CPF
-            </label>
-            <input
-              type="text"
-              value={cpf}
-              onChange={handleCPFChange}
-              placeholder="000.000.000-00"
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
-                error 
-                  ? 'border-red-300 focus:ring-red-500' 
-                  : 'border-gray-300 focus:ring-blue-500'
-              }`}
-              disabled={isLoading}
-              autoFocus
-            />
-            {error && (
-              <p className="mt-2 text-sm text-red-600">{error}</p>
-            )}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+              <p className="text-xs text-blue-800">
+                Aguarde enquanto preparamos seu painel de controle.
+              </p>
+            </div>
           </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="px-6 py-6">
+            <div className="mb-6">
+              <p className="text-gray-700 text-sm leading-relaxed mb-4">
+                Para finalizar, precisamos do seu <span className="font-semibold">CPF</span> para que o domínio escolhido fique registrado em seu nome.
+              </p>
+              
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                CPF
+              </label>
+              <input
+                type="text"
+                value={cpf}
+                onChange={handleCPFChange}
+                placeholder="000.000.000-00"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
+                  error 
+                    ? 'border-red-300 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-blue-500'
+                }`}
+                disabled={isLoading}
+                autoFocus
+              />
+              {error && (
+                <p className="mt-2 text-sm text-red-600">{error}</p>
+              )}
+            </div>
 
-          <div className="flex gap-3">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
-            >
-              {isLoading ? 'Salvando...' : 'Continuar'}
-            </button>
-          </div>
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+              >
+                {isLoading ? 'Salvando...' : 'Continuar'}
+              </button>
+            </div>
 
-          <p className="text-xs text-gray-500 text-center mt-4">
-            Seus dados estão protegidos e serão usados apenas para fins de registro do domínio.
-          </p>
-        </form>
+            <p className="text-xs text-gray-500 text-center mt-4">
+              Seus dados estão protegidos e serão usados apenas para fins de registro do domínio.
+            </p>
+          </form>
+        )}
       </div>
     </div>
   );

@@ -43,6 +43,7 @@ export const PricingPage: React.FC<Props> = ({
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [confirmedDomain, setConfirmedDomain] = useState('');
   const [checkoutData, setCheckoutData] = useState<{ landingPageId: string; landingPageUrl: string; domain: string } | null>(null);
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('annual');
 
   // Se landingPageId for fornecido externamente (ex: após login), usar ele
   useEffect(() => {
@@ -84,6 +85,11 @@ export const PricingPage: React.FC<Props> = ({
   };
 
   const handleSelectPlan = (plan: Plan) => {
+    // Importar e usar trackPlanSelect e trackCheckoutStart
+    import('../services/google-analytics').then(({ trackPlanSelect, trackCheckoutStart }) => {
+      trackPlanSelect(plan.name, plan.price);
+      trackCheckoutStart(plan.name);
+    });
     setSelectedPlan(plan);
     setViewMode('checkout');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -92,68 +98,17 @@ export const PricingPage: React.FC<Props> = ({
   const handleCheckoutSuccess = async (data: { landingPageId: string; landingPageUrl: string; domain: string }) => {
     console.log('Checkout success - Dados recebidos:', data);
     
-    // Garantir que sessão está ativa antes de ir para dashboard
-    try {
-      // Refresh da sessão
-      console.log('Refreshing session após checkout...');
-      const { data: { session: refreshResult }, error: refreshError } = await supabase.auth.refreshSession();
-      
-      if (refreshError) {
-        console.error('Erro ao refresh da sessão:', refreshError);
-      }
-      
-      if (!refreshResult) {
-        console.warn('Refresh da sessão retornou null');
-      }
-      
-      // Aguardar mais tempo para garantir que sessão está sincronizada
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Verificar se está autenticado
-      const { data: { user }, error: getUserError } = await supabase.auth.getUser();
-      if (!user || !user.id) {
-        console.error('Erro: Usuário não autenticado após checkout', getUserError);
-        alert('Erro na autenticação. Por favor, faça login novamente.');
-        return;
-      }
-      
-      console.log('Usuário autenticado após checkout:', {
-        userId: user.id,
-        email: user.email
-      });
-      
-      // Verificar sessão também
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.warn('Sessão não disponível após refresh');
-        // Tentar mais uma vez
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const { data: { session: retrySession } } = await supabase.auth.getSession();
-        if (!retrySession) {
-          console.error('Sessão ainda não disponível após retry');
-          alert('Erro ao manter sessão. Por favor, faça login novamente.');
-          return;
-        }
-      }
-      
-      console.log('Sessão verificada com sucesso após checkout');
-    } catch (error: any) {
-      console.error('Erro ao verificar autenticação após checkout:', error);
-      alert('Erro ao manter sessão. Por favor, faça login novamente.');
-      return;
-    }
-    
     setConfirmedDomain(data.domain);
     setCheckoutData(data);
     
-    // Aguardar mais um pouco antes de mudar para dashboard para garantir que tudo está sincronizado
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
+    // Redirecionar imediatamente para dashboard (sem delays desnecessários)
+    // A verificação de sessão pode ser feita no dashboard se necessário
     setViewMode('dashboard');
     
     // Notificar App.tsx sobre sucesso do checkout
     onCheckoutSuccess?.(data);
     
+    // Scroll suave para o topo
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -174,21 +129,27 @@ export const PricingPage: React.FC<Props> = ({
     { title: 'Mobile First', desc: 'Perfeito em todos os celulares', icon: '📱' },
   ];
 
+  // Preços base (mensais)
+  const planPrices = {
+    starter: { monthly: 147, annual: 97 },
+    pro: { monthly: 297, annual: 197 },
+    authority: { monthly: null, annual: null }
+  };
+
   const plans: Plan[] = [
     {
       id: 'starter',
       name: 'Starter',
-      price: 'R$ 97',
-      oldPrice: 'R$ 147',
-      rawPrice: 97,
+      price: billingPeriod === 'annual' ? 'R$ 97' : 'R$ 147',
+      oldPrice: billingPeriod === 'annual' ? 'R$ 147' : undefined,
+      rawPrice: billingPeriod === 'annual' ? 97 : 147,
       period: '/mês',
       description: 'Para quem está começando e quer presença digital rápida.',
       features: [
         'Hospedagem inclusa',
         'Domínio .com.br grátis (1 ano)',
         'Botão WhatsApp',
-        'Integração com avaliações do Google',
-        'Dashboard básico de resultados'
+        'Estatísticas de acesso'
       ],
       cta: 'Começar Agora',
       popular: false,
@@ -197,18 +158,17 @@ export const PricingPage: React.FC<Props> = ({
     {
       id: 'pro',
       name: 'Profissional',
-      price: 'R$ 197',
-      oldPrice: 'R$ 297',
-      rawPrice: 197,
+      price: billingPeriod === 'annual' ? 'R$ 197' : 'R$ 297',
+      oldPrice: billingPeriod === 'annual' ? 'R$ 297' : undefined,
+      rawPrice: billingPeriod === 'annual' ? 197 : 297,
       period: '/mês',
       description: 'Para especialistas que buscam autoridade e agendamentos.',
       features: [
-        'Tudo do plano Starter',
-        'SEO Otimizado (Google)',
-        'Integração Doctoralia',
+        'Tudo do Starter',
+        'Estatísticas de acesso avançadas',
+        'Plano estratégico para otimizar resultados',
         'Email Profissional',
-        'Dashboard avançado de resultados',
-        'Pacote de postagens semanais para redes sociais'
+        'Posts semanais (Redes Sociais)'
       ],
       cta: 'Assinar Profissional',
       popular: true,
@@ -224,10 +184,10 @@ export const PricingPage: React.FC<Props> = ({
       description: 'Para profissionais que são referência e buscam presença sólida.',
       features: [
         'Tudo do Profissional',
-        'Customização Visual Expert',
+        'Customização humana',
         'Gestão de Tráfego (Ads)',
         'Consultoria Mensal',
-        'Posts diários (Redes Sociais)'
+        'Posts sob demanda (Redes Sociais)'
       ],
       cta: 'Falar com Consultor',
       popular: false,
@@ -424,7 +384,35 @@ export const PricingPage: React.FC<Props> = ({
       </div>
 
       <div id="plans-section" className="max-w-7xl mx-auto px-4 mt-16 relative z-30">
-        <h2 className="text-3xl font-bold text-center text-gray-800 mb-12">Escolha seu plano</h2>
+        <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">Escolha seu plano</h2>
+        
+        {/* Billing Period Toggle */}
+        <div className="flex items-center justify-center gap-4 mb-12">
+          <span className={`text-sm font-medium ${billingPeriod === 'monthly' ? 'text-gray-900' : 'text-gray-400'}`}>
+            Mensal
+          </span>
+          <button
+            onClick={() => setBillingPeriod(billingPeriod === 'monthly' ? 'annual' : 'monthly')}
+            className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors ${
+              billingPeriod === 'annual' ? 'bg-blue-600' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                billingPeriod === 'annual' ? 'translate-x-9' : 'translate-x-1'
+              }`}
+            />
+          </button>
+          <span className={`text-sm font-medium ${billingPeriod === 'annual' ? 'text-gray-900' : 'text-gray-400'}`}>
+            Anual
+            {billingPeriod === 'annual' && (
+              <span className="ml-2 inline-block bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded">
+                Economize até 34%
+              </span>
+            )}
+          </span>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
           {plans.map((plan) => (
             <div 
@@ -441,12 +429,19 @@ export const PricingPage: React.FC<Props> = ({
               <p className="text-xs text-slate-500 mb-6 h-8">{plan.description}</p>
               
               <div className="mb-6">
-                {plan.oldPrice && <span className="text-xs text-red-400 font-bold line-through block">De {plan.oldPrice}</span>}
+                {plan.oldPrice && (
+                  <div className="mb-2">
+                    <span className="text-xs text-red-400 font-bold line-through block">De {plan.oldPrice}</span>
+                    <span className="text-xs text-gray-500">Por</span>
+                  </div>
+                )}
                 <div className="flex items-baseline">
-                  {plan.oldPrice && <span className="text-sm font-bold text-gray-500 mr-1">Por</span>}
                   <span className="text-4xl font-extrabold text-slate-900">{plan.price}</span>
                   <span className="text-slate-500 ml-1">{plan.period}</span>
                 </div>
+                {billingPeriod === 'annual' && plan.id !== 'authority' && (
+                  <span className="text-xs text-gray-500 mt-1 block">(plano anual)</span>
+                )}
               </div>
               
               <ul className="space-y-4 mb-8 flex-1">

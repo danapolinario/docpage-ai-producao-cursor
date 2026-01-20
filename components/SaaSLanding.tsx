@@ -157,17 +157,42 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
   // --- Marquee Logic (Move on Scroll Only) ---
   useEffect(() => {
     let scrollTimeout: ReturnType<typeof setTimeout>;
+    let lastScrollY = window.scrollY;
+    let lastScrollTime = Date.now();
+    const baseDuration = 10; // Duração base em segundos (mais rápido = menor duração)
+    const minDuration = 10; // Duração mínima (velocidade máxima)
+    const maxDuration = 10; // Duração máxima (velocidade mínima/pausada)
 
     // Initialize as paused
     if (marqueeRef.current) {
       marqueeRef.current.style.animationPlayState = 'paused';
+      marqueeRef.current.style.animationDuration = `${maxDuration}s`;
     }
 
     const handleScroll = () => {
-      // Play animation on scroll
-      if (marqueeRef.current) {
+      const currentScrollY = window.scrollY;
+      const currentTime = Date.now();
+      const timeDelta = currentTime - lastScrollTime;
+      const scrollDelta = Math.abs(currentScrollY - lastScrollY);
+      
+      // Calcular velocidade do scroll (pixels por segundo)
+      const scrollVelocity = timeDelta > 0 ? scrollDelta / (timeDelta / 1000) : 0;
+      
+      // Aumentar velocidade baseada na velocidade do scroll
+      // Scroll rápido = animação mais rápida (menor duração)
+      // Scroll lento = animação mais lenta (maior duração)
+      if (marqueeRef.current && scrollVelocity > 0) {
+        // Normalizar velocidade (ajustar esses valores conforme necessário)
+        // Velocidade de 0-500px/s mapeia para duração de 20s a 5s
+        const normalizedVelocity = Math.min(scrollVelocity / 500, 1); // Limitar entre 0 e 1
+        const newDuration = maxDuration - (normalizedVelocity * (maxDuration - minDuration));
+        
+        marqueeRef.current.style.animationDuration = `${newDuration}s`;
         marqueeRef.current.style.animationPlayState = 'running';
       }
+
+      lastScrollY = currentScrollY;
+      lastScrollTime = currentTime;
 
       clearTimeout(scrollTimeout);
       
@@ -175,6 +200,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
       scrollTimeout = setTimeout(() => {
         if (marqueeRef.current) {
           marqueeRef.current.style.animationPlayState = 'paused';
+          marqueeRef.current.style.animationDuration = `${maxDuration}s`; // Reset para velocidade normal
         }
       }, 150);
     };
@@ -322,7 +348,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
       period: '/mês',
       periodDetail: '(plano anual)',
       description: 'Para quem está começando e quer presença digital rápida.',
-      features: ['Hospedagem inclusa', 'Domínio .com.br grátis (1 ano)', 'Botão WhatsApp', 'Integração Google Reviews', 'Dashboard básico'],
+      features: ['Hospedagem inclusa', 'Domínio .com.br grátis (1 ano)', 'Botão WhatsApp', 'Estatísticas de acesso'],
       highlight: false,
       color: 'border-slate-200',
       cta: 'Escolher Plano',
@@ -335,7 +361,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
       period: '/mês',
       periodDetail: '(plano anual)',
       description: 'Para especialistas que buscam autoridade e agendamentos.',
-      features: ['Tudo do Starter', 'SEO Otimizado (Google)', 'Integração Doctoralia', 'Email Profissional', 'Posts semanais (Redes Sociais)'],
+      features: ['Tudo do Starter', 'Estatísticas de acesso avançadas', 'Plano estratégico para otimizar resultados', 'Email Profissional', 'Posts semanais (Redes Sociais)'],
       highlight: true,
       color: 'border-blue-500 ring-2 ring-blue-500 shadow-xl',
       cta: 'Escolher Plano',
@@ -347,7 +373,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
       period: '',
       periodDetail: '',
       description: 'Para profissionais que são referência e buscam presença sólida.',
-      features: ['Tudo do Profissional', 'Customização Visual Expert', 'Gestão de Tráfego (Ads)', 'Consultoria Mensal', 'Posts diários (Redes Sociais)'],
+      features: ['Tudo do Profissional', 'Customização humana', 'Gestão de Tráfego (Ads)', 'Consultoria Mensal', 'Posts sob demanda (Redes Sociais)'],
       highlight: false,
       color: 'border-slate-200',
       cta: 'Falar com Consultor',
@@ -479,7 +505,24 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
 
         <nav className="relative z-50 max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.reload()}>
-            <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-blue-600 rounded-lg"></div>
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-500 rounded-lg shadow-lg shadow-blue-900/20 flex items-center justify-center relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-purple-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <svg className="w-4 h-4 relative z-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <circle cx="8" cy="8" r="1.5" fill="currentColor" opacity="0.9" />
+                <circle cx="16" cy="8" r="1.5" fill="currentColor" opacity="0.9" />
+                <circle cx="12" cy="16" r="1.5" fill="currentColor" opacity="0.9" />
+                <path d="M8 8 L12 16 M16 8 L12 16 M8 8 L16 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
+                <circle cx="6" cy="6" r="0.5" fill="currentColor" opacity="0.7">
+                  <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="18" cy="6" r="0.5" fill="currentColor" opacity="0.7">
+                  <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" begin="0.5s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="12" cy="18" r="0.5" fill="currentColor" opacity="0.7">
+                  <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" begin="1s" repeatCount="indefinite" />
+                </circle>
+              </svg>
+            </div>
             <span className="font-bold text-xl tracking-tight">DocPage AI</span>
           </div>
           
@@ -603,7 +646,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
          <div 
            ref={marqueeRef}
            className="flex gap-8 whitespace-nowrap animate-scroll-x"
-           style={{ animationDuration: '20s', animationPlayState: 'paused' }} // Default to paused
+           style={{ animationDuration: '20s', animationPlayState: 'paused' }} // Será ajustado dinamicamente no scroll
          >
             {[...specialtiesList, ...specialtiesList, ...specialtiesList].map((spec, i) => (
                <span key={i} className="text-white text-xs font-bold uppercase tracking-widest flex items-center gap-8">

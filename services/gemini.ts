@@ -25,11 +25,30 @@ export const enhancePhoto = async (base64Image: string): Promise<string> => {
 
     if (error) {
       console.error('Erro na IA ao melhorar foto de perfil:', error);
+      console.error('Detalhes do erro:', JSON.stringify(error, null, 2));
       return base64Image;
     }
 
+    console.log('Resposta do photo-enhance (profile):', data);
+    
+    // Verifica se há erro na resposta
+    if (data?.error) {
+      console.error('Erro na resposta:', data.error);
+      return base64Image;
+    }
+
+    // Verifica se há warning (retornou imagem original)
+    if (data?.warning) {
+      console.warn('Aviso:', data.warning);
+    }
+
     const enhanced = (data as any)?.image as string | undefined;
-    return enhanced || base64Image;
+    if (!enhanced) {
+      console.warn('Nenhuma imagem retornada, usando original');
+      return base64Image;
+    }
+    
+    return enhanced;
   } catch (err) {
     console.error('Erro inesperado em enhancePhoto:', err);
     return base64Image;
@@ -44,11 +63,30 @@ export const generateOfficePhoto = async (base64Image: string): Promise<string> 
 
     if (error) {
       console.error('Erro na IA ao gerar foto de consultório:', error);
+      console.error('Detalhes do erro:', JSON.stringify(error, null, 2));
       return base64Image;
     }
 
+    console.log('Resposta do photo-enhance (office):', data);
+    
+    // Verifica se há erro na resposta
+    if (data?.error) {
+      console.error('Erro na resposta:', data.error);
+      return base64Image;
+    }
+
+    // Verifica se há warning (retornou imagem original)
+    if (data?.warning) {
+      console.warn('Aviso:', data.warning);
+    }
+
     const office = (data as any)?.image as string | undefined;
-    return office || base64Image;
+    if (!office) {
+      console.warn('Nenhuma imagem retornada, usando original');
+      return base64Image;
+    }
+    
+    return office;
   } catch (err) {
     console.error('Erro inesperado em generateOfficePhoto:', err);
     return base64Image;

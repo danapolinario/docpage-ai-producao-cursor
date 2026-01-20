@@ -103,6 +103,9 @@ export const Dashboard: React.FC<Props> = ({
 
   // Carregar dados do backend se landingPageId for fornecido
   useEffect(() => {
+    // Track dashboard view
+    trackDashboardView();
+    
     if (landingPageId) {
       setIsLoading(true);
       setError(null);

@@ -81,19 +81,27 @@ export async function checkIsAdmin(): Promise<boolean> {
 
 /**
  * Obter todas as landing pages (admin only)
+ * SOLUÇÃO DEFINITIVA: Usa supabase.functions.invoke() que adiciona headers automaticamente
  */
 export async function getAllLandingPages(): Promise<LandingPageWithUser[]> {
-  const { data, error } = await supabase
-    .from('landing_pages')
-    .select('*')
-    .order('created_at', { ascending: false });
+  // Obter usuário atual
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !user) {
+    throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
+  }
+
+  // Usar supabase.functions.invoke() que adiciona headers automaticamente
+  const { data, error } = await supabase.functions.invoke('admin-get-pages', {
+    body: { userId: user.id },
+  });
 
   if (error) {
     console.error('Error fetching landing pages:', error);
-    throw error;
+    throw new Error(error.message || 'Erro ao buscar landing pages');
   }
 
-  return data || [];
+  return (data as any)?.data || [];
 }
 
 /**
@@ -103,21 +111,21 @@ export async function updateLandingPageStatus(
   landingPageId: string, 
   status: LandingPageStatus
 ): Promise<void> {
-  const updateData: any = { status };
+  // Obter usuário atual
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
   
-  // Se está publicando, adicionar published_at
-  if (status === 'published') {
-    updateData.published_at = new Date().toISOString();
+  if (userError || !user) {
+    throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
   }
-  
-  const { error } = await supabase
-    .from('landing_pages')
-    .update(updateData)
-    .eq('id', landingPageId);
+
+  // Usar supabase.functions.invoke() que adiciona headers automaticamente
+  const { error } = await supabase.functions.invoke('admin-update-status', {
+    body: { userId: user.id, landingPageId, status },
+  });
 
   if (error) {
     console.error('Error updating landing page status:', error);
-    throw error;
+    throw new Error(error.message || 'Erro ao atualizar status');
   }
 
   // Ao publicar, dispara email automático avisando que o site está no ar
@@ -141,14 +149,8 @@ export async function updateLandingPageStatus(
  * Obter estatísticas do admin
  */
 export async function getAdminStats() {
-  const { data: landingPages, error } = await supabase
-    .from('landing_pages')
-    .select('id, status, created_at');
-
-  if (error) {
-    console.error('Error fetching stats:', error);
-    throw error;
-  }
+  // Usar getAllLandingPages que já bypassa RLS
+  const landingPages = await getAllLandingPages();
 
   const total = landingPages?.length || 0;
   const published = landingPages?.filter(lp => lp.status === 'published').length || 0;

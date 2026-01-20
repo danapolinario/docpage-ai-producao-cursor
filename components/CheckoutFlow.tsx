@@ -5,6 +5,7 @@ import { sendOTP, verifyCode, resendOTP } from '../services/auth';
 import { checkDomainAvailability, updateLandingPage } from '../services/landing-pages';
 import SuccessModal from './SuccessModal';
 import { supabase } from '../lib/supabase';
+import { trackCheckoutStep, trackPaymentComplete } from '../services/google-analytics';
 
 interface Props {
   plan: Plan;
@@ -39,6 +40,7 @@ export const CheckoutFlow: React.FC<Props> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [pendingSuccess, setPendingSuccess] = useState<{
     landingPageId: string;
     landingPageUrl: string;
@@ -140,6 +142,7 @@ export const CheckoutFlow: React.FC<Props> = ({
       return;
     }
 
+    trackCheckoutStep(1, 'Enviando código OTP');
     setIsSendingCode(true);
     setError(null);
     setEmailError('');
@@ -176,6 +179,7 @@ export const CheckoutFlow: React.FC<Props> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setIsAuthenticated(true);
+        trackCheckoutStep(2, 'Autenticação concluída');
         setCurrentStep(2);
       } else {
         // Aguardar um pouco e verificar novamente
@@ -183,6 +187,7 @@ export const CheckoutFlow: React.FC<Props> = ({
         const { data: { user: retryUser } } = await supabase.auth.getUser();
         if (retryUser) {
           setIsAuthenticated(true);
+          trackCheckoutStep(2, 'Autenticação concluída');
           setCurrentStep(2);
         } else {
           setError('Código verificado, mas não foi possível autenticar. Por favor, tente novamente.');
@@ -346,6 +351,9 @@ export const CheckoutFlow: React.FC<Props> = ({
         // Gerar URL completa do domínio (subdomínio + extensão)
         const fullDomain = `${selectedDomain}${domainExtension}`;
         
+        // Track pagamento completo
+        trackPaymentComplete(plan.name, plan.rawPrice);
+        
         // Mostrar modal de sucesso antes de redirecionar
         setPendingSuccess({
           landingPageId: result.landingPageId,
@@ -387,9 +395,13 @@ export const CheckoutFlow: React.FC<Props> = ({
         throw new Error('Erro ao salvar CPF. Tente novamente.');
       }
       
-      // Fechar modal e redirecionar
+      // CPF salvo com sucesso - redirecionar imediatamente sem fechar modal
+      // A modal continuará aberta mostrando mensagem de redirecionamento
       setIsLoading(false);
-      setShowSuccessModal(false);
+      setIsRedirecting(true);
+      
+      // Redirecionar para dashboard o mais rápido possível
+      // Não fechar modal - ela mostrará mensagem de redirecionamento
       onSuccess(pendingSuccess);
     } catch (err: any) {
       console.error('Erro ao salvar CPF:', err);
@@ -750,7 +762,10 @@ export const CheckoutFlow: React.FC<Props> = ({
 
                   {isDomainAvailable === true && (
                     <button
-                      onClick={() => setCurrentStep(3)}
+                      onClick={() => {
+                        trackCheckoutStep(3, 'Dados de pagamento');
+                        setCurrentStep(3);
+                      }}
                       className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 mt-4"
                     >
                       Continuar para Pagamento →
@@ -877,6 +892,7 @@ export const CheckoutFlow: React.FC<Props> = ({
         onClose={() => {}}
         onSubmit={handleCPFSubmit}
         isLoading={isLoading}
+        isRedirecting={isRedirecting}
       />
     </div>
   );

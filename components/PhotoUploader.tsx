@@ -3,7 +3,7 @@ import React, { useRef, useState, useEffect } from 'react';
 interface Props {
   photoUrl: string | null;
   aboutPhotoUrl?: string | null; // Added prop for secondary photo
-  onPhotoChange: (url: string) => void;
+  onPhotoChange: (url: string) => void | Promise<void>;
   onEnhance: (originalUrl: string) => void;
   isEnhanced: boolean;
   onNext: () => void;
@@ -243,16 +243,20 @@ export const PhotoUploader: React.FC<Props> = ({
                    </button>
                  </div>
 
-                 {/* Secondary "Office" Photo Preview */}
+                 {/* Secondary "Office" Photo Preview - Mostra quando "Melhorar com IA" foi clicado */}
                  {isEnhanced && aboutPhotoUrl && (
-                    <div className="relative w-full aspect-[3/4] max-w-[200px] mx-auto opacity-90 hover:opacity-100 transition-opacity">
-                      <img 
-                        src={aboutPhotoUrl} 
-                        alt="Office Context" 
-                        className="w-full h-full object-cover rounded-lg shadow-sm border-2 border-white grayscale-[30%] hover:grayscale-0 transition-all"
-                      />
-                      <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded backdrop-blur-sm">
-                        Foto Consultório
+                    <div className="mt-4 space-y-2">
+                      <p className="text-xs text-gray-500 text-center font-medium">Foto do Consultório</p>
+                      <div className="relative w-full aspect-[3/4] max-w-[200px] mx-auto">
+                        <img 
+                          src={aboutPhotoUrl} 
+                          alt="Consultório Médico" 
+                          className="w-full h-full object-cover rounded-lg shadow-md border-4 border-white"
+                        />
+                        <div className="absolute top-2 right-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
+                          Consultório IA
+                        </div>
                       </div>
                     </div>
                  )}

@@ -79,12 +79,18 @@ export async function trackPageView(
     referrer?: string;
     country?: string;
     city?: string;
+    subdomain?: string;
   }
 ): Promise<void> {
   // Também atualizar view_count na landing_page
   try {
     // Registrar evento primeiro
     await trackEvent(landingPageId, 'page_view', undefined, metadata);
+    
+    // Enviar para Google Analytics
+    if (metadata?.subdomain) {
+      trackGAPageView(landingPageId, metadata.subdomain);
+    }
     
     // Atualizar contador na landing_page
     // Primeiro obter valor atual
@@ -133,6 +139,21 @@ export async function trackClick(
     },
     metadata
   );
+  
+  // Enviar para Google Analytics
+  trackGAClick(landingPageId, action, section);
+  
+  // Detectar tipo específico de clique
+  if (action.toLowerCase().includes('whatsapp') || action.toLowerCase().includes('wa')) {
+    const phone = metadata?.ip_address; // Pode ser ajustado para pegar o telefone real
+    trackGAWhatsApp(landingPageId, phone);
+  } else if (action.toLowerCase().includes('telefone') || action.toLowerCase().includes('phone') || action.toLowerCase().includes('ligar')) {
+    const phone = metadata?.ip_address; // Pode ser ajustado para pegar o telefone real
+    trackGAPhone(landingPageId, phone);
+  } else if (action.toLowerCase().includes('email') || action.toLowerCase().includes('mail')) {
+    const email = metadata?.ip_address; // Pode ser ajustado para pegar o email real
+    trackGAEmail(landingPageId, email);
+  }
 }
 
 /**
