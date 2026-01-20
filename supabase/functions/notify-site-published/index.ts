@@ -93,7 +93,7 @@ const handler = async (req: Request): Promise<Response> => {
     const doctorName = briefing.name || "Doutor(a)";
 
     const emailResponse = await resend.emails.send({
-      from: "DocPage AI <noreply@resend.dev>",
+      from: "DocPage AI <noreply@docpage.com.br>",
       to: [toEmail],
       subject: "Seu site está no ar!",
       html: `

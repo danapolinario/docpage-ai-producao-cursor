@@ -27,7 +27,7 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   metaKeywords,
   customDomain,
 }) => {
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://docpageai.lovable.app';
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://docpage.com.br';
   const pageUrl = customDomain 
     ? `https://${customDomain}` 
     : `${baseUrl}/${subdomain}`;

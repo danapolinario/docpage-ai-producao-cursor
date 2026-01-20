@@ -890,7 +890,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
                   <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
                   <div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>
                   <div className="ml-4 h-4 bg-white rounded-sm w-32 opacity-50 text-[8px] flex items-center px-2 text-slate-400">
-                    docpage.ai/preview
+                    docpage.com.br/preview
                   </div>
                 </div>
                 <div className="relative h-64 overflow-hidden">
@@ -1001,7 +1001,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
              <h4 className="font-bold text-white mb-6 uppercase tracking-wider text-xs">Contato</h4>
              <ul className="space-y-3">
                <li className="flex items-center gap-3">
-                 <span className="text-slate-600 bg-slate-800 p-1.5 rounded">✉</span> suporte@docpage.ai
+                 <span className="text-slate-600 bg-slate-800 p-1.5 rounded">✉</span> suporte@docpage.com.br
                </li>
                <li className="flex items-center gap-3">
                  <span className="text-slate-600 bg-slate-800 p-1.5 rounded">📍</span> São Paulo, SP

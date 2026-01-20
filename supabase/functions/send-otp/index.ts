@@ -142,7 +142,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Enviar email com Resend
     const emailResponse = await resend.emails.send({
-      from: "DocPage AI <noreply@resend.dev>",
+      from: "DocPage AI <noreply@docpage.com.br>",
       to: [rawEmail],
       subject: "Seu código de verificação - DocPage AI",
       html: `
