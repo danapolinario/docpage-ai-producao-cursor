@@ -6,6 +6,7 @@ import { initGoogleAnalytics } from './services/google-analytics';
 import App from './App';
 import { AdminPage } from './components/AdminPage';
 import { LandingPageViewer } from './components/LandingPageViewer';
+import { DashboardPage } from './components/DashboardPage';
 
 // Inicializar Google Analytics
 initGoogleAnalytics();
@@ -22,6 +23,7 @@ root.render(
       <BrowserRouter>
         <Routes>
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/:subdomain" element={<LandingPageViewer />} />
           <Route path="/" element={<App />} />
         </Routes>
