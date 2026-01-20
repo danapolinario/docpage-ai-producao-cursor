@@ -183,6 +183,7 @@ const handler = async (req: Request): Promise<Response> => {
     
     if (emailResponse?.error) {
       console.error("Falha ao enviar email:", emailResponse.error);
+      console.error("Detalhes completos do erro:", JSON.stringify(emailResponse.error, null, 2));
       
       // Remover o OTP recém-criado para não deixar código órfão
       await supabase
@@ -191,10 +192,29 @@ const handler = async (req: Request): Promise<Response> => {
         .eq("email", rawEmail);
 
       const errorMessage = emailResponse.error.message || JSON.stringify(emailResponse.error);
+      const errorName = emailResponse.error.name || '';
+      
+      // Mensagens de erro mais específicas
+      let userFriendlyMessage = errorMessage;
+      
+      if (errorName === 'restricted_to_test_environment' || errorMessage?.includes('test mode') || errorMessage?.includes('modo teste')) {
+        userFriendlyMessage = `Envio de email bloqueado pelo provedor (modo teste). Para enviar OTP para qualquer destinatário, verifique um domínio no Resend (docpage.com.br) e use um remetente desse domínio (noreply@docpage.com.br). Verifique se o domínio está verificado em https://resend.com/domains`;
+      } else if (errorMessage?.includes('domain') || errorMessage?.includes('domínio')) {
+        userFriendlyMessage = `Erro de domínio: ${errorMessage}. Verifique se docpage.com.br está verificado no Resend e se noreply@docpage.com.br é um remetente autorizado.`;
+      } else if (errorMessage?.includes('unauthorized') || errorMessage?.includes('403')) {
+        userFriendlyMessage = `Erro de autorização (403): O domínio docpage.com.br pode não estar completamente verificado no Resend. Verifique os registros DNS e o status do domínio em https://resend.com/domains`;
+      }
       
       return new Response(
         JSON.stringify({
-          error: `Erro ao enviar email: ${errorMessage}. Verifique se o email está verificado no Resend ou configure um domínio.`,
+          error: userFriendlyMessage,
+          details: errorMessage,
+          errorName: errorName,
+          debugInfo: {
+            from: "noreply@docpage.com.br",
+            to: rawEmail,
+            suggestion: "Verifique: 1) Se docpage.com.br está verificado no Resend, 2) Se os registros DNS estão configurados corretamente, 3) Se noreply@docpage.com.br é um remetente autorizado"
+          }
         }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
