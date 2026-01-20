@@ -5,6 +5,7 @@ import { Preview } from './Preview';
 import { getDashboardData, DashboardData } from '../services/dashboard';
 import { updateLandingPage } from '../services/landing-pages';
 import { supabase } from '../lib/supabase';
+import { trackDashboardView } from '../services/google-analytics';
 
 interface Props {
   doctorName: string;

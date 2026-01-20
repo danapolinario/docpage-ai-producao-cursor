@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Confetti } from './common/Confetti';
 
 interface Props {
@@ -136,6 +137,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ step, index, isLast, onVisi
 };
 
 export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLoginClick, isAuthenticated, onLogout }) => {
+  const navigate = useNavigate();
   const [activeModal, setActiveModal] = useState<'none' | 'terms' | 'privacy'>('none');
   const [showDevMenu, setShowDevMenu] = useState(false);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
@@ -563,7 +565,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
              {isAuthenticated ? (
                 <>
                   <button 
-                    onClick={onStart} 
+                    onClick={() => navigate('/dashboard')} 
                     className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-full transition-colors"
                   >
                     Meu Painel
