@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Preview } from './Preview';
 import { LandingPageContent, DesignSettings, SectionVisibility, BriefingData, LayoutVariant, Plan } from '../types';
 import { CheckoutFlow } from './CheckoutFlow';
@@ -39,6 +40,7 @@ export const PricingPage: React.FC<Props> = ({
   landingPageId,
   onCheckoutSuccess
 }) => {
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<'plans' | 'checkout' | 'success' | 'dashboard'>(initialViewMode);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [confirmedDomain, setConfirmedDomain] = useState('');
@@ -118,8 +120,7 @@ export const PricingPage: React.FC<Props> = ({
   };
   
   const handleGoToDashboard = () => {
-    setViewMode('dashboard');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigate('/dashboard');
   };
 
   const checklistItems = [
