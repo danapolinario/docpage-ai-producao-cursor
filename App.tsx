@@ -125,6 +125,7 @@ const App: React.FC = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [isAuthenticatedUser, setIsAuthenticatedUser] = useState<boolean | null>(null);
   const [currentLandingPageId, setCurrentLandingPageId] = useState<string | null>(null);
+  const [isCreatingLandingPage, setIsCreatingLandingPage] = useState(false); // Flag para evitar redirecionamentos durante criação
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [hasAppliedRecommendedTheme, setHasAppliedRecommendedTheme] = useState(false);
@@ -348,6 +349,9 @@ const App: React.FC = () => {
   };
 
   const handlePhotoStepNext = () => {
+    // Marcar que está criando landing page para evitar redirecionamentos automáticos
+    setIsCreatingLandingPage(true);
+    
     // A foto do consultório será gerada apenas quando clicar em "Gerar Landing Page"
     setState(prev => {
       let nextState = { ...prev, isLoading: false, step: 3 };
@@ -416,6 +420,7 @@ const App: React.FC = () => {
     setViewMode('desktop');
     setIsSidebarOpen(true);
     setHasAppliedRecommendedTheme(false);
+    setIsCreatingLandingPage(false); // Resetar flag ao reiniciar
   };
   
   const handleGoHome = () => {
@@ -424,6 +429,7 @@ const App: React.FC = () => {
     setIsSidebarOpen(true);
     setShowSaaSIntro(true);
     setHasAppliedRecommendedTheme(false);
+    setIsCreatingLandingPage(false); // Resetar flag ao voltar para home
   };
 
   const handleLogout = async () => {
@@ -470,7 +476,12 @@ const App: React.FC = () => {
       // Aguardar mais um pouco após refresh
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Verificar se o usuário tem landing pages
+      // Verificar se o usuário tem landing pages (apenas se não estiver criando uma nova)
+      if (isCreatingLandingPage) {
+        console.log('handleAuthSuccess: Usuário está criando landing page, ignorando redirecionamento automático');
+        return;
+      }
+
       console.log('handleAuthSuccess: Buscando landing pages do usuário...');
       const landingPages = await getMyLandingPages();
       
@@ -635,7 +646,13 @@ const App: React.FC = () => {
               return;
             }
 
-            // Se autenticado, redirecionar para o dashboard se tiver landing page
+            // Se autenticado, redirecionar para o dashboard se tiver landing page (apenas se não estiver criando uma nova)
+            if (isCreatingLandingPage) {
+              console.log('onStart: Usuário está criando landing page, ignorando redirecionamento automático');
+              setShowSaaSIntro(false);
+              return;
+            }
+
             try {
               console.log('onStart: Buscando landing pages do usuário...');
               const landingPages = await getMyLandingPages();
@@ -985,6 +1002,7 @@ const App: React.FC = () => {
                 setIsAuthenticatedUser(true);
                 setCurrentLandingPageId(data.landingPageId);
                 setPricingViewMode('dashboard');
+                setIsCreatingLandingPage(false); // Finalizou a criação, pode permitir redirecionamentos novamente
               }}
             />
           </div>
