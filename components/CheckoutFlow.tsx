@@ -74,6 +74,25 @@ export const CheckoutFlow: React.FC<Props> = ({
   const [cvc, setCvc] = useState('');
   const [cardName, setCardName] = useState('');
 
+  // Pré-preencher dados fake quando entrar no Step 3
+  useEffect(() => {
+    if (currentStep === 3) {
+      // Pré-preencher apenas se os campos estiverem vazios
+      if (!cardNumber) {
+        setCardNumber('4111 1111 1111 1111'); // Visa test card
+      }
+      if (!expiry) {
+        setExpiry('12/25');
+      }
+      if (!cvc) {
+        setCvc('123');
+      }
+      if (!cardName) {
+        setCardName('João Silva');
+      }
+    }
+  }, [currentStep, cardNumber, expiry, cvc, cardName]);
+
   // Validation Logic
   const validateEmails = () => {
     if (email !== confirmEmail && confirmEmail.length > 0) {
@@ -787,6 +806,16 @@ export const CheckoutFlow: React.FC<Props> = ({
               <form onSubmit={handleSubmitPayment} className="space-y-6">
                 <div className="space-y-4">
                   <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-100 pb-2">3. Pagamento</h3>
+                  
+                  {/* Alerta discreto sobre simulação */}
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-start gap-2">
+                    <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="flex-1">
+                      <strong className="font-semibold">Essa é uma página de simulação de pagamento com dados fictícios.</strong> Não haverá nenhum tipo de cobrança neste momento de teste com usuários.
+                    </p>
+                  </div>
                   
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
                     <p className="text-blue-900 font-medium mb-1">Domínio selecionado:</p>

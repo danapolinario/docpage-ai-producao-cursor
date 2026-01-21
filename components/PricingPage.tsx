@@ -307,6 +307,14 @@ export const PricingPage: React.FC<Props> = ({
           >
             Quero publicar
           </button>
+          {onEditSite && (
+            <button
+              onClick={onEditSite}
+              className="mt-4 text-sm text-slate-400 hover:text-slate-300 transition-colors underline"
+            >
+              Voltar para o editor
+            </button>
+          )}
         </div>
 
         {/* Device Mockups Container - FIXED SCALING */}

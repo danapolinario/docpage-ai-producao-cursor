@@ -452,9 +452,6 @@ export const TestimonialsSection: React.FC<SectionProps> = ({ content, design, l
             </div>
           ))}
         </div>
-        <p className="text-center text-xs text-gray-400 mt-8">
-           * Imagens e depoimentos ilustrativos. Resultados variam conforme o caso clínico.
-        </p>
       </div>
     </section>
   );
@@ -661,7 +658,7 @@ export const FooterSection: React.FC<SectionProps> = ({ content, design, briefin
            </div>
         </div>
         <div className="bg-black text-white p-4 text-center font-mono text-xs uppercase">
-          Powered by DocPage AI
+          Powered by <a href="https://docpage.com.br" target="_blank">DocPage AI</a>
         </div>
       </footer>
     );

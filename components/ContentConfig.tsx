@@ -99,20 +99,20 @@ export const ContentConfig: React.FC<Props> = ({
          {/* Background pulse */}
          <div className="absolute inset-0 bg-blue-50 opacity-50 animate-pulse"></div>
          
-         <div className="relative z-10 flex flex-col items-center">
+         <div className="relative z-10 flex flex-col items-center px-4">
             <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-8 shadow-lg"></div>
             
-            <h2 className="text-2xl font-bold text-gray-800 mb-2 transition-all duration-500 transform">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2 transition-all duration-500 transform text-center break-words" style={{ overflowWrap: 'break-word' }}>
               Criando sua Copy...
             </h2>
             
-            <div className="h-8 overflow-hidden relative w-full text-center">
-               <p key={loadingStep} className="text-gray-600 font-medium text-lg animate-slide-up">
+            <div className="h-8 overflow-hidden relative w-full text-center px-4">
+               <p key={loadingStep} className="text-gray-600 font-medium text-lg animate-slide-up break-words" style={{ overflowWrap: 'break-word' }}>
                  {LOADING_MESSAGES[loadingStep]}
                </p>
             </div>
             
-            <p className="text-xs text-gray-400 mt-8 max-w-md text-center">
+            <p className="text-xs text-gray-400 mt-8 max-w-md text-center break-words px-4" style={{ overflowWrap: 'break-word' }}>
               Nossa IA está analisando normas do CFM e as melhores práticas de SEO para sua especialidade.
             </p>
          </div>

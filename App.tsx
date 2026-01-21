@@ -348,22 +348,61 @@ const App: React.FC = () => {
      setState(prev => ({ ...prev, step: 2 }));
   };
 
-  const handlePhotoStepNext = () => {
+  const handlePhotoStepNext = async () => {
     // Marcar que está criando landing page para evitar redirecionamentos automáticos
     setIsCreatingLandingPage(true);
     
-    // A foto do consultório será gerada apenas quando clicar em "Gerar Landing Page"
-    setState(prev => {
-      let nextState = { ...prev, isLoading: false, step: 3 };
+    // Se a foto não foi melhorada com IA, gerar automaticamente a foto do consultório
+    if (state.photoUrl && !state.isPhotoAIEnhanced && !state.aboutPhotoUrl) {
+      try {
+        setState(prev => ({ ...prev, isLoading: true, loadingMessage: 'Gerando foto ambientada no consultório...' }));
+        const officePhotoUrl = await generateOfficePhoto(state.photoUrl);
+        
+        setState(prev => {
+          let nextState = { 
+            ...prev, 
+            aboutPhotoUrl: officePhotoUrl,
+            isLoading: false,
+            step: 3 
+          };
 
-      // Initialize with a random layout if not set
-      if (prev.layoutVariant === 1) {
-         const randomVariant = Math.floor(Math.random() * 5) + 1 as LayoutVariant;
-         nextState.layoutVariant = randomVariant;
+          // Initialize with a random layout if not set
+          if (prev.layoutVariant === 1) {
+             const randomVariant = Math.floor(Math.random() * 5) + 1 as LayoutVariant;
+             nextState.layoutVariant = randomVariant;
+          }
+          
+          return nextState;
+        });
+      } catch (error) {
+        console.error('Erro ao gerar foto do consultório:', error);
+        // Continua mesmo se falhar a geração da foto do consultório
+        setState(prev => {
+          let nextState = { ...prev, isLoading: false, step: 3 };
+
+          // Initialize with a random layout if not set
+          if (prev.layoutVariant === 1) {
+             const randomVariant = Math.floor(Math.random() * 5) + 1 as LayoutVariant;
+             nextState.layoutVariant = randomVariant;
+          }
+          
+          return nextState;
+        });
       }
-      
-      return nextState;
-    });
+    } else {
+      // Se já tem foto melhorada ou não tem foto, apenas avançar
+      setState(prev => {
+        let nextState = { ...prev, isLoading: false, step: 3 };
+
+        // Initialize with a random layout if not set
+        if (prev.layoutVariant === 1) {
+           const randomVariant = Math.floor(Math.random() * 5) + 1 as LayoutVariant;
+           nextState.layoutVariant = randomVariant;
+        }
+        
+        return nextState;
+      });
+    }
   };
 
   const handleVisualConfigNext = () => {
@@ -1012,9 +1051,9 @@ const App: React.FC = () => {
       {/* Loading Overlay */}
       {/* Não mostrar overlay no Step 5 (checkout) para não bloquear os inputs */}
       {state.isLoading && state.step !== 1 && state.step !== 5 && ( // Step 1 e Step 5 não devem ter overlay bloqueando
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex flex-col items-center justify-center text-white">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex flex-col items-center justify-center text-white px-4">
           <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-xl font-semibold animate-pulse">{state.loadingMessage}</p>
+          <p className="text-xl font-semibold animate-pulse text-center break-words max-w-md" style={{ overflowWrap: 'break-word' }}>{state.loadingMessage}</p>
         </div>
       )}
 

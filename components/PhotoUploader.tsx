@@ -235,7 +235,13 @@ export const PhotoUploader: React.FC<Props> = ({
                      </div>
                    )}
                    <button 
-                     onClick={() => onPhotoChange('')}
+                     onClick={() => {
+                       onPhotoChange('');
+                       // Resetar o input file para permitir novo upload
+                       if (fileInputRef.current) {
+                         fileInputRef.current.value = '';
+                       }
+                     }}
                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                      title="Remover foto"
                    >
