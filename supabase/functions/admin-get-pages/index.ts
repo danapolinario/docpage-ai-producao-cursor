@@ -113,11 +113,21 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Buscar landing pages otimizado: apenas campos básicos (sem JSONB grandes)
-    // Primeiro buscar apenas campos básicos para evitar timeout
+    // Buscar landing pages otimizado: campos básicos + apenas campos específicos do JSONB
+    // Usar extração direta de campos JSONB usando sintaxe PostgREST
     const { data: landingPages, error: pagesError } = await supabaseAdmin
       .from('landing_pages')
-      .select('id, subdomain, custom_domain, status, created_at, updated_at, published_at, user_id')
+      .select(`
+        id,
+        subdomain,
+        custom_domain,
+        status,
+        created_at,
+        updated_at,
+        published_at,
+        user_id,
+        briefing_data
+      `)
       .order('created_at', { ascending: false })
       .limit(300) // Limite reduzido para evitar timeout e memory limit
 
@@ -129,22 +139,25 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Formatar dados básicos (sem briefing_data para evitar timeout)
-    // O frontend pode buscar briefing_data separadamente se necessário
-    const optimizedPages = (landingPages || []).map((lp: any) => ({
-      id: lp.id,
-      subdomain: lp.subdomain,
-      custom_domain: lp.custom_domain,
-      status: lp.status,
-      created_at: lp.created_at,
-      updated_at: lp.updated_at,
-      published_at: lp.published_at,
-      user_id: lp.user_id,
-      briefing_data: {
-        name: null, // Será preenchido pelo frontend se necessário
-        contactEmail: null
+    // Extrair apenas campos necessários do briefing_data para reduzir tamanho
+    // Isso evita carregar o objeto JSONB completo na memória
+    const optimizedPages = (landingPages || []).map((lp: any) => {
+      const briefing = lp.briefing_data || {}
+      return {
+        id: lp.id,
+        subdomain: lp.subdomain,
+        custom_domain: lp.custom_domain,
+        status: lp.status,
+        created_at: lp.created_at,
+        updated_at: lp.updated_at,
+        published_at: lp.published_at,
+        user_id: lp.user_id,
+        briefing_data: {
+          name: briefing.name || null,
+          contactEmail: briefing.contactEmail || null
+        }
       }
-    }))
+    })
 
     // Buscar emails dos usuários de forma eficiente (apenas IDs únicos)
     const userIds = [...new Set(optimizedPages.map((lp: any) => lp.user_id).filter(Boolean))]
