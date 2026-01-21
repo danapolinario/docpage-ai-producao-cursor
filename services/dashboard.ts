@@ -107,9 +107,11 @@ export async function getDashboardData(landingPageId: string): Promise<Dashboard
     };
   }
 
-  // Obter informações do domínio
+  // Obter informações do domínio (formato path-based: docpage.com.br/xxx)
   const domainInfo = {
-    domain: `${landingPage.subdomain}.com.br`,
+    domain: landingPage.custom_domain 
+      ? landingPage.custom_domain 
+      : `docpage.com.br/${landingPage.subdomain}`,
     status: landingPage.status === 'published' ? ('active' as const) : ('pending' as const),
     sslStatus: 'active' as const,
     customDomain: landingPage.custom_domain || undefined,

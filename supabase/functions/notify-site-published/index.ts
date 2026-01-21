@@ -158,9 +158,10 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Usar formato path-based: https://docpage.com.br/xxx
     const displayDomain = landingPage.custom_domain
       ? landingPage.custom_domain
-      : `${landingPage.subdomain}.docpage.com.br`;
+      : `docpage.com.br/${landingPage.subdomain}`;
 
     const siteUrl = `https://${displayDomain}`;
 
