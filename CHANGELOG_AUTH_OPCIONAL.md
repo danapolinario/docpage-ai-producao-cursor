@@ -136,5 +136,5 @@ Nenhum no momento.
 
 ---
 
-**Implementado em:** 2024
+**Implementado em:** 2026
 **Versão:** 1.1.0

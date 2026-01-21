@@ -141,6 +141,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
   const [activeModal, setActiveModal] = useState<'none' | 'terms' | 'privacy'>('none');
   const [showDevMenu, setShowDevMenu] = useState(false);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Confetti & Notification States
   const [showTimelineConfetti, setShowTimelineConfetti] = useState(false);
@@ -299,6 +300,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
     }
+    setIsMobileMenuOpen(false); // Fechar menu mobile após clicar
   };
 
   const toggleFaq = (index: number) => {
@@ -309,6 +311,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
     if (onDevNavigation) {
       onDevNavigation(step, mode);
       setShowDevMenu(false);
+      setIsMobileMenuOpen(false); // Fechar menu mobile também
     }
   };
 
@@ -528,6 +531,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
             <span className="font-bold text-xl tracking-tight">DocPage AI</span>
           </div>
           
+          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
              <button onClick={() => scrollToSection('how-it-works')} className="hover:text-blue-600 transition-colors">Como funciona</button>
              <button onClick={() => scrollToSection('examples')} className="hover:text-blue-600 transition-colors">Exemplos</button>
@@ -535,7 +539,8 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
              <button onClick={() => scrollToSection('faq')} className="hover:text-blue-600 transition-colors">FAQ</button>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Desktop Actions */}
+          <div className="hidden md:flex items-center gap-4">
              {/* DEV MENU */}
              {onDevNavigation && (
                 <div className="relative">
@@ -602,6 +607,178 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
                 </>
               )}
           </div>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden flex items-center gap-2">
+            {isAuthenticated && (
+              <button 
+                onClick={() => navigate('/dashboard')} 
+                className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-full transition-colors"
+              >
+                Painel
+              </button>
+            )}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2 text-slate-600 hover:text-slate-900 transition-colors"
+              aria-label="Menu"
+            >
+              {isMobileMenuOpen ? (
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {/* Mobile Menu Overlay */}
+          {isMobileMenuOpen && (
+            <>
+              <div 
+                className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                onClick={() => setIsMobileMenuOpen(false)}
+              />
+              <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 md:hidden transform transition-transform duration-300 ease-in-out">
+                <div className="flex flex-col h-full">
+                  {/* Mobile Menu Header */}
+                  <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                    <span className="font-bold text-xl text-slate-900">Menu</span>
+                    <button
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="p-2 text-slate-600 hover:text-slate-900 transition-colors"
+                    >
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Mobile Menu Items */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                    <button
+                      onClick={() => scrollToSection('how-it-works')}
+                      className="w-full text-left px-4 py-3 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                    >
+                      Como funciona
+                    </button>
+                    <button
+                      onClick={() => scrollToSection('examples')}
+                      className="w-full text-left px-4 py-3 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                    >
+                      Exemplos
+                    </button>
+                    <button
+                      onClick={() => scrollToSection('pricing')}
+                      className="w-full text-left px-4 py-3 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                    >
+                      Planos
+                    </button>
+                    <button
+                      onClick={() => scrollToSection('faq')}
+                      className="w-full text-left px-4 py-3 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                    >
+                      FAQ
+                    </button>
+
+                    {/* Dev Menu */}
+                    {onDevNavigation && (
+                      <>
+                        <div className="border-t border-gray-200 my-2"></div>
+                        <button
+                          onClick={() => {
+                            setShowDevMenu(!showDevMenu);
+                          }}
+                          className="w-full text-left px-4 py-3 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors font-medium flex items-center justify-between"
+                        >
+                          <span>Dev Menu</span>
+                          <svg 
+                            className={`w-5 h-5 transform transition-transform ${showDevMenu ? 'rotate-180' : ''}`} 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {showDevMenu && (
+                          <div className="pl-4 space-y-1">
+                            <button onClick={() => handleDevClick(0)} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Step 1: Dados</button>
+                            <button onClick={() => handleDevClick(1)} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Step 2: Conteúdo</button>
+                            <button onClick={() => handleDevClick(2)} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Step 3: Foto</button>
+                            <button onClick={() => handleDevClick(3)} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Step 4: Visual</button>
+                            <button onClick={() => handleDevClick(4)} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Step 5: Editor</button>
+                            <div className="border-t border-gray-200 my-1"></div>
+                            <button onClick={() => handleDevClick(5, 'plans')} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg font-semibold">Step 6: Planos</button>
+                            <button onClick={() => handleDevClick(5, 'checkout')} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 rounded-lg font-semibold">Checkout (Demo)</button>
+                            <button onClick={() => handleDevClick(5, 'dashboard')} className="w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-lg font-semibold">Dashboard</button>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    <div className="border-t border-gray-200 my-2"></div>
+
+                    {/* Login/Auth Actions */}
+                    {isAuthenticated ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            navigate('/dashboard');
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-3 bg-blue-600 text-white rounded-lg transition-colors font-semibold hover:bg-blue-700"
+                        >
+                          Meu Painel
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (onLogout) onLogout();
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-3 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors font-medium flex items-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                          </svg>
+                          Sair
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {onLoginClick && (
+                          <button
+                            onClick={() => {
+                              if (onLoginClick) onLoginClick();
+                              setIsMobileMenuOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-3 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors font-medium flex items-center gap-2"
+                          >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                            </svg>
+                            Login
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            onStart();
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-3 bg-blue-600 text-white rounded-lg transition-colors font-semibold hover:bg-blue-700"
+                        >
+                          Começar
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </nav>
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 pt-16 pb-24 text-center">
@@ -1012,7 +1189,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
         </div>
         
         <div className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-slate-800 text-center text-xs text-slate-600">
-           © 2024 DocPage AI Tecnologia Ltda. Todos os direitos reservados.
+           © 2026 DocPage AI Tecnologia Ltda. Todos os direitos reservados.
         </div>
       </footer>
 

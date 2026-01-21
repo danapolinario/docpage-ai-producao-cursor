@@ -221,5 +221,5 @@ Para produção em escala, considere o **Pro Plan ($25/mês)** que oferece recur
 
 ---
 
-**Última atualização**: 2024
+**Última atualização**: 2026
 **Fonte**: https://supabase.com/pricing

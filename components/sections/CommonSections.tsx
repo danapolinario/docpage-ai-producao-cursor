@@ -616,7 +616,7 @@ export const FooterSection: React.FC<SectionProps> = ({ content, design, briefin
            <div className="text-xs text-gray-400 mb-8">
              CRM/{briefing.crmState} {briefing.crm} {briefing.rqe && `• RQE ${briefing.rqe}`}
            </div>
-           <p className="text-sm text-gray-400">© 2024 {briefing.name}. Todos os direitos reservados.</p>
+           <p className="text-sm text-gray-400">© 2026 {briefing.name}. Todos os direitos reservados.</p>
         </footer>
      )
    }

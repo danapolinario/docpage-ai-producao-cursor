@@ -479,5 +479,5 @@ Total: $198/mês
 
 ---
 
-**Última atualização**: 2024
+**Última atualização**: 2026
 **Próxima revisão**: A cada 3 meses ou quando atingir limites

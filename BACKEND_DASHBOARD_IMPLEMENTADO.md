@@ -224,6 +224,6 @@ console.log(data.stats.visitsByDay);      // Visitantes por dia
 
 ---
 
-**Implementado em**: 2024
+**Implementado em**: 2026
 **Status**: ✅ Funcional
 **Próximo passo**: Implementar script de tracking na landing page

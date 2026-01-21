@@ -194,6 +194,6 @@ GRANT EXECUTE ON FUNCTION check_subdomain_available(TEXT) TO anon, authenticated
 
 ---
 
-**Refatorado em**: 2024
+**Refatorado em**: 2026
 **Status**: ✅ Completo
 **Próximo passo**: Executar SQL no Supabase e testar fluxo completo

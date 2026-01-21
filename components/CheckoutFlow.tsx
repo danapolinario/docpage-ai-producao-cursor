@@ -79,16 +79,16 @@ export const CheckoutFlow: React.FC<Props> = ({
     if (currentStep === 3) {
       // Pré-preencher apenas se os campos estiverem vazios
       if (!cardNumber) {
-        setCardNumber('4111 1111 1111 1111'); // Visa test card
+        setCardNumber('4590 2133 1234 5678'); // Visa test card
       }
       if (!expiry) {
-        setExpiry('12/25');
+        setExpiry('12/26');
       }
       if (!cvc) {
         setCvc('123');
       }
       if (!cardName) {
-        setCardName('João Silva');
+        setCardName('João da Silva Santos');
       }
     }
   }, [currentStep, cardNumber, expiry, cvc, cardName]);

@@ -607,7 +607,7 @@ export const NewSaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onSw
             <a href="#" className="hover:text-white transition-colors">Compliance CFM</a>
           </div>
           <div className="text-slate-600">
-            © 2024 DocPage AI
+            © 2026 DocPage AI
           </div>
         </div>
       </footer>

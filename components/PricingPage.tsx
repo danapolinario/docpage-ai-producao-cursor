@@ -301,20 +301,22 @@ export const PricingPage: React.FC<Props> = ({
           <p className="text-lg text-slate-300 max-w-2xl mx-auto mb-8">
             Sua presença digital está quase no ar. Veja como sua página ficou incrível em todos os dispositivos.
           </p>
-          <button 
-            onClick={scrollToPlans}
-            className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold shadow-lg shadow-blue-500/30 transition-all hover:-translate-y-1"
-          >
-            Quero publicar
-          </button>
-          {onEditSite && (
-            <button
-              onClick={onEditSite}
-              className="mt-4 text-sm text-slate-400 hover:text-slate-300 transition-colors underline"
+          <div className="flex flex-col items-center gap-4">
+            <button 
+              onClick={scrollToPlans}
+              className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold shadow-lg shadow-blue-500/30 transition-all hover:-translate-y-1"
             >
-              Voltar para o editor
+              Quero publicar
             </button>
-          )}
+            {onEditSite && (
+              <button
+                onClick={onEditSite}
+                className="text-sm text-slate-400 hover:text-slate-300 transition-colors underline"
+              >
+                Voltar para o editor
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Device Mockups Container - FIXED SCALING */}

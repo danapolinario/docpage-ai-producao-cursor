@@ -223,6 +223,6 @@ POST /api/stripe/webhook
 
 ---
 
-**Implementado em**: 2024
+**Implementado em**: 2026
 **Status**: ✅ Funcional (com mock do Stripe)
 **Próximo passo**: Implementar backend API para Stripe

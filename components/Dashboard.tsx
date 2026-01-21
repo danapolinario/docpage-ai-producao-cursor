@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { BriefingData, LandingPageContent, DesignSettings, SectionVisibility, LayoutVariant, Plan } from '../types';
+import { BriefingData, LandingPageContent, DesignSettings, SectionVisibility, LayoutVariant, Plan, ThemeType } from '../types';
 import { Preview } from './Preview';
+import { EditorPanel } from './EditorPanel';
 import { getDashboardData, DashboardData } from '../services/dashboard';
 import { updateLandingPage } from '../services/landing-pages';
 import { supabase } from '../lib/supabase';
@@ -101,6 +102,11 @@ export const Dashboard: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
   const [testimonials, setTestimonials] = useState(content.testimonials || []);
   const [isSavingTestimonials, setIsSavingTestimonials] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [localContent, setLocalContent] = useState<LandingPageContent>(content);
+  const [localDesign, setLocalDesign] = useState<DesignSettings>(design);
+  const [localVisibility, setLocalVisibility] = useState<SectionVisibility>(visibility);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Carregar dados do backend se landingPageId for fornecido
   useEffect(() => {
@@ -431,6 +437,144 @@ export const Dashboard: React.FC<Props> = ({
     }
   };
 
+  // Handlers para EditorPanel
+  const handleUpdateContent = async (key: keyof LandingPageContent, value: any) => {
+    setLocalContent(prev => ({ ...prev, [key]: value }));
+    
+    // Salvar automaticamente no banco
+    if (landingPageId) {
+      try {
+        setIsSaving(true);
+        const updatedContent = { ...localContent, [key]: value };
+        await updateLandingPage(landingPageId, {
+          content_data: updatedContent as any,
+        });
+        
+        // Atualizar dashboardData
+        if (dashboardData) {
+          setDashboardData(prev => prev ? {
+            ...prev,
+            landingPage: { ...prev.landingPage, content_data: updatedContent }
+          } : prev);
+        }
+      } catch (err) {
+        console.error('Erro ao salvar conteúdo:', err);
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  const handleUpdateDesign = async (key: keyof DesignSettings, value: any) => {
+    setLocalDesign(prev => ({ ...prev, [key]: value }));
+    
+    // Salvar automaticamente no banco
+    if (landingPageId) {
+      try {
+        setIsSaving(true);
+        const updatedDesign = { ...localDesign, [key]: value };
+        await updateLandingPage(landingPageId, {
+          design_settings: updatedDesign as any,
+        });
+        
+        // Atualizar dashboardData
+        if (dashboardData) {
+          setDashboardData(prev => prev ? {
+            ...prev,
+            landingPage: { ...prev.landingPage, design_settings: updatedDesign }
+          } : prev);
+        }
+      } catch (err) {
+        console.error('Erro ao salvar design:', err);
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  const handleToggleSection = async (key: keyof SectionVisibility) => {
+    const newVisibility = { ...localVisibility, [key]: !localVisibility[key] };
+    setLocalVisibility(newVisibility);
+    
+    // Salvar automaticamente no banco
+    if (landingPageId) {
+      try {
+        setIsSaving(true);
+        await updateLandingPage(landingPageId, {
+          section_visibility: newVisibility as any,
+        });
+        
+        // Atualizar dashboardData
+        if (dashboardData) {
+          setDashboardData(prev => prev ? {
+            ...prev,
+            landingPage: { ...prev.landingPage, section_visibility: newVisibility }
+          } : prev);
+        }
+      } catch (err) {
+        console.error('Erro ao salvar visibilidade:', err);
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  const handleUpdateLayout = async (variant: LayoutVariant) => {
+    if (landingPageId) {
+      try {
+        setIsSaving(true);
+        await updateLandingPage(landingPageId, {
+          layout_variant: variant,
+        });
+        
+        // Atualizar dashboardData
+        if (dashboardData) {
+          setDashboardData(prev => prev ? {
+            ...prev,
+            landingPage: { ...prev.landingPage, layout_variant: variant }
+          } : prev);
+        }
+      } catch (err) {
+        console.error('Erro ao salvar layout:', err);
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  const handleRefineWithAI = async (instruction: string) => {
+    // TODO: Implementar refinamento com IA
+    console.log('Refinar com IA:', instruction);
+  };
+
+  const handleThemeSelect = async (theme: ThemeType) => {
+    // Aplicar tema ao design
+    let newDesign: DesignSettings = { ...localDesign };
+    
+    if (theme === ThemeType.CLINICAL) {
+      newDesign = { ...newDesign, colorPalette: 'blue', secondaryColor: 'teal', fontPairing: 'sans', borderRadius: 'medium', photoStyle: 'minimal' };
+    } else if (theme === ThemeType.CARING) {
+      newDesign = { ...newDesign, colorPalette: 'green', secondaryColor: 'gold', fontPairing: 'serif-sans', borderRadius: 'full', photoStyle: 'organic' };
+    } else if (theme === ThemeType.MODERN) {
+      newDesign = { ...newDesign, colorPalette: 'slate', secondaryColor: 'purple', fontPairing: 'sans', borderRadius: 'none', photoStyle: 'glass' };
+    }
+    
+    await handleUpdateDesign('colorPalette', newDesign.colorPalette);
+    await handleUpdateDesign('secondaryColor', newDesign.secondaryColor);
+    await handleUpdateDesign('fontPairing', newDesign.fontPairing);
+    await handleUpdateDesign('borderRadius', newDesign.borderRadius);
+    await handleUpdateDesign('photoStyle', newDesign.photoStyle);
+  };
+
+  // Sincronizar estados locais quando dashboardData mudar
+  useEffect(() => {
+    if (dashboardData?.landingPage) {
+      setLocalContent(dashboardData.landingPage.content_data || content);
+      setLocalDesign(dashboardData.landingPage.design_settings || design);
+      setLocalVisibility(dashboardData.landingPage.section_visibility || visibility);
+    }
+  }, [dashboardData]);
+
   const TestimonialsView = () => (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
       {showTestimonialsWarning && (
@@ -453,14 +597,12 @@ export const Dashboard: React.FC<Props> = ({
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-base font-bold text-gray-800">Depoimentos atuais</h3>
-          {onEditSite && (
-            <button
-              onClick={onEditSite}
-              className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors"
-            >
-              Editar no Editor
-            </button>
-          )}
+          <button
+            onClick={() => setIsEditing(true)}
+            className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+          >
+            Editar no Editor
+          </button>
         </div>
         {visibility.testimonials ? (
           <>
@@ -733,8 +875,8 @@ export const Dashboard: React.FC<Props> = ({
                 Painel Geral
              </button>
              <button 
-               onClick={onEditSite}
-               className={`flex w-full items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition-colors text-slate-400 hover:text-white hover:bg-slate-800`}
+               onClick={() => setIsEditing(true)}
+               className={`flex w-full items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition-colors ${isEditing ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
              >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 Editar Site
@@ -814,7 +956,54 @@ export const Dashboard: React.FC<Props> = ({
              </div>
           </header>
 
-          <div className="p-8 max-w-7xl mx-auto space-y-8">
+          {/* Modo de Edição: Mostrar EditorPanel */}
+          {isEditing ? (
+            <div className="flex h-[calc(100vh-73px)]">
+              <div className="w-80 flex-none border-r border-gray-200 bg-white">
+                <EditorPanel
+                  content={localContent}
+                  design={localDesign}
+                  visibility={localVisibility}
+                  layoutVariant={layoutVariant}
+                  onUpdateContent={handleUpdateContent}
+                  onUpdateDesign={handleUpdateDesign}
+                  onUpdateLayout={handleUpdateLayout}
+                  onToggleSection={handleToggleSection}
+                  onRefineWithAI={handleRefineWithAI}
+                  modificationsLeft={5}
+                  isLoading={isSaving}
+                  onPublish={() => setIsEditing(false)}
+                  onHide={() => setIsEditing(false)}
+                  onThemeSelect={handleThemeSelect}
+                />
+              </div>
+              <div className="flex-1 overflow-y-auto bg-gray-100 p-8">
+                <div className="max-w-4xl mx-auto">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-bold text-gray-800">Preview do Site</h2>
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Fechar Editor
+                    </button>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                    <Preview
+                      content={localContent}
+                      design={localDesign}
+                      visibility={localVisibility}
+                      photoUrl={photoUrl}
+                      aboutPhotoUrl={aboutPhotoUrl}
+                      briefing={briefing}
+                      layoutVariant={layoutVariant}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-8 max-w-7xl mx-auto space-y-8">
              
              {/* Loading State */}
              {isLoading && (
@@ -1017,7 +1206,8 @@ export const Dashboard: React.FC<Props> = ({
 
              {activeView === 'social' && <SocialMediaView />}
 
-          </div>
+            </div>
+          )}
        </main>
     </div>
   );

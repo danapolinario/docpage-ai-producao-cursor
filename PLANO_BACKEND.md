@@ -628,6 +628,6 @@ backend/
 
 ---
 
-**Documento criado em**: 2024
+**Documento criado em**: 2026
 **Versão**: 1.0
 **Autor**: Plano de Implementação DocPage AI

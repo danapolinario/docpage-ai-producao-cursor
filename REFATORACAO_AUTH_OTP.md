@@ -208,6 +208,6 @@ No Supabase Dashboard:
 
 ---
 
-**Refatorado em**: 2024
+**Refatorado em**: 2026
 **Status**: ✅ Completo
 **Próximo passo**: Configurar email no Supabase e testar fluxo completo
