@@ -70,15 +70,35 @@ const handler = async (req: Request): Promise<Response> => {
     const toEmail: string | undefined =
       briefing.contactEmail || briefing.email;
 
+    console.log('Dados da landing page para notificação:', {
+      landingPageId,
+      subdomain: landingPage.subdomain,
+      customDomain: landingPage.custom_domain,
+      briefingName: briefing.name,
+      hasContactEmail: !!briefing.contactEmail,
+      hasEmail: !!briefing.email,
+      toEmail: toEmail || 'NÃO ENCONTRADO',
+    });
+
     if (!toEmail) {
-      console.warn(
+      console.error(
         "Nenhum email encontrado no briefing para landing page",
-        landingPageId,
+        {
+          landingPageId,
+          briefingKeys: Object.keys(briefing),
+          briefingData: briefing,
+        }
       );
       return new Response(
-        JSON.stringify({ message: "Nenhum email para notificar" }),
+        JSON.stringify({ 
+          error: "Nenhum email encontrado no briefing_data para enviar notificação",
+          details: {
+            landingPageId,
+            availableFields: Object.keys(briefing),
+          }
+        }),
         {
-          status: 200,
+          status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders },
         },
       );
@@ -144,20 +164,34 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (emailResponse?.error) {
       // Log the error but don't fail the request - site was published successfully
-      console.warn("Email de notificação não enviado (modo teste Resend):", emailResponse.error);
+      console.error("Email de notificação não enviado - Erro do Resend:", {
+        error: emailResponse.error,
+        landingPageId,
+        toEmail,
+        errorName: emailResponse.error?.name,
+        errorMessage: emailResponse.error?.message,
+      });
       return new Response(
         JSON.stringify({ 
-          success: true, 
-          warning: "Site publicado, mas email não enviado (configure domínio no Resend)" 
+          success: false,
+          error: emailResponse.error?.message || JSON.stringify(emailResponse.error),
+          warning: "Site publicado, mas email não enviado. Verifique a configuração do Resend.",
+          details: emailResponse.error,
         }),
         {
-          status: 200,
+          status: 500,
           headers: { "Content-Type": "application/json", ...corsHeaders },
         },
       );
     }
 
-    console.log("Email de site publicado enviado com sucesso:", emailResponse);
+    const emailId = emailResponse?.data?.id;
+    console.log("Email de site publicado enviado com sucesso:", {
+      landingPageId,
+      toEmail,
+      emailId,
+      response: emailResponse,
+    });
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

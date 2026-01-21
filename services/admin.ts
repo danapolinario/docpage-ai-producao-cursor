@@ -131,15 +131,36 @@ export async function updateLandingPageStatus(
   // Ao publicar, dispara email automático avisando que o site está no ar
   if (status === 'published') {
     try {
-      await fetch(`${FUNCTIONS_BASE_URL}/notify-site-published`, {
+      console.log('Enviando email de notificação de publicação (via admin):', landingPageId);
+      const notifyResponse = await fetch(`${FUNCTIONS_BASE_URL}/notify-site-published`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ landingPageId }),
       });
-    } catch (notifyError) {
-      console.error('Error notifying site published:', notifyError);
+      
+      const notifyData = await notifyResponse.json();
+      
+      if (!notifyResponse.ok) {
+        console.error('Erro ao enviar email de notificação (via admin):', {
+          status: notifyResponse.status,
+          statusText: notifyResponse.statusText,
+          error: notifyData.error || notifyData,
+          landingPageId,
+        });
+      } else {
+        console.log('Email de publicação enviado com sucesso (via admin):', {
+          landingPageId,
+          response: notifyData,
+        });
+      }
+    } catch (notifyError: any) {
+      console.error('Error notifying site published:', {
+        landingPageId,
+        error: notifyError.message || notifyError,
+        stack: notifyError.stack,
+      });
       // Não lançar erro aqui para não quebrar o fluxo do admin
     }
   }

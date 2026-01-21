@@ -102,6 +102,7 @@ Deno.serve(async (req) => {
     // Se status mudou para 'published', enviar email de notificação
     if (status === 'published') {
       try {
+        console.log('Enviando email de notificação de publicação (via Edge Function):', landingPageId)
         const FUNCTIONS_BASE_URL = `${Deno.env.get('SUPABASE_URL')}/functions/v1`
         const notifyResponse = await fetch(`${FUNCTIONS_BASE_URL}/notify-site-published`, {
           method: 'POST',
@@ -112,14 +113,28 @@ Deno.serve(async (req) => {
           body: JSON.stringify({ landingPageId }),
         })
         
+        const notifyData = await notifyResponse.json()
+        
         if (!notifyResponse.ok) {
-          console.warn('Erro ao enviar email de notificação:', await notifyResponse.text())
+          console.error('Erro ao enviar email de notificação:', {
+            status: notifyResponse.status,
+            statusText: notifyResponse.statusText,
+            error: notifyData.error || notifyData,
+            landingPageId,
+          })
           // Não falhar a atualização se o email falhar
         } else {
-          console.log('Email de notificação enviado com sucesso para landing page:', landingPageId)
+          console.log('Email de notificação enviado com sucesso:', {
+            landingPageId,
+            response: notifyData,
+          })
         }
-      } catch (notifyError) {
-        console.error('Erro ao enviar email de notificação:', notifyError)
+      } catch (notifyError: any) {
+        console.error('Erro ao enviar email de notificação:', {
+          landingPageId,
+          error: notifyError.message || notifyError,
+          stack: notifyError.stack,
+        })
         // Não falhar a atualização se o email falhar
       }
     }

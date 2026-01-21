@@ -311,17 +311,36 @@ export async function createLandingPage(data: {
   // Se foi criada como 'published', enviar email de notificação
   if (shouldAutoPublish && landingPage.status === 'published') {
     try {
+      console.log('Enviando email de notificação de publicação para landing page:', landingPage.id);
       const FUNCTIONS_BASE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-      await fetch(`${FUNCTIONS_BASE_URL}/notify-site-published`, {
+      const notifyResponse = await fetch(`${FUNCTIONS_BASE_URL}/notify-site-published`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ landingPageId: landingPage.id }),
       });
-      console.log('Email de publicação enviado para landing page:', landingPage.id);
-    } catch (notifyError) {
-      console.error('Erro ao enviar email de notificação de publicação:', notifyError);
+      
+      const notifyData = await notifyResponse.json();
+      
+      if (!notifyResponse.ok) {
+        console.error('Erro ao enviar email de notificação:', {
+          status: notifyResponse.status,
+          statusText: notifyResponse.statusText,
+          error: notifyData.error || notifyData,
+        });
+      } else {
+        console.log('Email de publicação enviado com sucesso:', {
+          landingPageId: landingPage.id,
+          response: notifyData,
+        });
+      }
+    } catch (notifyError: any) {
+      console.error('Erro ao enviar email de notificação de publicação:', {
+        landingPageId: landingPage.id,
+        error: notifyError.message || notifyError,
+        stack: notifyError.stack,
+      });
       // Não lançar erro aqui para não quebrar o fluxo de criação
     }
   }
