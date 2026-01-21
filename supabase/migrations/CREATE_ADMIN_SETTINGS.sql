@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.admin_settings (
 INSERT INTO public.admin_settings (key, value, description)
 VALUES (
   'auto_publish_enabled',
-  false::jsonb,
+  to_jsonb(false),
   'Habilita publicação automática de landing pages criadas pelos usuários'
 )
 ON CONFLICT (key) DO NOTHING;
