@@ -163,3 +163,80 @@ export async function getAdminStats() {
     draft,
   };
 }
+
+/**
+ * Obter configuração de publicação automática
+ */
+export async function getAutoPublishSetting(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('admin_settings')
+      .select('value')
+      .eq('key', 'auto_publish_enabled')
+      .single();
+
+    if (error || !data) {
+      // Se não existe, retorna false (padrão)
+      console.log('Configuração de publicação automática não encontrada, usando padrão (false)');
+      return false;
+    }
+
+    // O valor está em JSONB, pode ser boolean direto ou string
+    const value = data.value;
+    
+    // Se já é boolean, retornar diretamente
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    
+    // Se é string, converter
+    if (typeof value === 'string') {
+      return value === 'true' || value === 'True';
+    }
+    
+    // Se é número (0 = false, 1 = true)
+    if (typeof value === 'number') {
+      return value !== 0;
+    }
+    
+    // Default: false
+    return false;
+  } catch (error) {
+    console.error('Error getting auto publish setting:', error);
+    // Em caso de erro, retornar false (padrão seguro)
+    return false;
+  }
+}
+
+/**
+ * Atualizar configuração de publicação automática
+ */
+export async function updateAutoPublishSetting(enabled: boolean): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('Usuário não autenticado');
+  }
+
+  // Verificar se é admin
+  const isAdmin = await checkIsAdmin();
+  if (!isAdmin) {
+    throw new Error('Apenas administradores podem alterar configurações');
+  }
+
+  const { error } = await supabase
+    .from('admin_settings')
+    .upsert({
+      key: 'auto_publish_enabled',
+      value: enabled,
+      updated_by: user.id,
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'key',
+    });
+
+  if (error) {
+    console.error('Error updating auto publish setting:', error);
+    throw new Error(error.message || 'Erro ao atualizar configuração');
+  }
+}

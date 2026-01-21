@@ -211,6 +211,21 @@ export async function createLandingPage(data: {
   // Usar o usuário final (pode ter mudado entre verificações)
   const userIdToUse = finalUser.id;
 
+  // Verificar se publicação automática está habilitada
+  let initialStatus: 'draft' | 'published' = 'draft';
+  let shouldAutoPublish = false;
+  
+  try {
+    const { getAutoPublishSetting } = await import('./admin');
+    shouldAutoPublish = await getAutoPublishSetting();
+    if (shouldAutoPublish) {
+      initialStatus = 'published';
+    }
+  } catch (error) {
+    console.warn('Erro ao verificar configuração de publicação automática, usando padrão (draft):', error);
+    // Em caso de erro, manter status 'draft' (padrão seguro)
+  }
+
   const insertData = {
     user_id: userIdToUse,
     subdomain: data.subdomain.toLowerCase(),
@@ -220,7 +235,8 @@ export async function createLandingPage(data: {
     design_settings: data.design,
     section_visibility: data.visibility,
     layout_variant: data.layoutVariant,
-    status: 'draft', // Status inicial - rascunho, aguardando publicação pelo admin
+    status: initialStatus,
+    published_at: shouldAutoPublish ? new Date().toISOString() : null,
     meta_title: metaTitle,
     meta_description: metaDescription,
     meta_keywords: [
@@ -253,6 +269,24 @@ export async function createLandingPage(data: {
       landingPageId: landingPage.id
     });
     throw new Error('Erro ao criar landing page: user_id não corresponde');
+  }
+
+  // Se foi criada como 'published', enviar email de notificação
+  if (shouldAutoPublish && landingPage.status === 'published') {
+    try {
+      const FUNCTIONS_BASE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+      await fetch(`${FUNCTIONS_BASE_URL}/notify-site-published`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ landingPageId: landingPage.id }),
+      });
+      console.log('Email de publicação enviado para landing page:', landingPage.id);
+    } catch (notifyError) {
+      console.error('Erro ao enviar email de notificação de publicação:', notifyError);
+      // Não lançar erro aqui para não quebrar o fluxo de criação
+    }
   }
   
   return landingPage;

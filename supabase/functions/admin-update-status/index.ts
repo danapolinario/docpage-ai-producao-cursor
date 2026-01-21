@@ -99,6 +99,31 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Se status mudou para 'published', enviar email de notificação
+    if (status === 'published') {
+      try {
+        const FUNCTIONS_BASE_URL = `${Deno.env.get('SUPABASE_URL')}/functions/v1`
+        const notifyResponse = await fetch(`${FUNCTIONS_BASE_URL}/notify-site-published`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ landingPageId }),
+        })
+        
+        if (!notifyResponse.ok) {
+          console.warn('Erro ao enviar email de notificação:', await notifyResponse.text())
+          // Não falhar a atualização se o email falhar
+        } else {
+          console.log('Email de notificação enviado com sucesso para landing page:', landingPageId)
+        }
+      } catch (notifyError) {
+        console.error('Erro ao enviar email de notificação:', notifyError)
+        // Não falhar a atualização se o email falhar
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

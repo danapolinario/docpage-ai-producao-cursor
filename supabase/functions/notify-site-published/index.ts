@@ -95,13 +95,50 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: "DocPage AI <noreply@docpage.com.br>",
       to: [toEmail],
-      subject: "Seu site está no ar!",
+      subject: "🎉 Seu site está no ar! - DocPage AI",
       html: `
-        <h1>Parabéns, ${doctorName}!</h1>
-        <p>Seu novo site profissional acaba de ser publicado e já está disponível no endereço:</p>
-        <p><a href="${siteUrl}">${siteUrl}</a></p>
-        <p>Agora você já pode divulgar o link para seus pacientes e em todas as suas redes.</p>
-        <p style="margin-top: 24px; font-size: 14px; color: #555;">Este é um email automático enviado pela plataforma DocPage AI.</p>
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f4f5; padding: 40px 20px;">
+          <div style="max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h1 style="color: #18181b; font-size: 28px; margin: 0 0 24px 0; text-align: center;">
+              🎉 Parabéns, ${doctorName}!
+            </h1>
+            <p style="color: #52525b; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">
+              Seu novo site profissional acaba de ser publicado e já está disponível no ar!
+            </p>
+            <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 8px; padding: 24px; text-align: center; margin: 0 0 24px 0;">
+              <p style="color: white; font-size: 14px; margin: 0 0 8px 0; font-weight: 500;">Seu site está disponível em:</p>
+              <a href="${siteUrl}" style="color: white; font-size: 18px; font-weight: bold; text-decoration: none; word-break: break-all;">${siteUrl}</a>
+            </div>
+            <p style="color: #52525b; font-size: 16px; line-height: 1.6; margin: 0 0 16px 0;">
+              Agora você pode:
+            </p>
+            <ul style="color: #52525b; font-size: 16px; line-height: 1.8; margin: 0 0 24px 0; padding-left: 20px;">
+              <li>Divulgar o link para seus pacientes</li>
+              <li>Compartilhar nas suas redes sociais</li>
+              <li>Adicionar o link nas suas assinaturas de email</li>
+              <li>Usar em materiais de marketing</li>
+            </ul>
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${siteUrl}" style="display: inline-block; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                Ver Meu Site
+              </a>
+            </div>
+            <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0 24px 0;">
+            <p style="color: #a1a1aa; font-size: 12px; text-align: center; margin: 0 0 8px 0;">
+              Este é um email automático enviado pela plataforma DocPage AI.
+            </p>
+            <p style="color: #a1a1aa; font-size: 12px; text-align: center; margin: 0;">
+              Em caso de dúvidas, entre em contato: <a href="mailto:suporte@docpage.com.br" style="color: #6366f1;">suporte@docpage.com.br</a>
+            </p>
+          </div>
+        </body>
+        </html>
       `,
     });
 

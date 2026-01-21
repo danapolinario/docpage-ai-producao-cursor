@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { 
   getAllLandingPages, 
   updateLandingPageStatus, 
-  getAdminStats, 
+  getAdminStats,
+  getAutoPublishSetting,
+  updateAutoPublishSetting,
   LandingPageWithUser,
   LandingPageStatus 
 } from '../services/admin';
@@ -25,16 +27,20 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [autoPublishEnabled, setAutoPublishEnabled] = useState(false);
+  const [updatingAutoPublish, setUpdatingAutoPublish] = useState(false);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [pages, statsData] = await Promise.all([
+      const [pages, statsData, autoPublish] = await Promise.all([
         getAllLandingPages(),
-        getAdminStats()
+        getAdminStats(),
+        getAutoPublishSetting()
       ]);
       setLandingPages(pages);
       setStats(statsData);
+      setAutoPublishEnabled(autoPublish);
       setError(null);
     } catch (err: any) {
       console.error('Error loading admin data:', err);
@@ -64,6 +70,21 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
   const handleLogout = async () => {
     await signOut();
     onLogout();
+  };
+
+  const handleToggleAutoPublish = async () => {
+    try {
+      setUpdatingAutoPublish(true);
+      const newValue = !autoPublishEnabled;
+      await updateAutoPublishSetting(newValue);
+      setAutoPublishEnabled(newValue);
+      setError(null);
+    } catch (err: any) {
+      console.error('Error updating auto publish setting:', err);
+      setError(err.message || 'Erro ao atualizar configuração');
+    } finally {
+      setUpdatingAutoPublish(false);
+    }
   };
 
   // Get URL for landing page
@@ -134,6 +155,38 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
             </div>
           </div>
         )}
+
+        {/* Auto Publish Settings */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Publicação Automática</h3>
+              <p className="text-sm text-gray-600">
+                Quando habilitado, as landing pages criadas pelos usuários serão automaticamente publicadas com status "Publicado"
+              </p>
+            </div>
+            <button
+              onClick={handleToggleAutoPublish}
+              disabled={updatingAutoPublish}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${
+                autoPublishEnabled ? 'bg-amber-600' : 'bg-gray-300'
+              } ${updatingAutoPublish ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  autoPublishEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+          {autoPublishEnabled && (
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800">
+                ✓ Publicação automática está <strong>HABILITADA</strong>. Novas landing pages serão automaticamente publicadas.
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
