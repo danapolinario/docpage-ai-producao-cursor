@@ -20,14 +20,21 @@ VALUES (
 )
 ON CONFLICT (key) DO NOTHING;
 
--- RLS: Apenas admins podem ler e atualizar
+-- RLS: Apenas admins podem inserir e atualizar, mas qualquer usuário autenticado pode ler
+-- (Configurações não são sensíveis e precisam ser lidas por usuários normais)
 ALTER TABLE public.admin_settings ENABLE ROW LEVEL SECURITY;
 
--- Policy: Apenas admins podem ler
-CREATE POLICY "Admins can read admin settings"
+-- Policy: Qualquer usuário autenticado pode ler (necessário para verificar publicação automática)
+CREATE POLICY "Authenticated users can read admin settings"
 ON public.admin_settings
 FOR SELECT
-USING (
+USING (auth.uid() IS NOT NULL);
+
+-- Policy: Apenas admins podem inserir
+CREATE POLICY "Admins can insert admin settings"
+ON public.admin_settings
+FOR INSERT
+WITH CHECK (
   EXISTS (
     SELECT 1 FROM public.user_roles
     WHERE user_roles.user_id = auth.uid()
@@ -40,6 +47,13 @@ CREATE POLICY "Admins can update admin settings"
 ON public.admin_settings
 FOR UPDATE
 USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_roles.user_id = auth.uid()
+    AND user_roles.role = 'admin'
+  )
+)
+WITH CHECK (
   EXISTS (
     SELECT 1 FROM public.user_roles
     WHERE user_roles.user_id = auth.uid()

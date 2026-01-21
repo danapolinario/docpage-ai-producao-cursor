@@ -218,13 +218,33 @@ export async function createLandingPage(data: {
   try {
     const { getAutoPublishSetting } = await import('./admin');
     shouldAutoPublish = await getAutoPublishSetting();
+    console.log('Configuração de publicação automática:', {
+      enabled: shouldAutoPublish,
+      userId: userIdToUse
+    });
+    
     if (shouldAutoPublish) {
       initialStatus = 'published';
+      console.log('Publicação automática habilitada - criando landing page com status "published"');
+    } else {
+      console.log('Publicação automática desabilitada - criando landing page com status "draft"');
     }
-  } catch (error) {
-    console.warn('Erro ao verificar configuração de publicação automática, usando padrão (draft):', error);
+  } catch (error: any) {
+    console.error('Erro ao verificar configuração de publicação automática:', error);
+    console.error('Detalhes do erro:', {
+      message: error?.message,
+      error: error
+    });
     // Em caso de erro, manter status 'draft' (padrão seguro)
+    console.warn('Usando padrão (draft) devido ao erro na verificação');
   }
+
+  console.log('Criando landing page com os seguintes dados:', {
+    subdomain: data.subdomain.toLowerCase(),
+    status: initialStatus,
+    shouldAutoPublish,
+    published_at: shouldAutoPublish ? new Date().toISOString() : null
+  });
 
   const insertData = {
     user_id: userIdToUse,
@@ -261,6 +281,14 @@ export async function createLandingPage(data: {
     throw new Error(error.message || 'Erro ao criar landing page');
   }
 
+  console.log('Landing page criada com sucesso:', {
+    id: landingPage.id,
+    subdomain: landingPage.subdomain,
+    status: landingPage.status,
+    published_at: landingPage.published_at,
+    expectedStatus: initialStatus
+  });
+
   // Verificar se a landing page foi criada corretamente com o user_id correto
   if (landingPage.user_id !== userIdToUse) {
     console.error('ERRO: Landing page criada com user_id diferente!', {
@@ -269,6 +297,15 @@ export async function createLandingPage(data: {
       landingPageId: landingPage.id
     });
     throw new Error('Erro ao criar landing page: user_id não corresponde');
+  }
+
+  // Verificar se o status foi aplicado corretamente
+  if (landingPage.status !== initialStatus) {
+    console.warn('ATENÇÃO: Status da landing page diferente do esperado:', {
+      expected: initialStatus,
+      actual: landingPage.status,
+      landingPageId: landingPage.id
+    });
   }
 
   // Se foi criada como 'published', enviar email de notificação
