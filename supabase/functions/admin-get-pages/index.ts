@@ -113,11 +113,13 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Buscar todas as landing pages usando service role (bypass RLS)
+    // Buscar landing pages otimizado: apenas campos básicos (sem JSONB grandes)
+    // Primeiro buscar apenas campos básicos para evitar timeout
     const { data: landingPages, error: pagesError } = await supabaseAdmin
       .from('landing_pages')
-      .select('*')
+      .select('id, subdomain, custom_domain, status, created_at, updated_at, published_at, user_id')
       .order('created_at', { ascending: false })
+      .limit(300) // Limite reduzido para evitar timeout e memory limit
 
     if (pagesError) {
       console.error('Error fetching landing pages:', pagesError)
@@ -127,8 +129,53 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Formatar dados básicos (sem briefing_data para evitar timeout)
+    // O frontend pode buscar briefing_data separadamente se necessário
+    const optimizedPages = (landingPages || []).map((lp: any) => ({
+      id: lp.id,
+      subdomain: lp.subdomain,
+      custom_domain: lp.custom_domain,
+      status: lp.status,
+      created_at: lp.created_at,
+      updated_at: lp.updated_at,
+      published_at: lp.published_at,
+      user_id: lp.user_id,
+      briefing_data: {
+        name: null, // Será preenchido pelo frontend se necessário
+        contactEmail: null
+      }
+    }))
+
+    // Buscar emails dos usuários de forma eficiente (apenas IDs únicos)
+    const userIds = [...new Set(optimizedPages.map((lp: any) => lp.user_id).filter(Boolean))]
+    const userEmailsMap: Record<string, string> = {}
+    
+    if (userIds.length > 0 && userIds.length <= 100) {
+      // Buscar emails apenas se houver poucos usuários (evitar timeout)
+      try {
+        const { data: users, error: usersError } = await supabaseAdmin.auth.admin.listUsers()
+        
+        if (!usersError && users && users.users) {
+          users.users.forEach((user: any) => {
+            if (userIds.includes(user.id) && user.email) {
+              userEmailsMap[user.id] = user.email
+            }
+          })
+        }
+      } catch (emailError) {
+        console.warn('Erro ao buscar emails dos usuários (não crítico):', emailError)
+        // Não falhar se não conseguir buscar emails
+      }
+    }
+
+    // Adicionar emails aos dados formatados
+    const formattedPages = optimizedPages.map((lp: any) => ({
+      ...lp,
+      user_email: userEmailsMap[lp.user_id] || null
+    }))
+
     return new Response(
-      JSON.stringify({ data: landingPages || [] }),
+      JSON.stringify({ data: formattedPages }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
