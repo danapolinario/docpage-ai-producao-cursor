@@ -51,7 +51,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { data: landingPage, error } = await supabase
       .from("landing_pages")
-      .select("id, subdomain, custom_domain, briefing_data")
+      .select("id, subdomain, custom_domain, briefing_data, user_id")
       .eq("id", landingPageId)
       .single();
 
@@ -66,34 +66,88 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    if (!landingPage.user_id) {
+      console.error("Landing page sem user_id:", landingPageId);
+      return new Response(
+        JSON.stringify({ error: "Landing page sem usuário associado" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        },
+      );
+    }
+
+    // Buscar email do usuário autenticado (usado na etapa de Configuração & Pagamento)
+    const { data: user, error: userError } = await supabase.auth.admin.getUserById(landingPage.user_id);
+
+    if (userError || !user || !user.user?.email) {
+      console.error("Erro ao buscar email do usuário:", {
+        error: userError,
+        userId: landingPage.user_id,
+        user: user,
+      });
+
+      // Fallback: tentar pegar do briefing_data como backup
+      const briefing: any = landingPage.briefing_data || {};
+      const fallbackEmail = briefing.contactEmail || briefing.email;
+
+      if (!fallbackEmail) {
+        return new Response(
+          JSON.stringify({ 
+            error: "Não foi possível encontrar email do usuário",
+            details: {
+              landingPageId,
+              userId: landingPage.user_id,
+              userError: userError?.message,
+            }
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          },
+        );
+      }
+
+      console.warn("Usando email do briefing_data como fallback:", fallbackEmail);
+      var toEmail = fallbackEmail;
+    } else {
+      // Usar email do usuário autenticado (correto - da etapa Configuração & Pagamento)
+      var toEmail = user.user.email;
+    }
+
     const briefing: any = landingPage.briefing_data || {};
-    const toEmail: string | undefined =
-      briefing.contactEmail || briefing.email;
+    const doctorName = briefing.name || "Doutor(a)";
 
     console.log('Dados da landing page para notificação:', {
       landingPageId,
       subdomain: landingPage.subdomain,
       customDomain: landingPage.custom_domain,
+      userId: landingPage.user_id,
+      userEmail: user?.user?.email || 'NÃO ENCONTRADO',
       briefingName: briefing.name,
       hasContactEmail: !!briefing.contactEmail,
       hasEmail: !!briefing.email,
       toEmail: toEmail || 'NÃO ENCONTRADO',
+      emailSource: user?.user?.email ? 'auth.users (correto)' : 'briefing_data (fallback)',
     });
 
     if (!toEmail) {
       console.error(
-        "Nenhum email encontrado no briefing para landing page",
+        "Nenhum email encontrado para enviar notificação",
         {
           landingPageId,
+          userId: landingPage.user_id,
+          userError: userError?.message,
           briefingKeys: Object.keys(briefing),
-          briefingData: briefing,
         }
       );
       return new Response(
         JSON.stringify({ 
-          error: "Nenhum email encontrado no briefing_data para enviar notificação",
+          error: "Nenhum email encontrado para enviar notificação",
           details: {
             landingPageId,
+            userId: landingPage.user_id,
+            userError: userError?.message,
             availableFields: Object.keys(briefing),
           }
         }),
@@ -110,7 +164,12 @@ const handler = async (req: Request): Promise<Response> => {
 
     const siteUrl = `https://${displayDomain}`;
 
-    const doctorName = briefing.name || "Doutor(a)";
+    console.log("Tentando enviar email via Resend:", {
+      from: "DocPage AI <noreply@docpage.com.br>",
+      to: toEmail,
+      subject: "🎉 Seu site está no ar! - DocPage AI",
+      hasResendApiKey: !!Deno.env.get("RESEND_API_KEY"),
+    });
 
     const emailResponse = await resend.emails.send({
       from: "DocPage AI <noreply@docpage.com.br>",
@@ -162,14 +221,17 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
+    console.log("Resposta completa do Resend:", JSON.stringify(emailResponse, null, 2));
+
+    // Verificar se há erro explícito
     if (emailResponse?.error) {
-      // Log the error but don't fail the request - site was published successfully
       console.error("Email de notificação não enviado - Erro do Resend:", {
         error: emailResponse.error,
         landingPageId,
         toEmail,
         errorName: emailResponse.error?.name,
         errorMessage: emailResponse.error?.message,
+        fullError: emailResponse.error,
       });
       return new Response(
         JSON.stringify({ 
@@ -185,7 +247,33 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Verificar se a resposta tem data.id (confirmação de envio bem-sucedido)
     const emailId = emailResponse?.data?.id;
+    if (!emailId) {
+      console.error("Email não foi enviado - Resposta do Resend sem data.id:", {
+        landingPageId,
+        toEmail,
+        emailResponse,
+        hasData: !!emailResponse?.data,
+        dataKeys: emailResponse?.data ? Object.keys(emailResponse.data) : [],
+      });
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: "Resposta do Resend inválida - email não foi enviado",
+          warning: "Site publicado, mas email não foi enviado. Verifique a configuração do Resend.",
+          details: {
+            response: emailResponse,
+            message: "A resposta do Resend não contém data.id, indicando que o email não foi enviado.",
+          },
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        },
+      );
+    }
+
     console.log("Email de site publicado enviado com sucesso:", {
       landingPageId,
       toEmail,
@@ -193,7 +281,11 @@ const handler = async (req: Request): Promise<Response> => {
       response: emailResponse,
     });
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ 
+      success: true,
+      emailId: emailId,
+      to: toEmail,
+    }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
