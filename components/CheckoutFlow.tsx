@@ -699,8 +699,72 @@ export const CheckoutFlow: React.FC<Props> = ({
                   <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-100 pb-2">2. Escolha seu Domínio</h3>
                   <label className="block text-xs font-medium text-gray-700">Qual será o endereço do seu site?</label>
                   
-                  <div className="flex rounded-lg shadow-sm">
-                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                  {/* Mobile: Layout vertical para melhor usabilidade */}
+                  <div className="md:hidden space-y-3">
+                    <div className="flex rounded-lg shadow-sm">
+                      <span className="inline-flex items-center px-3 md:px-4 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-base font-medium">
+                        www.
+                      </span>
+                      <input
+                        type="text"
+                        value={domain}
+                        onChange={(e) => {
+                          setDomain(e.target.value.toLowerCase().replace(/\s/g, ''));
+                          setIsDomainAvailable(null);
+                          setDomainError(null);
+                        }}
+                        onKeyDown={handleDomainKeyDown}
+                        className={`flex-1 min-w-0 block w-full px-4 py-4 text-base rounded-none border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          isDomainAvailable === true 
+                            ? 'border-green-500 text-green-700 bg-green-50' 
+                            : isDomainAvailable === false
+                            ? 'border-red-500 text-red-700 bg-red-50'
+                            : 'border-gray-300 bg-white'
+                        }`}
+                        placeholder="drjoaosilva"
+                        disabled={isCheckingDomain || isDomainAvailable === true}
+                        autoComplete="off"
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <select 
+                        value={domainExtension}
+                        onChange={(e) => {
+                          setDomainExtension(e.target.value);
+                          setIsDomainAvailable(null);
+                        }}
+                        className="flex-1 bg-gray-50 border border-gray-300 text-gray-700 text-base font-medium px-4 py-4 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        disabled={isDomainAvailable === true}
+                      >
+                        <option>.com.br</option>
+                        <option>.med.br</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={handleCheckDomain}
+                        disabled={isCheckingDomain || !domain || isDomainAvailable === true || domain.length < 3}
+                        className={`flex-1 inline-flex items-center justify-center px-4 py-4 rounded-lg border text-base font-medium hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
+                          isDomainAvailable === true 
+                            ? 'bg-green-50 text-green-700 border-green-500' 
+                            : 'bg-gray-50 text-gray-700 border-gray-300'
+                        }`}
+                      >
+                        {isCheckingDomain ? (
+                          <svg className="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        ) : isDomainAvailable === true ? (
+                          <span className="flex items-center gap-1">✓ Disponível</span>
+                        ) : (
+                          "Verificar"
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Desktop: Layout horizontal */}
+                  <div className="hidden md:flex rounded-lg shadow-sm">
+                    <span className="inline-flex items-center px-3 md:px-4 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm font-medium">
                       www.
                     </span>
                     <input
@@ -712,7 +776,7 @@ export const CheckoutFlow: React.FC<Props> = ({
                         setDomainError(null);
                       }}
                       onKeyDown={handleDomainKeyDown}
-                      className={`flex-1 min-w-0 block w-full px-3 py-3 rounded-none border focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                      className={`flex-1 min-w-0 block w-full px-3 py-3 rounded-none border focus:ring-blue-500 focus:border-blue-500 text-sm ${
                         isDomainAvailable === true 
                           ? 'border-green-500 text-green-700 bg-green-50' 
                           : isDomainAvailable === false
@@ -721,6 +785,9 @@ export const CheckoutFlow: React.FC<Props> = ({
                       }`}
                       placeholder="drjoaosilva"
                       disabled={isCheckingDomain || isDomainAvailable === true}
+                      autoComplete="off"
+                      autoCapitalize="off"
+                      autoCorrect="off"
                     />
                     <select 
                       value={domainExtension}
@@ -728,7 +795,7 @@ export const CheckoutFlow: React.FC<Props> = ({
                         setDomainExtension(e.target.value);
                         setIsDomainAvailable(null);
                       }}
-                      className="bg-gray-50 border border-l-0 border-gray-300 text-gray-500 sm:text-sm px-2 outline-none"
+                      className="bg-gray-50 border border-l-0 border-gray-300 text-gray-500 text-sm px-2 outline-none"
                       disabled={isDomainAvailable === true}
                     >
                       <option>.com.br</option>
