@@ -781,7 +781,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
           )}
         </nav>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-6 pt-16 pb-24 text-center">
+        <div className="relative z-10 max-w-7xl mx-auto px-6 pt-8 pb-12 text-center">
           <div className="flex flex-col md:flex-row items-center justify-center gap-3 mb-6">
             <div className="inline-block px-4 py-1.5 rounded-full bg-teal-50 border border-teal-100 text-teal-700 text-xs font-bold uppercase tracking-wider">
               ✨ O Novo Padrão para Médicos
