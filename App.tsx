@@ -199,6 +199,14 @@ const App: React.FC = () => {
     } else if (state.step === 5) {
       trackPricingView();
       trackGAPageView('/step/pricing', 'Planos e Preços');
+      
+      // Scroll automático para a seção de planos quando entrar no step 5
+      setTimeout(() => {
+        const plansSection = document.getElementById('plans-section');
+        if (plansSection) {
+          plansSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 300);
     }
   }, [state.step]);
 
@@ -1025,7 +1033,7 @@ const App: React.FC = () => {
 
 
               {/* Right Area - Preview */}
-              <div className="flex-1 h-full overflow-hidden bg-gray-200 flex flex-col items-center justify-center relative p-4 md:p-6">
+              <div className="flex-1 h-full overflow-hidden bg-gray-200 flex flex-col items-center justify-center relative p-4 md:p-6 pb-24 md:pb-6">
                  {state.generatedContent ? (
                    <div className={`transition-all duration-300 ease-in-out bg-white overflow-hidden shadow-2xl origin-top ${getViewDimensions()}`}>
                       <Preview 
@@ -1049,7 +1057,7 @@ const App: React.FC = () => {
             </div>
 
             {/* Footer Bar - Static at bottom of flex column */}
-            <div className="h-20 bg-white border-t border-gray-200 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-[60] flex-none flex items-center justify-between px-8 relative">
+            <div className="h-20 bg-white border-t border-gray-200 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-[60] flex-none flex items-center justify-between px-4 md:px-8 fixed md:relative bottom-0 left-0 right-0 md:bottom-auto md:left-auto md:right-auto">
                <div className="flex items-center gap-4">
                   <button 
                     onClick={() => setIsSidebarOpen(!isSidebarOpen)}

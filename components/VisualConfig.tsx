@@ -82,7 +82,7 @@ export const VisualConfig: React.FC<Props> = ({
         
         {/* LEFT SIDEBAR: CONTROLS */}
         <aside className="w-[340px] flex-none bg-white border-r border-gray-100 overflow-y-auto z-20 flex flex-col h-full">
-          <div className="p-6 space-y-8 flex-1">
+          <div className="p-6 space-y-8 flex-1 pb-24 md:pb-6">
             
             <div>
                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-1">
@@ -227,7 +227,7 @@ export const VisualConfig: React.FC<Props> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="p-4 border-t border-gray-200 bg-white flex gap-3 sticky bottom-0 z-20">
+          <div className="p-4 border-t border-gray-200 bg-white flex gap-3 sticky md:sticky fixed md:relative bottom-0 left-0 right-0 z-20 md:z-auto">
             <button
               onClick={onBack}
               className="flex-1 px-4 py-2.5 rounded-xl font-medium text-gray-600 hover:bg-gray-100 transition-colors border border-gray-200 text-sm"
