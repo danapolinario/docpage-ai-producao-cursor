@@ -165,6 +165,24 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // Scroll para o topo no mobile quando o step muda
+  useEffect(() => {
+    // Verificar se está no mobile (largura < 768px)
+    const isMobile = window.innerWidth < 768;
+    
+    if (isMobile && state.step !== undefined) {
+      // Pequeno delay para garantir que o DOM foi atualizado
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Também tentar scroll no elemento main se existir
+        const mainElement = document.querySelector('main');
+        if (mainElement) {
+          mainElement.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 100);
+    }
+  }, [state.step]);
+
   // Track step changes
   useEffect(() => {
     if (state.step === 0) {
