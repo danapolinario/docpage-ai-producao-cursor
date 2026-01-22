@@ -75,14 +75,15 @@ export const VisualConfig: React.FC<Props> = ({
   const recommendedTheme = themeRecommendations[briefing.specialty] || null;
 
   return (
-    <div className="h-[calc(100vh-64px)] w-full bg-gray-100 flex items-center justify-center p-4 md:p-8 animate-fade-in font-sans">
+    <>
+    <div className="h-[calc(100vh-64px)] w-full bg-gray-100 flex items-center justify-center p-4 md:p-8 animate-fade-in font-sans relative pb-20 md:pb-8">
       
       {/* Floating Container */}
       <div className="w-full max-w-7xl h-full max-h-[900px] bg-white rounded-2xl shadow-2xl overflow-hidden flex border border-gray-200">
         
         {/* LEFT SIDEBAR: CONTROLS */}
         <aside className="w-[340px] flex-none bg-white border-r border-gray-100 overflow-y-auto z-20 flex flex-col h-full">
-          <div className="p-6 space-y-8 flex-1 pb-24 md:pb-6">
+          <div className="p-6 space-y-8 flex-1 pb-20 md:pb-6">
             
             <div>
                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-1">
@@ -226,8 +227,8 @@ export const VisualConfig: React.FC<Props> = ({
 
           </div>
 
-          {/* Action Buttons */}
-          <div className="p-4 border-t border-gray-200 bg-white flex gap-3 sticky md:sticky fixed md:relative bottom-0 left-0 right-0 z-20 md:z-auto">
+          {/* Action Buttons - Desktop (dentro do aside) */}
+          <div className="hidden md:flex p-4 border-t border-gray-200 bg-white gap-3 sticky bottom-0 z-20">
             <button
               onClick={onBack}
               className="flex-1 px-4 py-2.5 rounded-xl font-medium text-gray-600 hover:bg-gray-100 transition-colors border border-gray-200 text-sm"
@@ -292,5 +293,23 @@ export const VisualConfig: React.FC<Props> = ({
         </main>
       </div>
     </div>
+    
+    {/* Action Buttons - Mobile (fora do container, fixo na tela) */}
+    <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white flex gap-3 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.1)]" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+      <button
+        onClick={onBack}
+        className="flex-1 px-4 py-2.5 rounded-xl font-medium text-gray-600 hover:bg-gray-100 transition-colors border border-gray-200 text-sm"
+      >
+        Voltar
+      </button>
+      <button
+        onClick={onNext}
+        className="flex-[2] px-4 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-lg hover:shadow-blue-200 hover:-translate-y-0.5 flex items-center justify-center gap-2 text-sm"
+      >
+        Próximo
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+      </button>
+    </div>
+    </>
   );
 };
