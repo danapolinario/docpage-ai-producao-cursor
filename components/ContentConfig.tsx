@@ -95,12 +95,12 @@ export const ContentConfig: React.FC<Props> = ({
 
   if (isLoading || !content) {
     return (
-      <div className="max-w-4xl mx-auto bg-white p-12 rounded-xl shadow-lg border border-gray-100 min-h-[400px] flex flex-col items-center justify-center animate-fade-in relative overflow-hidden">
+      <div className="max-w-6xl mx-auto bg-white p-12 rounded-xl shadow-lg border border-gray-100 min-h-[400px] flex flex-col items-center justify-center animate-fade-in relative overflow-hidden">
          {/* Background pulse */}
          <div className="absolute inset-0 bg-blue-50 opacity-50 animate-pulse"></div>
          
          <div className="relative z-10 flex flex-col items-center px-4">
-            <div className="w-full h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-8 shadow-lg"></div>
+            <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-8 shadow-lg"></div>
             
             <h2 className="text-2xl font-bold text-gray-800 mb-2 transition-all duration-500 transform text-center break-words" style={{ overflowWrap: 'break-word' }}>
               Criando sua Copy...
