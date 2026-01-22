@@ -302,6 +302,32 @@ const App: React.FC = () => {
     }
   };
 
+  // Handler para upload manual da foto de consultório
+  const handleAboutPhotoChange = (url: string) => {
+    setState(prev => ({ ...prev, aboutPhotoUrl: url }));
+  };
+
+  // Handler para gerar foto de consultório por IA
+  const handleGenerateOfficePhoto = async () => {
+    if (!state.photoUrl) {
+      setState(prev => ({ ...prev, error: 'É necessário ter uma foto de perfil para gerar a foto de consultório por IA.' }));
+      return;
+    }
+    
+    setState(prev => ({ ...prev, isLoading: true, loadingMessage: 'Gerando foto ambientada no consultório...' }));
+    try {
+      const officeUrl = await generateOfficePhoto(state.photoUrl);
+      setState(prev => ({ 
+        ...prev, 
+        aboutPhotoUrl: officeUrl,
+        isLoading: false 
+      }));
+    } catch (e) {
+      console.error(e);
+      setState(prev => ({ ...prev, isLoading: false, error: 'Falha ao gerar foto de consultório. Tente novamente.' }));
+    }
+  };
+
   const handleGenerateContentOnly = async () => {
     trackGAPageView('/step/content/generate', 'Gerando Conteúdo');
     setState(prev => ({ ...prev, isLoading: true, loadingMessage: 'Gerando conteúdo e foto do consultório...' }));
@@ -905,7 +931,9 @@ const App: React.FC = () => {
               photoUrl={state.photoUrl}
               aboutPhotoUrl={state.aboutPhotoUrl} 
               onPhotoChange={updatePhoto}
+              onAboutPhotoChange={handleAboutPhotoChange}
               onEnhance={handleEnhancePhoto}
+              onGenerateOfficePhoto={handleGenerateOfficePhoto}
               isEnhanced={state.isPhotoAIEnhanced}
               onNext={handlePhotoStepNext}
               onBack={() => setState(prev => ({ ...prev, step: 1 }))}
