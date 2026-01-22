@@ -320,6 +320,26 @@ const App: React.FC = () => {
     }
   };
 
+  // Handler para melhorar apenas a foto de perfil
+  const handleEnhanceProfilePhoto = async () => {
+    if (!state.photoUrl) return;
+    
+    trackPhotoEnhance();
+    setState(prev => ({ ...prev, isLoading: true, loadingMessage: 'Melhorando foto de perfil com IA...' }));
+    try {
+      const enhancedUrl = await enhancePhoto(state.photoUrl);
+      setState(prev => ({ 
+        ...prev, 
+        photoUrl: enhancedUrl,
+        isPhotoAIEnhanced: true,
+        isLoading: false 
+      }));
+    } catch (e) {
+      console.error(e);
+      setState(prev => ({ ...prev, isLoading: false, error: 'Falha ao melhorar foto de perfil. Tente novamente.' }));
+    }
+  };
+
   // Handler para upload manual da foto de consultório
   const handleAboutPhotoChange = (url: string) => {
     setState(prev => ({ ...prev, aboutPhotoUrl: url }));
@@ -951,6 +971,7 @@ const App: React.FC = () => {
               onPhotoChange={updatePhoto}
               onAboutPhotoChange={handleAboutPhotoChange}
               onEnhance={handleEnhancePhoto}
+              onEnhanceProfilePhoto={handleEnhanceProfilePhoto}
               onGenerateOfficePhoto={handleGenerateOfficePhoto}
               isEnhanced={state.isPhotoAIEnhanced}
               onNext={handlePhotoStepNext}
