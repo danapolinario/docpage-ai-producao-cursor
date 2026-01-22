@@ -106,7 +106,7 @@ export const ContentConfig: React.FC<Props> = ({
               Criando sua Copy...
             </h2>
             
-            <div className="h-12 w-full text-center px-4">
+            <div className="h-12 w-full text-center px-6">
                <p key={loadingStep} className="text-gray-600 font-small text-lg animate-slide-up break-words" style={{ overflowWrap: 'break-word' }}>
                  {LOADING_MESSAGES[loadingStep]}
                </p>
