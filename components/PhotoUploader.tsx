@@ -721,7 +721,7 @@ export const PhotoUploader: React.FC<Props> = ({
           </div>
 
           {/* Right Column: Preview & Enhance */}
-          <div className="flex flex-col items-center bg-gray-50 p-6 rounded-xl border border-gray-200">
+          <div className="hidden md:flex flex-col items-center bg-gray-50 p-6 rounded-xl border border-gray-200">
              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Pré-visualização</h3>
              
              {photoUrl ? (
