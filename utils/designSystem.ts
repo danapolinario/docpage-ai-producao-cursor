@@ -71,17 +71,17 @@ export const getDesignClasses = (design: DesignSettings) => {
     'sans': { 
       head: 'font-sans font-bold tracking-tight', 
       body: 'font-sans font-normal text-gray-600',
-      hero: 'text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter'
+      hero: 'text-3xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter'
     },
     'serif-sans': { 
       head: 'font-serif font-semibold tracking-tight', 
       body: 'font-sans font-light text-gray-600',
-      hero: 'font-serif text-5xl md:text-6xl italic'
+      hero: 'font-serif text-3xl md:text-6xl italic'
     },
     'mono-sans': { 
       head: 'font-mono font-bold tracking-tighter uppercase', 
       body: 'font-sans text-gray-600',
-      hero: 'font-mono text-4xl md:text-5xl'
+      hero: 'font-mono text-3xl md:text-5xl'
     },
   };
 
