@@ -314,7 +314,7 @@ export const AboutSection: React.FC<SectionProps> = ({ content, design, layoutVa
                <div className="w-full md:w-1/2">
                   <div className="relative">
                      <div className={`absolute inset-0 ${s.bg} rounded-[2rem] rotate-3 opacity-20`}></div>
-                     <img src={photoSrc} className={`relative rounded-[2rem] shadow-xl w-full h-64 md:h-auto object-cover rotate-[-2deg] hover:rotate-0 transition-transform duration-500`} alt="About" />
+                     <img src={photoSrc} className={`relative rounded-[2rem] shadow-xl w-full h-96 md:h-auto object-cover rotate-[-2deg] hover:rotate-0 transition-transform duration-500`} alt="About" />
                   </div>
                </div>
                <div className="w-full md:w-1/2 text-center md:text-left">
