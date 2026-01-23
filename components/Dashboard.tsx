@@ -105,6 +105,7 @@ export const Dashboard: React.FC<Props> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [localContent, setLocalContent] = useState<LandingPageContent>(content);
   const [localDesign, setLocalDesign] = useState<DesignSettings>(design);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [localVisibility, setLocalVisibility] = useState<SectionVisibility>(visibility);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -852,10 +853,86 @@ export const Dashboard: React.FC<Props> = ({
     );
   };
 
+  // Funcionalidades por plano
+  const getPlanFeatures = () => {
+    const planId = plan.id || plan.name?.toLowerCase() || 'starter';
+    
+    if (planId.includes('authority') || planId.includes('autoridade')) {
+      return {
+        canEdit: true,
+        canViewStats: true,
+        canViewAdvancedStats: true,
+        canManageDomain: true,
+        canManageEmail: true,
+        canManageTestimonials: true,
+        canAccessSocialMedia: true,
+        canGetConsulting: true,
+        canGetCustomDesign: true,
+        canGetAdsManagement: true,
+        description: 'Seu plano Autoridade inclui todas as funcionalidades: edição completa do site, estatísticas avançadas, gerenciamento de domínio e email profissional, depoimentos, posts para redes sociais, consultoria mensal, customização humana e gestão de tráfego (Ads).'
+      };
+    } else if (planId.includes('pro') || planId.includes('profissional')) {
+      return {
+        canEdit: true,
+        canViewStats: true,
+        canViewAdvancedStats: true,
+        canManageDomain: true,
+        canManageEmail: true,
+        canManageTestimonials: true,
+        canAccessSocialMedia: true,
+        canGetConsulting: false,
+        canGetCustomDesign: false,
+        canGetAdsManagement: false,
+        description: 'Seu plano Profissional inclui: edição completa do site, estatísticas avançadas, gerenciamento de domínio e email profissional, depoimentos e posts semanais para redes sociais.'
+      };
+    } else {
+      return {
+        canEdit: true,
+        canViewStats: true,
+        canViewAdvancedStats: false,
+        canManageDomain: true,
+        canManageEmail: false,
+        canManageTestimonials: true,
+        canAccessSocialMedia: false,
+        canGetConsulting: false,
+        canGetCustomDesign: false,
+        canGetAdsManagement: false,
+        description: 'Seu plano Starter inclui: edição básica do site, estatísticas de acesso e gerenciamento de domínio. Para acessar funcionalidades avançadas como estatísticas detalhadas, email profissional e posts para redes sociais, considere fazer upgrade para o plano Profissional.'
+      };
+    }
+  };
+
+  const planFeatures = getPlanFeatures();
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans flex">
+       {/* Mobile Menu Button */}
+       <button
+         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+         className="md:hidden fixed top-4 left-4 z-50 bg-slate-900 text-white p-3 rounded-lg shadow-lg"
+         aria-label="Abrir menu"
+       >
+         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+           {isMobileMenuOpen ? (
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+           ) : (
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+           )}
+         </svg>
+       </button>
+
+       {/* Mobile Menu Overlay */}
+       {isMobileMenuOpen && (
+         <div 
+           className="md:hidden fixed inset-0 bg-black/50 z-40"
+           onClick={() => setIsMobileMenuOpen(false)}
+         />
+       )}
+
        {/* Sidebar */}
-       <aside className="w-64 bg-slate-900 text-white flex-none hidden md:flex flex-col">
+       <aside className={`w-64 bg-slate-900 text-white flex-none flex flex-col fixed md:relative inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out ${
+         isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+       }`}>
            <div className="p-6 border-b border-slate-800 flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-lg text-blue-400 border-2 border-slate-600">
                  {doctorName.charAt(0)}
@@ -868,42 +945,60 @@ export const Dashboard: React.FC<Props> = ({
 
           <nav className="flex-1 p-4 space-y-2 mt-4">
              <button 
-               onClick={() => setActiveView('overview')}
+               onClick={() => {
+                 setActiveView('overview');
+                 setIsMobileMenuOpen(false);
+               }}
                className={`flex w-full items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition-colors ${activeView === 'overview' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
              >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
                 Painel Geral
              </button>
              <button 
-               onClick={() => setIsEditing(true)}
+               onClick={() => {
+                 setIsEditing(true);
+                 setIsMobileMenuOpen(false);
+               }}
                className={`flex w-full items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition-colors ${isEditing ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
              >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 Editar Site
              </button>
              <button 
-               onClick={() => setActiveView('settings')}
+               onClick={() => {
+                 setActiveView('settings');
+                 setIsMobileMenuOpen(false);
+               }}
                className={`flex w-full items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition-colors ${activeView === 'settings' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
              >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 Configurações
              </button>
              <button 
-               onClick={() => setActiveView('testimonials')}
+               onClick={() => {
+                 setActiveView('testimonials');
+                 setIsMobileMenuOpen(false);
+               }}
                className={`flex w-full items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition-colors ${activeView === 'testimonials' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
              >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h6m-6 4h4M5 5a2 2 0 00-2 2v9.5a.5.5 0 00.8.4L7 15h12a2 2 0 002-2V7a2 2 0 00-2-2H5z" /></svg>
                 Depoimentos
              </button>
              <button 
-               onClick={() => setActiveView('domain')}
+               onClick={() => {
+                 setActiveView('domain');
+                 setIsMobileMenuOpen(false);
+               }}
                className={`flex w-full items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition-colors ${activeView === 'domain' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
              >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
                 Domínio
              </button>
              <button 
-               onClick={() => setActiveView('social')}
+               onClick={() => {
+                 setActiveView('social');
+                 setIsMobileMenuOpen(false);
+               }}
                className={`flex w-full items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition-colors mt-2 ${activeView === 'social' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
              >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
@@ -923,9 +1018,9 @@ export const Dashboard: React.FC<Props> = ({
        </aside>
 
        {/* Main Area */}
-       <main className="flex-1 overflow-y-auto">
-          <header className="bg-white border-b border-gray-200 py-4 px-8 flex justify-between items-center sticky top-0 z-40 shadow-sm">
-             <h1 className="text-xl font-bold text-gray-800">
+       <main className="flex-1 overflow-y-auto md:ml-0">
+          <header className="bg-white border-b border-gray-200 py-4 px-4 md:px-8 flex justify-between items-center sticky top-0 z-30 shadow-sm">
+             <h1 className="text-lg md:text-xl font-bold text-gray-800">
                 {activeView === 'overview'
                   ? 'Painel de Controle'
                   : activeView === 'settings'
@@ -1003,7 +1098,7 @@ export const Dashboard: React.FC<Props> = ({
               </div>
             </div>
           ) : (
-            <div className="p-8 max-w-7xl mx-auto space-y-8">
+            <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
              
              {/* Loading State */}
              {isLoading && (
@@ -1034,11 +1129,11 @@ export const Dashboard: React.FC<Props> = ({
              {activeView === 'overview' && !isLoading && !error && dashboardData && (
                <>
                  {/* Welcome Banner */}
-                 <div className="bg-slate-900 rounded-2xl p-8 text-white shadow-xl flex justify-between items-center relative overflow-hidden">
+                 <div className="bg-slate-900 rounded-2xl p-6 md:p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 rounded-full blur-3xl opacity-20 -mr-16 -mt-16"></div>
-                    <div className="relative z-10 space-y-2">
-                       <h2 className="text-3xl font-bold mb-1">Bem-vindo(a), {doctorName}!</h2>
-                       <p className="text-slate-300">
+                    <div className="relative z-10 space-y-2 flex-1">
+                       <h2 className="text-2xl md:text-3xl font-bold mb-1">Bem-vindo(a), {doctorName}!</h2>
+                       <p className="text-slate-300 text-sm md:text-base">
                          Seu site está <strong>{dashboardData.landingPage?.status === 'published' ? 'ativo' : 'em publicação'}</strong>.
                        </p>
                        {!dashboardData.landingPage || dashboardData.landingPage.status !== 'published' && (
@@ -1053,6 +1148,91 @@ export const Dashboard: React.FC<Props> = ({
                           {displayDomain}
                        </div>
                     </div>
+                 </div>
+
+                 {/* Plan Features Info Banner */}
+                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 md:p-6 shadow-sm">
+                   <div className="flex items-start gap-3 md:gap-4">
+                     <div className="flex-shrink-0 mt-1">
+                       <svg className="w-5 h-5 md:w-6 md:h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                       </svg>
+                     </div>
+                     <div className="flex-1">
+                       <div className="flex items-center gap-2 mb-2">
+                         <h3 className="text-sm md:text-base font-bold text-blue-900">Funcionalidades do seu plano</h3>
+                         <span className="px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded uppercase">{plan.name}</span>
+                       </div>
+                       <p className="text-xs md:text-sm text-blue-800 mb-3 leading-relaxed">
+                         {planFeatures.description}
+                       </p>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
+                         <div className="flex items-center gap-2 text-xs md:text-sm">
+                           <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canEdit ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canEdit ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
+                           </svg>
+                           <span className={planFeatures.canEdit ? 'text-blue-900' : 'text-gray-500'}>Edição completa do site</span>
+                         </div>
+                         <div className="flex items-center gap-2 text-xs md:text-sm">
+                           <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canViewAdvancedStats ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canViewAdvancedStats ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
+                           </svg>
+                           <span className={planFeatures.canViewAdvancedStats ? 'text-blue-900' : 'text-gray-500'}>Estatísticas avançadas</span>
+                         </div>
+                         <div className="flex items-center gap-2 text-xs md:text-sm">
+                           <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canManageEmail ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canManageEmail ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
+                           </svg>
+                           <span className={planFeatures.canManageEmail ? 'text-blue-900' : 'text-gray-500'}>Email profissional</span>
+                         </div>
+                         <div className="flex items-center gap-2 text-xs md:text-sm">
+                           <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canAccessSocialMedia ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canAccessSocialMedia ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
+                           </svg>
+                           <span className={planFeatures.canAccessSocialMedia ? 'text-blue-900' : 'text-gray-500'}>Posts para redes sociais</span>
+                         </div>
+                         {planFeatures.canGetConsulting && (
+                           <div className="flex items-center gap-2 text-xs md:text-sm">
+                             <svg className="w-4 h-4 flex-shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                             </svg>
+                             <span className="text-blue-900">Consultoria mensal</span>
+                           </div>
+                         )}
+                         {planFeatures.canGetCustomDesign && (
+                           <div className="flex items-center gap-2 text-xs md:text-sm">
+                             <svg className="w-4 h-4 flex-shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                             </svg>
+                             <span className="text-blue-900">Customização humana</span>
+                           </div>
+                         )}
+                         {planFeatures.canGetAdsManagement && (
+                           <div className="flex items-center gap-2 text-xs md:text-sm">
+                             <svg className="w-4 h-4 flex-shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                             </svg>
+                             <span className="text-blue-900">Gestão de tráfego (Ads)</span>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                   </div>
+                 </div>
+
+                 {/* Mobile Menu Orientation */}
+                 <div className="md:hidden bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                   <div className="flex items-start gap-3">
+                     <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                     </svg>
+                     <div>
+                       <h4 className="text-sm font-bold text-amber-900 mb-1">Como acessar o menu</h4>
+                       <p className="text-xs text-amber-800 leading-relaxed">
+                         Toque no botão <span className="font-bold">☰</span> no canto superior esquerdo para abrir o menu e acessar todas as funcionalidades do painel: Editar Site, Configurações, Depoimentos, Domínio e Posts para Redes Sociais.
+                       </p>
+                     </div>
+                   </div>
                  </div>
 
                  {/* Stats Grid - Updated with Conversion Rate */}
