@@ -66,7 +66,7 @@ export const BriefingForm: React.FC<Props> = ({ data, onChange, onNext }) => {
         
         <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo (inclua Dr. ou Dra.)</label>
             <input
               type="text"
               name="name"

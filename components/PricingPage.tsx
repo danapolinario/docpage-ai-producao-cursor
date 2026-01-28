@@ -296,10 +296,10 @@ export const PricingPage: React.FC<Props> = ({
             Página Pronta para Publicar
           </div>
           <h1 className="text-3xl md:text-5xl font-bold mb-4 tracking-tight">
-            Parabéns, Dr(a). {doctorName}!
+            Uaau, {doctorName}!
           </h1>
           <p className="text-lg text-slate-300 max-w-2xl mx-auto mb-8">
-            Sua presença digital está quase no ar. Veja como sua página ficou incrível em todos os dispositivos.
+            Falta muito pouco para sua presença digital estar no ar. Clique no botão abaixo para escolher o plano que melhor te atende.
           </p>
           <div className="flex flex-col items-center gap-4">
             <button 
