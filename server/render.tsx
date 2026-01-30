@@ -232,12 +232,25 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
       .animate-fade-in {
         animation: fadeIn 0.5s ease-out forwards;
       }
+      .animate-slide-down {
+        animation: slideDown 0.3s ease-out;
+      }
       .animate-slide-up {
         animation: slideUp 0.5s ease-out forwards;
       }
       @keyframes fadeIn {
         from { opacity: 0; }
         to { opacity: 1; }
+      }
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translate(-50%, -20px);
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, 0);
+        }
       }
       @keyframes slideUp {
         from { opacity: 0; transform: translateY(20px); }

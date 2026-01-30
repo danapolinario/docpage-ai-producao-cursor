@@ -14,9 +14,11 @@ interface Props {
   briefing: BriefingData;
   layoutVariant: LayoutVariant;
   landingPageId?: string;
+  isEditorMode?: boolean;
+  hasCustomTestimonials?: boolean;
 }
 
-export const ImmersiveOverlay: React.FC<Props> = ({ content, design, visibility, photoUrl, aboutPhotoUrl, briefing, layoutVariant, landingPageId }) => {
+export const ImmersiveOverlay: React.FC<Props> = ({ content, design, visibility, photoUrl, aboutPhotoUrl, briefing, layoutVariant, landingPageId, isEditorMode, hasCustomTestimonials }) => {
   const { p, s, t, r } = getDesignClasses(design);
 
   const handlePrimaryCtaClick = () => {
@@ -76,7 +78,7 @@ export const ImmersiveOverlay: React.FC<Props> = ({ content, design, visibility,
 
       {visibility.services && <ServicesSection content={content} design={design} layoutVariant={layoutVariant} />}
       {visibility.about && <AboutSection content={content} design={design} layoutVariant={layoutVariant} aboutPhotoUrl={aboutPhotoUrl} />}
-      {visibility.testimonials && <TestimonialsSection content={content} design={design} layoutVariant={layoutVariant} />}
+      {visibility.testimonials && <TestimonialsSection content={content} design={design} layoutVariant={layoutVariant} isEditorMode={isEditorMode} hasCustomTestimonials={hasCustomTestimonials} visibility={visibility} />}
       <LocationSection content={content} design={design} briefing={briefing} layoutVariant={layoutVariant} />
       {visibility.footer && <FooterSection content={content} design={design} briefing={briefing} layoutVariant={layoutVariant} />}
       

@@ -17,6 +17,7 @@ interface Props {
   onPublish: () => void;
   onHide: () => void;
   onThemeSelect: (theme: ThemeType) => void;
+  hasCustomTestimonials?: boolean; // NOVO: Flag para indicar se depoimentos são customizados
 }
 
 
@@ -37,6 +38,7 @@ export const EditorPanel: React.FC<Props> = ({
   onPublish,
   onHide,
   onThemeSelect,
+  hasCustomTestimonials,
 }) => {
   const [activeTab, setActiveTab] = useState<Tab>('content');
   const [expandedSection, setExpandedSection] = useState<keyof SectionVisibility | null>(null);
@@ -245,25 +247,29 @@ export const EditorPanel: React.FC<Props> = ({
                     <div className="flex items-center gap-2">
                        <input type="checkbox" checked={visibility.testimonials} onChange={() => onToggleSection('testimonials')} className="w-4 h-4 text-blue-600 rounded" />
                        <span className="text-sm font-medium text-gray-700">Depoimentos ({content.testimonials.length})</span>
-                       <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
-                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
-                         </svg>
-                         Atenção
-                       </span>
+                       {!hasCustomTestimonials && (
+                         <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
+                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
+                           </svg>
+                           Atenção
+                         </span>
+                       )}
                     </div>
                     <button onClick={() => toggleAccordion('testimonials')}><svg className={`w-4 h-4 transform ${expandedSection === 'testimonials' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg></button>
                  </div>
                  {expandedSection === 'testimonials' && visibility.testimonials && (
                     <div className="p-3 bg-white border-t border-gray-200 space-y-4">
-                       <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200">
-                         <svg className="w-4 h-4 text-amber-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
-                         </svg>
-                         <p className="text-xs text-amber-800">
-                           Os depoimentos abaixo são <strong>ilustrativos</strong>. Altere os textos com experiências reais dos seus pacientes ou desative a seção de depoimentos para seguir em conformidade com o CFM.
-                         </p>
-                       </div>
+                       {!hasCustomTestimonials && (
+                         <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200">
+                           <svg className="w-4 h-4 text-amber-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
+                           </svg>
+                           <p className="text-xs text-amber-800">
+                             Os depoimentos abaixo são <strong>ilustrativos</strong>. Altere os textos com experiências reais dos seus pacientes ou desative a seção de depoimentos para seguir em conformidade com o CFM.
+                           </p>
+                         </div>
+                       )}
                        {content.testimonials.map((t, idx) => (
                           <div key={idx} className="p-3 bg-gray-50 rounded border border-gray-100 relative group">
                              <button onClick={() => handleDeleteTestimonial(idx)} className="absolute top-2 right-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100">✕</button>
@@ -271,7 +277,7 @@ export const EditorPanel: React.FC<Props> = ({
                              <textarea className="w-full text-xs text-gray-600 bg-transparent resize-none outline-none italic" value={t.text} onChange={(e) => handleTestimonialChange(idx, 'text', e.target.value)} rows={3} />
                           </div>
                        ))}
-                       <button onClick={handleAddTestimonial} className="w-full py-2 text-xs font-bold text-blue-600 border border-dashed border-blue-300 rounded hover:bg-blue-50">+ Add Depoimento</button>
+                       <button onClick={handleAddTestimonial} className="w-full py-2 text-xs font-bold text-blue-600 border border-dashed border-blue-300 rounded hover:bg-blue-50">+ Adicionar Depoimento</button>
                     </div>
                  )}
               </div>

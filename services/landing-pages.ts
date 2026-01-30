@@ -239,11 +239,26 @@ export async function createLandingPage(data: {
     console.warn('Usando padrão (draft) devido ao erro na verificação');
   }
 
+  // Validar depoimentos antes de criar
+  // Se não houver depoimentos customizados, ocultar a seção
+  const hasCustomTestimonials = (data.visibility as any)?.hasCustomTestimonials === true;
+  const hasTestimonials = data.content.testimonials && data.content.testimonials.length > 0;
+  
+  // Se não tem depoimentos customizados, ocultar a seção de depoimentos
+  const finalVisibility = {
+    ...data.visibility,
+    testimonials: hasCustomTestimonials && hasTestimonials 
+      ? data.visibility.testimonials 
+      : false, // Ocultar se não são customizados
+  };
+
   console.log('Criando landing page com os seguintes dados:', {
     subdomain: data.subdomain.toLowerCase(),
     status: initialStatus,
     shouldAutoPublish,
-    published_at: shouldAutoPublish ? new Date().toISOString() : null
+    published_at: shouldAutoPublish ? new Date().toISOString() : null,
+    hasCustomTestimonials,
+    testimonialsVisible: finalVisibility.testimonials
   });
 
   const insertData = {
@@ -253,7 +268,7 @@ export async function createLandingPage(data: {
     briefing_data: data.briefing,
     content_data: data.content,
     design_settings: data.design,
-    section_visibility: data.visibility,
+    section_visibility: finalVisibility,
     layout_variant: data.layoutVariant,
     status: initialStatus,
     published_at: shouldAutoPublish ? new Date().toISOString() : null,
@@ -637,6 +652,20 @@ export async function publishLandingPage(id: string): Promise<LandingPageRow> {
     throw new Error('Landing page não encontrada');
   }
   
+  // Verificar se tem depoimentos customizados
+  const hasCustomTestimonials = (currentPage.section_visibility as any)?.hasCustomTestimonials === true;
+  const hasTestimonials = currentPage.content_data?.testimonials && 
+    Array.isArray(currentPage.content_data.testimonials) && 
+    currentPage.content_data.testimonials.length > 0;
+  
+  // Se não tem depoimentos customizados, ocultar a seção
+  const updatedVisibility = {
+    ...currentPage.section_visibility,
+    testimonials: hasCustomTestimonials && hasTestimonials 
+      ? currentPage.section_visibility.testimonials 
+      : false,
+  };
+  
   // Gerar metadados SEO
   const seoMeta = generateSEOMetadata(
     currentPage.briefing_data as BriefingData,
@@ -673,6 +702,7 @@ export async function publishLandingPage(id: string): Promise<LandingPageRow> {
     meta_keywords: seoMeta.keywords,
     schema_markup: schemaMarkup,
     og_image_url: ogImageUrl,
+    section_visibility: updatedVisibility,
   });
 }
 

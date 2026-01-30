@@ -276,10 +276,24 @@ const App: React.FC = () => {
   const handleUpdateContent = (key: keyof LandingPageContent, value: any) => {
     if (!state.generatedContent) return;
     trackContentEdit(key);
-    setState(prev => ({
-      ...prev,
-      generatedContent: { ...prev.generatedContent!, [key]: value }
-    }));
+    setState(prev => {
+      const newContent = { ...prev.generatedContent!, [key]: value };
+      
+      // Se está editando depoimentos, marcar como customizados
+      let newVisibility = prev.sectionVisibility;
+      if (key === 'testimonials') {
+        newVisibility = {
+          ...prev.sectionVisibility,
+          hasCustomTestimonials: true, // Marcar como customizado
+        } as any;
+      }
+      
+      return {
+        ...prev,
+        generatedContent: newContent,
+        sectionVisibility: newVisibility,
+      };
+    });
   };
 
   const handleUpdateDesign = (key: keyof DesignSettings, value: any) => {
@@ -1044,6 +1058,8 @@ const App: React.FC = () => {
                         aboutPhotoUrl={state.aboutPhotoUrl}
                         briefing={state.briefing}
                         layoutVariant={state.layoutVariant}
+                        isEditorMode={true}
+                        hasCustomTestimonials={(state.sectionVisibility as any)?.hasCustomTestimonials}
                       />
                    </div>
                  ) : (

@@ -11,6 +11,8 @@ interface SectionProps {
   layoutVariant?: LayoutVariant;
   aboutPhotoUrl?: string | null; // Added prop
   landingPageId?: string;
+  isEditorMode?: boolean; // NOVO: Flag para indicar se está no modo editor
+  hasCustomTestimonials?: boolean; // NOVO: Flag para indicar se depoimentos são customizados
 }
 
 // --- Helper Functions & Components ---
@@ -379,14 +381,40 @@ export const AboutSection: React.FC<SectionProps> = ({ content, design, layoutVa
   );
 };
 
-export const TestimonialsSection: React.FC<SectionProps> = ({ content, design, layoutVariant = 1 }) => {
+export const TestimonialsSection: React.FC<SectionProps> = ({ content, design, layoutVariant = 1, isEditorMode, hasCustomTestimonials, visibility }) => {
   const { p, s, t, r } = getDesignClasses(design);
+
+  // Verificar se há depoimentos fake (ilustrativos)
+  const hasFakeTestimonials = 
+    isEditorMode && 
+    visibility?.testimonials && 
+    content.testimonials && 
+    content.testimonials.length > 0 && 
+    !hasCustomTestimonials;
+
+  // Componente de aviso discreto
+  const TestimonialWarning = () => {
+    if (!hasFakeTestimonials) return null;
+    return (
+      <div className="mb-8 max-w-3xl mx-auto">
+        <div className="bg-amber-50/50 border border-amber-200/50 rounded-lg p-3 text-xs text-amber-700">
+          <p>
+            Os depoimentos exibidos aqui são apenas ilustrativos e não aparecerão para os visitantes da sua página enquanto você não adicionar depoimentos reais de seus pacientes. Para isso, clique em <strong>"Editar Página"</strong> ou, se preferir, deixe para fazer em outro momento.
+          </p>
+        </div>
+      </div>
+    );
+  };
 
   if (layoutVariant === 5) {
      return (
        <section id="testimonials" className="py-24 md:py-32 px-6 bg-stone-50 text-center">
           <div className="max-w-3xl mx-auto">
-             <div className="text-6xl font-serif text-gray-300 mb-8">“</div>
+             <h2 className={`text-center text-3xl md:text-4xl mb-8 ${t.head} ${p.primary}`}>
+               Histórias de Sucesso
+             </h2>
+             <TestimonialWarning />
+             <div className="text-6xl font-serif text-gray-300 mb-8">"</div>
              <p className="text-2xl md:text-4xl font-serif leading-tight mb-10 text-gray-800">
                {content.testimonials[0]?.text}
              </p>
@@ -404,6 +432,7 @@ export const TestimonialsSection: React.FC<SectionProps> = ({ content, design, l
       <section id="testimonials" className={`py-20 px-6 ${p.softBg}`}>
          <div className="max-w-7xl mx-auto">
             <h2 className="text-center text-3xl font-bold mb-12">O que dizem nossos pacientes</h2>
+            <TestimonialWarning />
             <div className="flex flex-col md:flex-row gap-6 overflow-x-auto pb-8 snap-x">
                {content.testimonials.map((testi, idx) => (
                  <div key={idx} className={`flex-1 min-w-[280px] snap-center bg-white p-8 rounded-2xl shadow-lg border border-gray-100`}>
@@ -430,9 +459,11 @@ export const TestimonialsSection: React.FC<SectionProps> = ({ content, design, l
   return (
     <section id="testimonials" className="py-24 px-6 md:px-12 bg-white">
       <div className="max-w-5xl mx-auto">
-        <h2 className={`text-center text-3xl md:text-4xl mb-16 ${t.head} ${p.primary}`}>
+        <h2 className={`text-center text-3xl md:text-4xl mb-4 ${t.head} ${p.primary}`}>
           Histórias de Sucesso
         </h2>
+        <TestimonialWarning />
+        <div className="mb-16"></div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
           {content.testimonials.map((testi, idx) => (
             <div key={idx} className={`p-8 ${p.surface} ${r.box} relative group border ${p.border} hover:border-${design.secondaryColor}-200 transition-colors`}>

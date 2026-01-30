@@ -323,8 +323,8 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
 
   const examples = [
     {
-      author: "Dr. Ricardo Mendes",
-      specialty: "Cardiologia",
+      author: "Dra. Ricardo Mendes",
+      specialty: "Otorrinolaringologia",
       theme: "Estilo Clínico",
       image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80",
       tagColor: "bg-blue-100 text-blue-700"

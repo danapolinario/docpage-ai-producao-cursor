@@ -16,10 +16,12 @@ interface Props {
   layoutVariant: LayoutVariant;
   landingPageId?: string;
   isPreview?: boolean;
+  isEditorMode?: boolean; // NOVO: Flag para indicar se está no modo editor
+  hasCustomTestimonials?: boolean; // NOVO: Flag para indicar se depoimentos são customizados
 }
 
 export const Preview: React.FC<Props> = (props) => {
-  const { layoutVariant, content } = props;
+  const { layoutVariant, content, isEditorMode, hasCustomTestimonials, visibility } = props;
 
   // Verificação de segurança: se não houver conteúdo, mostrar mensagem
   if (!content) {
@@ -34,17 +36,18 @@ export const Preview: React.FC<Props> = (props) => {
     );
   }
 
+  // Renderizar preview - aviso agora está dentro da seção de depoimentos
   switch (layoutVariant) {
     case 2:
-      return <ModernCentered {...props} />;
+      return <ModernCentered {...props} isEditorMode={isEditorMode} hasCustomTestimonials={hasCustomTestimonials} />;
     case 3:
-      return <ImmersiveOverlay {...props} />;
+      return <ImmersiveOverlay {...props} isEditorMode={isEditorMode} hasCustomTestimonials={hasCustomTestimonials} />;
     case 4:
-      return <GridStudio {...props} />;
+      return <GridStudio {...props} isEditorMode={isEditorMode} hasCustomTestimonials={hasCustomTestimonials} />;
     case 5:
-      return <Editorial {...props} />;
+      return <Editorial {...props} isEditorMode={isEditorMode} hasCustomTestimonials={hasCustomTestimonials} />;
     case 1:
     default:
-      return <ClassicSplit {...props} />;
+      return <ClassicSplit {...props} isEditorMode={isEditorMode} hasCustomTestimonials={hasCustomTestimonials} />;
   }
 };
