@@ -16,7 +16,12 @@ interface VercelResponse {
 import { renderLandingPage } from './render';
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// Para ES modules, precisamos definir __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
@@ -128,13 +133,69 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   });
   
   try {
-    // Tentar ler index.html do dist
-    const indexPath = join(process.cwd(), 'dist', 'index.html');
-    const indexHtml = readFileSync(indexPath, 'utf-8');
-    res.setHeader('Content-Type', 'text/html');
-    return res.send(indexHtml);
+    // Tentar múltiplos caminhos possíveis para index.html no Vercel
+    const possiblePaths = [
+      join(process.cwd(), 'dist', 'index.html'),
+      join(process.cwd(), 'index.html'),
+      join(__dirname, '..', 'dist', 'index.html'),
+      join(__dirname, '..', 'index.html'),
+    ];
+    
+    let indexHtml: string | null = null;
+    let lastError: Error | null = null;
+    
+    for (const indexPath of possiblePaths) {
+      try {
+        indexHtml = readFileSync(indexPath, 'utf-8');
+        console.log('[SUBDOMAIN DEBUG] index.html encontrado em (index):', indexPath);
+        break;
+      } catch (err: any) {
+        lastError = err;
+        continue;
+      }
+    }
+    
+    if (indexHtml) {
+      res.setHeader('Content-Type', 'text/html');
+      return res.send(indexHtml);
+    } else {
+      console.error('Erro ao ler index.html de todos os caminhos (index):', lastError);
+      // Retornar HTML básico como fallback
+      const fallbackHtml = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DocPage AI</title>
+  <script>
+    window.location.href = '/';
+  </script>
+</head>
+<body>
+  <p>Redirecionando...</p>
+</body>
+</html>`;
+      res.setHeader('Content-Type', 'text/html');
+      return res.send(fallbackHtml);
+    }
   } catch (error) {
-    // Se não encontrar, retornar 404 (Vercel tentará servir do outputDirectory)
-    return res.status(404).send('Not found');
+    console.error('Erro geral ao servir index.html (index):', error);
+    // Retornar HTML básico como fallback
+    const fallbackHtml = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DocPage AI</title>
+  <script>
+    window.location.href = '/';
+  </script>
+</head>
+<body>
+  <p>Redirecionando...</p>
+</body>
+</html>`;
+    res.setHeader('Content-Type', 'text/html');
+    return res.send(fallbackHtml);
   }
 }

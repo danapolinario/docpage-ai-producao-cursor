@@ -10,8 +10,16 @@
       "destination": "/api"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!admin|dashboard|assets).*)",
       "destination": "/api/$1"
+    },
+    {
+      "source": "/admin",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/index.html"
     }
   ],
   "headers": [
