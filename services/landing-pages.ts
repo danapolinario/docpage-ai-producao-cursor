@@ -158,6 +158,7 @@ export function generateSubdomain(name: string): string {
  */
 export async function createLandingPage(data: {
   subdomain: string;
+  customDomain?: string | null;
   briefing: BriefingData;
   content: LandingPageContent;
   design: DesignSettings;
@@ -261,7 +262,7 @@ export async function createLandingPage(data: {
     testimonialsVisible: finalVisibility.testimonials
   });
 
-  const insertData = {
+  const insertData: any = {
     user_id: userIdToUse,
     subdomain: data.subdomain.toLowerCase(),
     slug: data.subdomain.toLowerCase(),
@@ -282,6 +283,11 @@ export async function createLandingPage(data: {
       'consulta médica',
     ],
   };
+
+  // Adicionar custom_domain se fornecido
+  if (data.customDomain) {
+    insertData.custom_domain = data.customDomain.trim();
+  }
 
   const { data: landingPage, error } = await supabase
     .from('landing_pages')

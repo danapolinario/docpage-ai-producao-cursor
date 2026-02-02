@@ -312,8 +312,21 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
                     <tr key={page.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div>
-                          <p className="font-medium text-gray-900">{page.subdomain}</p>
-                          <p className="text-xs text-gray-500">{getLandingPageUrl(page.subdomain)}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-900">
+                              {page.custom_domain || page.subdomain}
+                            </p>
+                            {page.custom_domain && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                Domínio próprio
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            {page.custom_domain 
+                              ? page.custom_domain 
+                              : getLandingPageUrl(page.subdomain)}
+                          </p>
                         </div>
                       </td>
                       <td className="px-6 py-4">

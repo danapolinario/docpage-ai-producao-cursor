@@ -67,6 +67,8 @@ export const CheckoutFlow: React.FC<Props> = ({
   const [isDomainAvailable, setIsDomainAvailable] = useState<boolean | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
+  const [hasCustomDomain, setHasCustomDomain] = useState(false);
+  const [customDomainValue, setCustomDomainValue] = useState('');
 
   // Step 3: Payment States
   const [cardNumber, setCardNumber] = useState('');
@@ -319,7 +321,9 @@ export const CheckoutFlow: React.FC<Props> = ({
     email === confirmEmail &&
     (!isCodeSent || (otpCode.length === 6));
 
-  const isStep2Valid = isDomainAvailable === true && selectedDomain !== null;
+  const isStep2Valid = hasCustomDomain 
+    ? customDomainValue.length > 0 
+    : (isDomainAvailable === true && selectedDomain !== null);
 
   const isStep3Valid = 
     cardNumber.length >= 18 && // accounting for spaces
@@ -341,16 +345,25 @@ export const CheckoutFlow: React.FC<Props> = ({
         return;
       }
 
-      // O selectedDomain já é apenas o subdomínio (sem extensão)
-      // No processCompletePaymentFlow, ele será usado como subdomain
-      const finalDomain = selectedDomain; // Apenas o subdomínio para o banco
+      // Se tem domínio próprio, usar o valor informado; senão, usar o subdomínio verificado
+      const finalDomain = hasCustomDomain 
+        ? customDomainValue 
+        : selectedDomain; // Subdomínio apenas (ex: "drjoaosilva")
+      
+      if (!finalDomain) {
+        setError('Por favor, informe um domínio válido.');
+        setIsLoading(false);
+        return;
+      }
       
       // Processar fluxo completo: Pagamento + Landing Page
       // Usuário já está autenticado no Step 1 (via OTP)
       const result = await processCompletePaymentFlow({
         email,
         name: briefing.name,
-        domain: finalDomain, // Subdomínio apenas (ex: "drjoaosilva")
+        domain: finalDomain,
+        hasCustomDomain,
+        customDomain: hasCustomDomain ? customDomainValue : null,
         planId: plan.id,
         planPrice: plan.rawPrice,
         briefing,
@@ -697,8 +710,80 @@ export const CheckoutFlow: React.FC<Props> = ({
               <div className="space-y-6">
                 <div className="space-y-4">
                   <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-100 pb-2">2. Escolha seu Domínio</h3>
-                  <label className="block text-xs font-medium text-gray-700">Qual será o endereço do seu site?</label>
                   
+                  {/* Toggle para domínio próprio */}
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm font-medium text-gray-700 cursor-pointer" htmlFor="hasCustomDomain">
+                        Já tenho domínio próprio
+                      </label>
+                      <button
+                        type="button"
+                        id="hasCustomDomain"
+                        onClick={() => {
+                          setHasCustomDomain(!hasCustomDomain);
+                          if (!hasCustomDomain) {
+                            // Ao ativar, limpar estados de verificação
+                            setIsDomainAvailable(null);
+                            setSelectedDomain(null);
+                            setDomainError(null);
+                            setDomain('');
+                            setCustomDomainValue('');
+                          } else {
+                            // Ao desativar, limpar domínio customizado
+                            setCustomDomainValue('');
+                          }
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                          hasCustomDomain ? 'bg-blue-600' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            hasCustomDomain ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Mensagem de alerta quando toggle está ativo */}
+                  {hasCustomDomain && (
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p className="text-sm text-amber-800">
+                          Como você já possui o domínio próprio, nossa equipe de atendimento irá entrar em contato com você para realizar as configurações necessárias para seu domínio exibir o seu novo site.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!hasCustomDomain && (
+                    <label className="block text-xs font-medium text-gray-700">Qual será o endereço do seu site?</label>
+                  )}
+
+                  {hasCustomDomain ? (
+                    /* Campo para domínio próprio */
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-gray-700">Informe seu domínio:</label>
+                      <input
+                        type="text"
+                        value={customDomainValue}
+                        onChange={(e) => {
+                          setCustomDomainValue(e.target.value.trim());
+                        }}
+                        className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="exemplo.com.br"
+                        autoComplete="off"
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                      />
+                    </div>
+                  ) : (
+                    <>
                   {/* Mobile: Layout vertical para melhor usabilidade */}
                   <div className="md:hidden space-y-3">
                     <div className="flex rounded-lg shadow-sm">
@@ -722,7 +807,7 @@ export const CheckoutFlow: React.FC<Props> = ({
                             : 'border-gray-300 bg-white'
                         }`}
                         placeholder="drjoaosilva"
-                        disabled={isCheckingDomain || isDomainAvailable === true}
+                        disabled={isCheckingDomain || isDomainAvailable === true || hasCustomDomain}
                         autoComplete="off"
                         autoCapitalize="off"
                         autoCorrect="off"
@@ -736,7 +821,7 @@ export const CheckoutFlow: React.FC<Props> = ({
                           setIsDomainAvailable(null);
                         }}
                         className="flex-1 bg-gray-50 border border-gray-300 text-gray-700 text-base font-medium px-4 py-4 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        disabled={isDomainAvailable === true}
+                        disabled={isDomainAvailable === true || hasCustomDomain}
                       >
                         <option>.com.br</option>
                         <option>.med.br</option>
@@ -744,7 +829,7 @@ export const CheckoutFlow: React.FC<Props> = ({
                       <button
                         type="button"
                         onClick={handleCheckDomain}
-                        disabled={isCheckingDomain || !domain || isDomainAvailable === true || domain.length < 3}
+                        disabled={isCheckingDomain || !domain || isDomainAvailable === true || domain.length < 3 || hasCustomDomain}
                         className={`flex-1 inline-flex items-center justify-center px-4 py-4 rounded-lg border text-base font-medium hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
                           isDomainAvailable === true 
                             ? 'bg-green-50 text-green-700 border-green-500' 
@@ -784,7 +869,7 @@ export const CheckoutFlow: React.FC<Props> = ({
                           : 'border-gray-300'
                       }`}
                       placeholder="drjoaosilva"
-                      disabled={isCheckingDomain || isDomainAvailable === true}
+                      disabled={isCheckingDomain || isDomainAvailable === true || hasCustomDomain}
                       autoComplete="off"
                       autoCapitalize="off"
                       autoCorrect="off"
@@ -796,7 +881,7 @@ export const CheckoutFlow: React.FC<Props> = ({
                         setIsDomainAvailable(null);
                       }}
                       className="bg-gray-50 border border-l-0 border-gray-300 text-gray-500 text-sm px-2 outline-none"
-                      disabled={isDomainAvailable === true}
+                      disabled={isDomainAvailable === true || hasCustomDomain}
                     >
                       <option>.com.br</option>
                       <option>.med.br</option>
@@ -804,7 +889,7 @@ export const CheckoutFlow: React.FC<Props> = ({
                     <button
                       type="button"
                       onClick={handleCheckDomain}
-                      disabled={isCheckingDomain || !domain || isDomainAvailable === true || domain.length < 3}
+                        disabled={isCheckingDomain || !domain || isDomainAvailable === true || domain.length < 3 || hasCustomDomain}
                       className={`inline-flex items-center px-4 rounded-r-md border border-l-0 border-gray-300 text-sm font-medium hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
                         isDomainAvailable === true 
                           ? 'bg-green-50 text-green-700 border-green-500' 
@@ -820,33 +905,55 @@ export const CheckoutFlow: React.FC<Props> = ({
                       )}
                     </button>
                   </div>
-
-                  {domainError && (
-                    <p className="text-xs text-red-500">{domainError}</p>
+                    </>
                   )}
 
-                  {isDomainAvailable === true && (
-                    <div className="flex items-center justify-between text-xs p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-green-700 font-medium">Domínio disponível e reservado!</p>
-                      <button 
-                        type="button" 
-                        onClick={() => {
-                          setIsDomainAvailable(null);
-                          setSelectedDomain(null);
-                          setDomainError(null);
-                        }} 
-                        className="text-green-600 hover:text-green-800 underline font-medium"
-                      >
-                        Alterar
-                      </button>
-                    </div>
+                  {!hasCustomDomain && (
+                    <>
+                      {domainError && (
+                        <p className="text-xs text-red-500">{domainError}</p>
+                      )}
+
+                      {isDomainAvailable === true && (
+                        <div className="flex items-center justify-between text-xs p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <p className="text-green-700 font-medium">Domínio disponível e reservado!</p>
+                          <button 
+                            type="button" 
+                            onClick={() => {
+                              setIsDomainAvailable(null);
+                              setSelectedDomain(null);
+                              setDomainError(null);
+                            }} 
+                            className="text-green-600 hover:text-green-800 underline font-medium"
+                          >
+                            Alterar
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
 
-                  {isDomainAvailable === false && !domainError && (
-                    <p className="text-xs text-red-500">Este domínio não está disponível. Tente outro.</p>
+                  {!hasCustomDomain && (
+                    <>
+                      {isDomainAvailable === false && !domainError && (
+                        <p className="text-xs text-red-500">Este domínio não está disponível. Tente outro.</p>
+                      )}
+
+                      {isDomainAvailable === true && (
+                        <button
+                          onClick={() => {
+                            trackCheckoutStep(3, 'Dados de pagamento');
+                            setCurrentStep(3);
+                          }}
+                          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 mt-4"
+                        >
+                          Continuar para Pagamento →
+                        </button>
+                      )}
+                    </>
                   )}
 
-                  {isDomainAvailable === true && (
+                  {hasCustomDomain && customDomainValue && (
                     <button
                       onClick={() => {
                         trackCheckoutStep(3, 'Dados de pagamento');
@@ -886,7 +993,16 @@ export const CheckoutFlow: React.FC<Props> = ({
                   
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
                     <p className="text-blue-900 font-medium mb-1">Domínio selecionado:</p>
-                    <p className="text-blue-700">{selectedDomain}{domainExtension}</p>
+                    <p className="text-blue-700">
+                      {hasCustomDomain 
+                        ? customDomainValue 
+                        : `${selectedDomain}${domainExtension}`}
+                    </p>
+                    {hasCustomDomain && (
+                      <p className="text-xs text-blue-600 mt-1 italic">
+                        Domínio próprio - nossa equipe entrará em contato
+                      </p>
+                    )}
                   </div>
 
                   <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">

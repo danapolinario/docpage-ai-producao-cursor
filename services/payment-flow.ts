@@ -22,6 +22,8 @@ export interface PaymentFlowData {
   // Password removido - autenticação agora é via OTP
   name: string;
   domain: string;
+  hasCustomDomain?: boolean;
+  customDomain?: string | null;
   planId: string;
   planPrice: number;
   briefing: BriefingData;
@@ -103,26 +105,47 @@ export async function processCompletePaymentFlow(
     const userId = user?.id;
 
     // 3. Gerar subdomínio a partir do domínio escolhido
-    const subdomain = data.domain
-      .replace(/^www\./, '')
-      .replace(/\.(com|com\.br|med\.br)$/, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
+    // Se tem domínio próprio, gerar um subdomínio temporário único; senão, usar o domínio verificado
+    let finalSubdomain: string;
+    let customDomainToSave: string | null = null;
 
-    // Validar disponibilidade do subdomínio (já foi verificado no Step 2, mas verificamos novamente por segurança)
-    const availability = await checkSubdomainAvailability(subdomain);
-    
-    if (!availability.available) {
-      // Domínio não disponível - retornar erro (já foi verificado no Step 2, mas alguém pode ter reservado entre o tempo)
-      return {
-        success: false,
-        error: availability.error || 'Este domínio não está mais disponível. Por favor, escolha outro.',
-      };
+    if (data.hasCustomDomain && data.customDomain) {
+      // Usuário tem domínio próprio - gerar subdomínio temporário único e salvar o domínio customizado
+      customDomainToSave = data.customDomain.trim();
+      // Gerar subdomínio único baseado no timestamp e hash do email
+      const timestamp = Date.now().toString(36);
+      const emailHash = data.email.split('@')[0].substring(0, 8).toLowerCase().replace(/[^a-z0-9]/g, '');
+      finalSubdomain = `custom-${emailHash}-${timestamp}`.substring(0, 50);
+      
+      // Verificar se o subdomínio temporário está disponível (muito improvável que não esteja)
+      const tempAvailability = await checkSubdomainAvailability(finalSubdomain);
+      if (!tempAvailability.available) {
+        // Se por algum motivo não estiver disponível, adicionar mais caracteres
+        finalSubdomain = `${finalSubdomain}-${Math.random().toString(36).substring(2, 6)}`.substring(0, 50);
+      }
+    } else {
+      // Domínio normal - verificar disponibilidade
+      const subdomain = data.domain
+        .replace(/^www\./, '')
+        .replace(/\.(com|com\.br|med\.br)$/, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      // Validar disponibilidade do subdomínio (já foi verificado no Step 2, mas verificamos novamente por segurança)
+      const availability = await checkSubdomainAvailability(subdomain);
+      
+      if (!availability.available) {
+        // Domínio não disponível - retornar erro (já foi verificado no Step 2, mas alguém pode ter reservado entre o tempo)
+        return {
+          success: false,
+          error: availability.error || 'Este domínio não está mais disponível. Por favor, escolha outro.',
+        };
+      }
+      
+      finalSubdomain = subdomain; // Usar o subdomínio escolhido
     }
-    
-    const finalSubdomain = subdomain; // Usar o subdomínio escolhido
 
     // 4. Fazer upload de fotos se houver (base64 -> Supabase Storage)
     let uploadedPhotoUrl = data.photoUrl;
@@ -141,6 +164,7 @@ export async function processCompletePaymentFlow(
     // Criar landing page primeiro para ter um ID
     const landingPage = await createLandingPage({
       subdomain: finalSubdomain,
+      customDomain: customDomainToSave,
       briefing: data.briefing,
       content: data.content,
       design: data.design,
@@ -212,7 +236,10 @@ export async function processCompletePaymentFlow(
     });
 
     // 8. Construir URL final (será acessível após admin publicar)
-    const landingPageUrl = `https://${landingPage.subdomain}.docpage.com.br`;
+    // Se tem domínio próprio, usar o custom_domain; senão, usar o subdomínio
+    const landingPageUrl = landingPage.custom_domain 
+      ? `https://${landingPage.custom_domain}`
+      : `https://${landingPage.subdomain}.docpage.com.br`;
 
     return {
       success: true,
