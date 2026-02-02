@@ -26,7 +26,7 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
   const baseUrl = `${req.protocol}://${req.get('host')}`;
   const pageUrl = landingPage.custom_domain 
     ? `https://${landingPage.custom_domain}` 
-    : `${baseUrl}/${landingPage.subdomain}`;
+    : `https://${landingPage.subdomain}.docpage.com.br`;
 
   // Gerar tags SEO
   const title = landingPage.meta_title || 

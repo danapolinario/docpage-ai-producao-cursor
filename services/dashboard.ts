@@ -107,11 +107,11 @@ export async function getDashboardData(landingPageId: string): Promise<Dashboard
     };
   }
 
-  // Obter informações do domínio (formato path-based: docpage.com.br/xxx)
+  // Obter informações do domínio (formato subdomínio: xxx.docpage.com.br)
   const domainInfo = {
     domain: landingPage.custom_domain 
       ? landingPage.custom_domain 
-      : `docpage.com.br/${landingPage.subdomain}`,
+      : `${landingPage.subdomain}.docpage.com.br`,
     status: landingPage.status === 'published' ? ('active' as const) : ('pending' as const),
     sslStatus: 'active' as const,
     customDomain: landingPage.custom_domain || undefined,
@@ -149,7 +149,9 @@ export async function getAllDashboardsData(): Promise<DashboardData[]> {
     (landingPages || []).map(async (lp) => {
       const stats = await getDashboardStats(lp.id, 30);
       const domainInfo = {
-        domain: `${lp.subdomain}.com.br`,
+        domain: lp.custom_domain 
+          ? lp.custom_domain 
+          : `${lp.subdomain}.docpage.com.br`,
         status: lp.status === 'published' ? ('active' as const) : ('pending' as const),
         sslStatus: 'active' as const,
         customDomain: lp.custom_domain || undefined,

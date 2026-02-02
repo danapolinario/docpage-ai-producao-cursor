@@ -89,8 +89,7 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
 
   // Get URL for landing page
   const getLandingPageUrl = (subdomain: string) => {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/${subdomain}`;
+    return `https://${subdomain}.docpage.com.br`;
   };
 
   // Filter and search

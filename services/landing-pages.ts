@@ -529,8 +529,7 @@ export function generateSchemaMarkup(
   subdomain: string,
   photoUrl?: string | null
 ): object {
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://docpage.com.br';
-  const pageUrl = `${baseUrl}/${subdomain}`;
+  const pageUrl = `https://${subdomain}.docpage.com.br`;
   
   return {
     "@context": "https://schema.org",

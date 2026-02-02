@@ -27,10 +27,14 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   metaKeywords,
   customDomain,
 }) => {
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://docpage.com.br';
   const pageUrl = customDomain 
     ? `https://${customDomain}` 
-    : `${baseUrl}/${subdomain}`;
+    : `https://${subdomain}.docpage.com.br`;
+  
+  // Base URL para recursos estáticos
+  const baseUrl = customDomain 
+    ? `https://${customDomain}` 
+    : 'https://docpage.com.br';
   
   // Generate SEO-optimized title (50-60 chars ideal)
   const title = metaTitle || 
@@ -163,7 +167,7 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
       <meta name="twitter:image:alt" content={`${briefing.name} - ${briefing.specialty}`} />
       <meta name="twitter:site" content="@DocPageAI" />
       <meta name="twitter:creator" content="@DocPageAI" />
-      <meta name="twitter:domain" content={customDomain || baseUrl.replace('https://', '').replace('http://', '')} />
+      <meta name="twitter:domain" content={customDomain || 'docpage.com.br'} />
       
       {/* ============================================ */}
       {/* Mobile & PWA */}

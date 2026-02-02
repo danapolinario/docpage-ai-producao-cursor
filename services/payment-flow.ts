@@ -212,8 +212,7 @@ export async function processCompletePaymentFlow(
     });
 
     // 8. Construir URL final (será acessível após admin publicar)
-    const baseUrl = window.location.origin;
-    const landingPageUrl = `${baseUrl}/${landingPage.subdomain}`;
+    const landingPageUrl = `https://${landingPage.subdomain}.docpage.com.br`;
 
     return {
       success: true,
