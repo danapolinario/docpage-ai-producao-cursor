@@ -115,17 +115,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const pathArray = req.query.path;
   const path = Array.isArray(pathArray) ? pathArray.join('/') : (pathArray || '');
   
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/[...path].ts:95',message:'Not a subdomain, checking path',data:{host,subdomain:null,path,pathArray},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  
   // Ignorar arquivos estáticos (deixar Vercel servir automaticamente)
   if (path && (path.startsWith('assets/') || path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/))) {
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/[...path].ts:75',message:'Static file, returning 404 to let Vercel serve it',data:{path},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/[...path].ts:100',message:'Static file, returning 404 to let Vercel serve it',data:{path},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     return res.status(404).send('Not found');
   }
   
   // Se não for subdomínio e não for arquivo estático, servir index.html (SPA)
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/[...path].ts:82',message:'Not a subdomain, serving index.html',data:{host,subdomain:null,path},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/[...path].ts:106',message:'Not a subdomain, serving index.html',data:{host,subdomain:null,path},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
   
   try {
@@ -137,7 +141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     // Se não encontrar, retornar 404 (Vercel tentará servir do outputDirectory)
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/[...path].ts:92',message:'Could not read index.html, returning 404',data:{error:error instanceof Error ? error.message : String(error),cwd:process.cwd()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/[...path].ts:116',message:'Could not read index.html, returning 404',data:{error:error instanceof Error ? error.message : String(error),cwd:process.cwd()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     return res.status(404).send('Not found');
   }

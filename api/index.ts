@@ -15,6 +15,8 @@ interface VercelResponse {
 
 import { renderLandingPage } from '../server/render';
 import { createClient } from '@supabase/supabase-js';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
@@ -109,9 +111,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
   
-  // Se não for subdomínio, retornar 404 (Vercel servirá index.html via rewrites)
+  // Se não for subdomínio, servir index.html (SPA)
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:75',message:'Not a subdomain, returning 404',data:{host,subdomain:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:115',message:'Not a subdomain, serving index.html',data:{host,subdomain:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
-  return res.status(404).send('Not found');
+  
+  try {
+    // Tentar ler index.html do dist
+    const indexPath = join(process.cwd(), 'dist', 'index.html');
+    const indexHtml = readFileSync(indexPath, 'utf-8');
+    res.setHeader('Content-Type', 'text/html');
+    return res.send(indexHtml);
+  } catch (error) {
+    // Se não encontrar, retornar 404 (Vercel tentará servir do outputDirectory)
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:125',message:'Could not read index.html, returning 404',data:{error:error instanceof Error ? error.message : String(error),cwd:process.cwd()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    return res.status(404).send('Not found');
+  }
 }
