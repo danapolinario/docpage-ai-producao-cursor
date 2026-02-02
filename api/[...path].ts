@@ -112,16 +112,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         headers: req.headers,
       };
 
-      const html = await renderLandingPage(landingPage, mockReq);
-      res.setHeader('Content-Type', 'text/html');
-      return res.send(html);
-    } catch (error) {
-      console.error('Erro ao renderizar SSR:', error);
-      return res.status(500).send('Internal Server Error');
+      try {
+        const html = await renderLandingPage(landingPage, mockReq);
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(html);
+      } catch (renderError: any) {
+        console.error('Erro ao renderizar SSR:', renderError);
+        console.error('Stack trace:', renderError?.stack);
+        // Em caso de erro na renderização, servir index.html como fallback
+        try {
+          const indexPath = join(process.cwd(), 'dist', 'index.html');
+          const indexHtml = readFileSync(indexPath, 'utf-8');
+          res.setHeader('Content-Type', 'text/html');
+          return res.send(indexHtml);
+        } catch (fallbackError) {
+          console.error('Erro ao servir fallback:', fallbackError);
+          return res.status(500).send('Internal Server Error');
+        }
+      }
+    } catch (error: any) {
+      console.error('Erro geral ao processar subdomínio:', error);
+      console.error('Stack trace:', error?.stack);
+      // Em caso de erro, servir index.html como fallback
+      try {
+        const indexPath = join(process.cwd(), 'dist', 'index.html');
+        const indexHtml = readFileSync(indexPath, 'utf-8');
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(indexHtml);
+      } catch (fallbackError) {
+        console.error('Erro ao servir fallback:', fallbackError);
+        return res.status(500).send('Internal Server Error');
+      }
     }
   }
   
-  // Se não for subdomínio, verificar se é arquivo estático
+  // Se não for subdomínio, verificar se é arquivo estático ou rota do SPA
   const pathArray = req.query.path;
   const path = Array.isArray(pathArray) ? pathArray.join('/') : (pathArray || '');
   
@@ -136,7 +161,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(404).send('Not found');
   }
   
-  // Se não for subdomínio e não for arquivo estático, servir index.html (SPA)
+  // Rotas do SPA que devem ser servidas com index.html (React Router vai lidar)
+  // Inclui: /, /admin, /dashboard, e qualquer outra rota que não seja subdomínio
   try {
     // Tentar ler index.html do dist
     const indexPath = join(process.cwd(), 'dist', 'index.html');
@@ -144,6 +170,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Content-Type', 'text/html');
     return res.send(indexHtml);
   } catch (error) {
+    console.error('Erro ao ler index.html:', error);
     // Se não encontrar, retornar 404 (Vercel tentará servir do outputDirectory)
     return res.status(404).send('Not found');
   }

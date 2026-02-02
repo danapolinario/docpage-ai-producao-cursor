@@ -49,34 +49,39 @@ interface LandingPageData {
 }
 
 export async function renderLandingPage(landingPage: LandingPageData, req: any): Promise<string> {
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const pageUrl = landingPage.custom_domain 
-    ? `https://${landingPage.custom_domain}` 
-    : `https://${landingPage.subdomain}.docpage.com.br`;
+  try {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const pageUrl = landingPage.custom_domain 
+      ? `https://${landingPage.custom_domain}` 
+      : `https://${landingPage.subdomain}.docpage.com.br`;
 
-  // Gerar tags SEO
-  const title = landingPage.meta_title || 
-    `${landingPage.briefing_data.name} - ${landingPage.briefing_data.specialty} | CRM ${landingPage.briefing_data.crm}/${landingPage.briefing_data.crmState}`;
-  
-  const rawDescription = landingPage.meta_description || landingPage.content_data.subheadline || 
-    `Dr(a). ${landingPage.briefing_data.name}, ${landingPage.briefing_data.specialty} - CRM ${landingPage.briefing_data.crm}/${landingPage.briefing_data.crmState}. ${landingPage.briefing_data.crmState}. Agende sua consulta online.`;
-  const description = rawDescription.length > 160 
-    ? rawDescription.substring(0, 157) + '...' 
-    : rawDescription;
-  
-  const keywords = landingPage.meta_keywords?.join(', ') || 
-    `${landingPage.briefing_data.name}, ${landingPage.briefing_data.specialty}, médico ${landingPage.briefing_data.crmState}, CRM ${landingPage.briefing_data.crm}, consulta médica, agendar consulta, ${landingPage.briefing_data.mainServices?.split(',').slice(0, 3).join(', ') || ''}`;
-  
-  const ogImage = landingPage.og_image_url || landingPage.about_photo_url || landingPage.photo_url || `${baseUrl}/og-default.png`;
-  const ogImageSecure = ogImage.replace('http://', 'https://');
+    // Garantir que briefing_data e content_data existem
+    const briefing = landingPage.briefing_data || {} as any;
+    const content = landingPage.content_data || {} as any;
+
+    // Gerar tags SEO com valores seguros
+    const title = landingPage.meta_title || 
+      `${briefing.name || 'Médico'} - ${briefing.specialty || 'Especialista'} | CRM ${briefing.crm || ''}/${briefing.crmState || ''}`;
+    
+    const rawDescription = landingPage.meta_description || content.subheadline || 
+      `Dr(a). ${briefing.name || 'Médico'}, ${briefing.specialty || 'Especialista'} - CRM ${briefing.crm || ''}/${briefing.crmState || ''}. ${briefing.crmState || ''}. Agende sua consulta online.`;
+    const description = rawDescription.length > 160 
+      ? rawDescription.substring(0, 157) + '...' 
+      : rawDescription;
+    
+    const keywords = landingPage.meta_keywords?.join(', ') || 
+      `${briefing.name || 'Médico'}, ${briefing.specialty || 'Especialista'}, médico ${briefing.crmState || ''}, CRM ${briefing.crm || ''}, consulta médica, agendar consulta, ${briefing.mainServices?.split(',').slice(0, 3).join(', ') || ''}`;
+    
+    const ogImage = landingPage.og_image_url || landingPage.about_photo_url || landingPage.photo_url || `${baseUrl}/og-default.png`;
+    const ogImageSecure = ogImage.replace('http://', 'https://');
 
   // Schema.org JSON-LD
   const schemaMarkup = {
     "@context": "https://schema.org",
     "@type": "Physician",
     "@id": pageUrl,
-    "name": landingPage.briefing_data.name,
-    "alternateName": `Dr(a). ${landingPage.briefing_data.name}`,
+    "name": briefing.name || 'Médico',
+    "alternateName": `Dr(a). ${briefing.name || 'Médico'}`,
     "description": description,
     "image": [
       ogImage,
@@ -87,25 +92,25 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     "sameAs": [],
     "medicalSpecialty": {
       "@type": "MedicalSpecialty",
-      "name": landingPage.briefing_data.specialty
+      "name": briefing.specialty || 'Especialista'
     },
-    "telephone": landingPage.briefing_data.contactPhone || landingPage.content_data.contactPhone,
-    "email": landingPage.briefing_data.contactEmail || landingPage.content_data.contactEmail,
-    "address": landingPage.briefing_data.addresses?.length > 0 ? landingPage.briefing_data.addresses.map((addr: string) => ({
+    "telephone": briefing.contactPhone || content.contactPhone,
+    "email": briefing.contactEmail || content.contactEmail,
+    "address": briefing.addresses?.length > 0 ? briefing.addresses.map((addr: string) => ({
       "@type": "PostalAddress",
       "streetAddress": addr,
-      "addressLocality": landingPage.briefing_data.crmState,
+      "addressLocality": briefing.crmState || '',
       "addressCountry": "BR"
     })) : undefined,
     "identifier": {
       "@type": "PropertyValue",
       "name": "CRM",
-      "value": `${landingPage.briefing_data.crm}/${landingPage.briefing_data.crmState}`
+      "value": `${briefing.crm || ''}/${briefing.crmState || ''}`
     },
     "priceRange": "$$",
     "areaServed": {
       "@type": "State",
-      "name": landingPage.briefing_data.crmState
+      "name": briefing.crmState || ''
     },
     "potentialAction": {
       "@type": "ReserveAction",
@@ -131,8 +136,8 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
   // HTML básico - React hidratará no cliente
   const appHtml = `<div id="root"><div class="min-h-screen flex items-center justify-center p-8">
     <div class="text-center">
-      <h1 class="text-4xl font-bold mb-4">${escapeHtml(landingPage.briefing_data.name)}</h1>
-      <p class="text-xl text-gray-600">${escapeHtml(landingPage.content_data.subheadline || landingPage.briefing_data.specialty)}</p>
+      <h1 class="text-4xl font-bold mb-4">${escapeHtml(briefing.name || 'Médico')}</h1>
+      <p class="text-xl text-gray-600">${escapeHtml(content.subheadline || briefing.specialty || 'Especialista')}</p>
     </div>
   </div></div>`;
 
@@ -147,15 +152,15 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeHtml(description)}" />
     <meta name="keywords" content="${escapeHtml(keywords)}" />
-    <meta name="author" content="${escapeHtml(landingPage.briefing_data.name)}" />
+    <meta name="author" content="${escapeHtml(briefing.name || 'Médico')}" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="language" content="pt-BR" />
     <meta name="revisit-after" content="7 days" />
     <meta name="rating" content="general" />
     <meta name="distribution" content="global" />
-    <meta name="copyright" content="© ${new Date().getFullYear()} ${escapeHtml(landingPage.briefing_data.name)}" />
-    <meta name="geo.region" content="BR-${landingPage.briefing_data.crmState}" />
-    <meta name="geo.placename" content="${escapeHtml(landingPage.briefing_data.crmState)}" />
+    <meta name="copyright" content="© ${new Date().getFullYear()} ${escapeHtml(briefing.name || 'Médico')}" />
+    <meta name="geo.region" content="BR-${briefing.crmState || ''}" />
+    <meta name="geo.placename" content="${escapeHtml(briefing.crmState || '')}" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="format-detection" content="telephone=yes" />
     
@@ -167,21 +172,21 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="${escapeHtml(landingPage.briefing_data.name)} - ${escapeHtml(landingPage.briefing_data.specialty)} | CRM ${landingPage.briefing_data.crm}/${landingPage.briefing_data.crmState}" />
+    <meta property="og:image:alt" content="${escapeHtml(briefing.name || 'Médico')} - ${escapeHtml(briefing.specialty || 'Especialista')} | CRM ${briefing.crm || ''}/${briefing.crmState || ''}" />
     <meta property="og:url" content="${escapeHtml(pageUrl)}" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="DocPage AI" />
     <meta property="og:locale" content="pt_BR" />
     <meta property="og:locale:alternate" content="pt_PT" />
-    ${landingPage.briefing_data.contactPhone ? `<meta property="og:phone_number" content="${escapeHtml(landingPage.briefing_data.contactPhone)}" />` : ''}
-    ${landingPage.briefing_data.contactEmail ? `<meta property="og:email" content="${escapeHtml(landingPage.briefing_data.contactEmail)}" />` : ''}
+    ${briefing.contactPhone ? `<meta property="og:phone_number" content="${escapeHtml(briefing.contactPhone)}" />` : ''}
+    ${briefing.contactEmail ? `<meta property="og:email" content="${escapeHtml(briefing.contactEmail)}" />` : ''}
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${escapeHtml(title)}" />
     <meta name="twitter:description" content="${escapeHtml(description)}" />
     <meta name="twitter:image" content="${escapeHtml(ogImage)}" />
-    <meta name="twitter:image:alt" content="${escapeHtml(landingPage.briefing_data.name)} - ${escapeHtml(landingPage.briefing_data.specialty)}" />
+    <meta name="twitter:image:alt" content="${escapeHtml(briefing.name || 'Médico')} - ${escapeHtml(briefing.specialty || 'Especialista')}" />
     <meta name="twitter:site" content="@DocPageAI" />
     <meta name="twitter:creator" content="@DocPageAI" />
     <meta name="twitter:domain" content="${escapeHtml(landingPage.custom_domain || baseUrl.replace('https://', '').replace('http://', ''))}" />
@@ -193,7 +198,7 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="${escapeHtml(landingPage.briefing_data.name)}" />
+    <meta name="apple-mobile-web-app-title" content="${escapeHtml(briefing.name || 'Médico')}" />
     ${landingPage.photo_url ? `<link rel="apple-touch-icon" href="${escapeHtml(landingPage.photo_url)}" sizes="180x180" />` : ''}
     <link rel="icon" href="${escapeHtml(landingPage.photo_url || `${baseUrl}/favicon.ico`)}" type="image/x-icon" />
     
@@ -300,6 +305,11 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
 </html>`;
 
   return html;
+  } catch (error: any) {
+    console.error('Erro ao renderizar landing page:', error);
+    console.error('Stack trace:', error?.stack);
+    throw error; // Re-throw para ser tratado pelo handler
+  }
 }
 
 function escapeHtml(text: string): string {
