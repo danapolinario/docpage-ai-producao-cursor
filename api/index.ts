@@ -57,10 +57,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     host = Array.isArray(xHost) ? xHost[0] : xHost;
   }
   
+  console.log('[SUBDOMAIN DEBUG] Headers (index):', {
+    hostHeader,
+    xForwardedHost,
+    xVercelOriginalHost,
+    xHost,
+    finalHost: host
+  });
+  
   const subdomain = extractSubdomain(host);
+  
+  console.log('[SUBDOMAIN DEBUG] Subdomain extraction (index):', {
+    host,
+    subdomain,
+    hostname: host.split(':')[0],
+    endsWithCheck: host.split(':')[0].toLowerCase().endsWith('.docpage.com.br')
+  });
   
   // Se for subdomínio, renderizar SSR
   if (subdomain) {
+    console.log('[SUBDOMAIN DEBUG] Subdomain detected, querying database (index):', subdomain);
     try {
       const { data: landingPage, error } = await supabase
         .from('landing_pages')
@@ -68,11 +84,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq('subdomain', subdomain)
         .single();
 
+      console.log('[SUBDOMAIN DEBUG] Database query result (index):', {
+        subdomain,
+        found: !!landingPage,
+        error: error?.message,
+        status: landingPage?.status,
+        landingPageId: landingPage?.id
+      });
+
       if (error || !landingPage) {
+        console.log('[SUBDOMAIN DEBUG] Landing page not found (index), returning 404');
         return res.status(404).send('Not found');
       }
 
       if (landingPage.status !== 'published') {
+        console.log('[SUBDOMAIN DEBUG] Landing page not published (index), status:', landingPage.status);
         return res.status(404).send('Not found');
       }
 
@@ -96,6 +122,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   
   // Se não for subdomínio, servir index.html (SPA)
+  console.log('[SUBDOMAIN DEBUG] Not a subdomain (index), serving SPA:', {
+    host,
+    subdomain: null
+  });
+  
   try {
     // Tentar ler index.html do dist
     const indexPath = join(process.cwd(), 'dist', 'index.html');

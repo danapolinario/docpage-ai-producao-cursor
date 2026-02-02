@@ -57,10 +57,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     host = Array.isArray(xHost) ? xHost[0] : xHost;
   }
   
+  console.log('[SUBDOMAIN DEBUG] Headers:', {
+    hostHeader,
+    xForwardedHost,
+    xVercelOriginalHost,
+    xHost,
+    finalHost: host
+  });
+  
   const subdomain = extractSubdomain(host);
+  
+  console.log('[SUBDOMAIN DEBUG] Subdomain extraction:', {
+    host,
+    subdomain,
+    hostname: host.split(':')[0],
+    endsWithCheck: host.split(':')[0].toLowerCase().endsWith('.docpage.com.br')
+  });
   
   // Se for subdomínio, renderizar SSR
   if (subdomain) {
+    console.log('[SUBDOMAIN DEBUG] Subdomain detected, querying database:', subdomain);
     try {
       const { data: landingPage, error } = await supabase
         .from('landing_pages')
@@ -68,11 +84,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq('subdomain', subdomain)
         .single();
 
+      console.log('[SUBDOMAIN DEBUG] Database query result:', {
+        subdomain,
+        found: !!landingPage,
+        error: error?.message,
+        status: landingPage?.status,
+        landingPageId: landingPage?.id
+      });
+
       if (error || !landingPage) {
+        console.log('[SUBDOMAIN DEBUG] Landing page not found, returning 404');
         return res.status(404).send('Not found');
       }
 
       if (landingPage.status !== 'published') {
+        console.log('[SUBDOMAIN DEBUG] Landing page not published, status:', landingPage.status);
         return res.status(404).send('Not found');
       }
 
@@ -98,6 +124,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Se não for subdomínio, verificar se é arquivo estático
   const pathArray = req.query.path;
   const path = Array.isArray(pathArray) ? pathArray.join('/') : (pathArray || '');
+  
+  console.log('[SUBDOMAIN DEBUG] Not a subdomain, serving SPA:', {
+    host,
+    subdomain: null,
+    path
+  });
   
   // Ignorar arquivos estáticos (deixar Vercel servir automaticamente)
   if (path && (path.startsWith('assets/') || path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/))) {
