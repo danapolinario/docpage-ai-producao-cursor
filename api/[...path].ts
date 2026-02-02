@@ -41,7 +41,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/[...path].ts:23',message:'Handler called (catch-all)',data:{method:req.method,url:req.url,path:(req.query.path as string[])?.join('/'),headers:Object.keys(req.headers)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
   
-  const host = req.headers.host || '';
+  // Garantir que host seja string
+  const hostHeader = req.headers.host;
+  const host = Array.isArray(hostHeader) ? hostHeader[0] : (hostHeader || '');
   
   // #region agent log
   fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/[...path].ts:27',message:'Host header extracted',data:{host,allHeaders:req.headers},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
@@ -110,7 +112,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   
   // Se não for subdomínio, verificar se é arquivo estático
-  const path = (req.query.path as string[])?.join('/') || '';
+  const pathArray = req.query.path;
+  const path = Array.isArray(pathArray) ? pathArray.join('/') : (pathArray || '');
   
   // Ignorar arquivos estáticos (deixar Vercel servir automaticamente)
   if (path && (path.startsWith('assets/') || path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/))) {
