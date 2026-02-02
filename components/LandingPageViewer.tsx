@@ -25,8 +25,29 @@ interface LandingPageData {
   og_image_url?: string | null;
 }
 
+// Função para extrair subdomínio do hostname
+function extractSubdomainFromHost(): string | null {
+  if (typeof window === 'undefined') return null;
+  
+  const hostname = window.location.hostname.toLowerCase();
+  if (hostname.endsWith('.docpage.com.br')) {
+    const parts = hostname.split('.');
+    if (parts.length >= 4) {
+      const subdomain = parts[0];
+      if (subdomain && subdomain !== 'www' && subdomain !== 'docpage') {
+        return subdomain;
+      }
+    }
+  }
+  return null;
+}
+
 export const LandingPageViewer: React.FC = () => {
-  const { subdomain } = useParams<{ subdomain: string }>();
+  const { subdomain: subdomainFromRoute } = useParams<{ subdomain: string }>();
+  
+  // Tentar pegar subdomínio da rota ou do hostname
+  const subdomain = subdomainFromRoute || extractSubdomainFromHost();
+  
   const [landingPage, setLandingPage] = useState<LandingPageData | null>(
     // Tentar usar dados do SSR se disponíveis
     (window as any).__LANDING_PAGE_DATA__ || null
