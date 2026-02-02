@@ -21,11 +21,27 @@ function extractSubdomain(host: string): string | null {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:23',message:'Handler called',data:{method:req.method,url:req.url,headers:Object.keys(req.headers)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+  
   const host = req.headers.host || '';
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:27',message:'Host header extracted',data:{host,allHeaders:req.headers},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+  
   const subdomain = extractSubdomain(host);
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:31',message:'Subdomain extracted',data:{host,subdomain,hostname:host.split(':')[0],endsWithCheck:host.split(':')[0].toLowerCase().endsWith('.docpage.com.br')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
   
   // Se for subdomínio, renderizar SSR
   if (subdomain) {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:36',message:'Subdomain detected, querying database',data:{subdomain},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     try {
       const { data: landingPage, error } = await supabase
         .from('landing_pages')
@@ -33,12 +49,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq('subdomain', subdomain)
         .single();
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:42',message:'Database query result',data:{subdomain,found:!!landingPage,error:error?.message,status:landingPage?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+
       if (error || !landingPage) {
         // Se não encontrar, servir SPA normal
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:48',message:'Landing page not found',data:{subdomain,error:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
         return res.status(404).send('Not found');
       }
 
       if (landingPage.status !== 'published') {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:54',message:'Landing page not published',data:{subdomain,status:landingPage.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
         return res.status(404).send('Not found');
       }
 
@@ -54,13 +80,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const html = await renderLandingPage(landingPage, mockReq);
       res.setHeader('Content-Type', 'text/html');
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:63',message:'SSR rendered successfully',data:{subdomain,htmlLength:html.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       return res.send(html);
     } catch (error) {
       console.error('Erro ao renderizar SSR:', error);
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:68',message:'SSR render error',data:{subdomain,error:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       return res.status(500).send('Internal Server Error');
     }
   }
   
   // Se não for subdomínio, retornar 404 (Vercel servirá index.html via rewrites)
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:75',message:'Not a subdomain, returning 404',data:{host,subdomain:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
   return res.status(404).send('Not found');
 }
