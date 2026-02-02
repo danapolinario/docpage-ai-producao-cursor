@@ -1,4 +1,18 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+// Types for Vercel serverless functions
+interface VercelRequest {
+  method?: string;
+  url?: string;
+  headers: Record<string, string | string[] | undefined>;
+  query: Record<string, string | string[] | undefined>;
+  body?: any;
+}
+
+interface VercelResponse {
+  status: (code: number) => VercelResponse;
+  send: (body: any) => void;
+  setHeader: (name: string, value: string) => void;
+}
+
 import { renderLandingPage } from '../server/render';
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'fs';
