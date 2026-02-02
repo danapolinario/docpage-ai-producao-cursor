@@ -39,7 +39,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:23',message:'Handler called',data:{method:req.method,url:req.url,headers:Object.keys(req.headers)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
   // #endregion
   
-  const host = req.headers.host || '';
+  // Garantir que host seja string
+  const hostHeader = req.headers.host;
+  const host = Array.isArray(hostHeader) ? hostHeader[0] : (hostHeader || '');
   
   // #region agent log
   fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/index.ts:27',message:'Host header extracted',data:{host,allHeaders:req.headers},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
