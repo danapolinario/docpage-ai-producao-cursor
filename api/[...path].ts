@@ -38,15 +38,46 @@ function extractSubdomain(host: string): string | null {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/[...path].ts:23',message:'Handler called (catch-all)',data:{method:req.method,url:req.url,path:(req.query.path as string[])?.join('/'),headers:Object.keys(req.headers)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  console.log('[DEBUG] Handler called (catch-all)', {
+    method: req.method,
+    url: req.url,
+    path: req.query.path,
+    allHeaders: req.headers
+  });
   // #endregion
   
-  // Garantir que host seja string
+  // Garantir que host seja string - verificar múltiplos headers do Vercel
   const hostHeader = req.headers.host;
-  const host = Array.isArray(hostHeader) ? hostHeader[0] : (hostHeader || '');
+  const xForwardedHost = req.headers['x-forwarded-host'];
+  const xVercelOriginalHost = req.headers['x-vercel-original-host'];
+  const xHost = req.headers['x-host'];
   
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/[...path].ts:27',message:'Host header extracted',data:{host,allHeaders:req.headers},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  console.log('[DEBUG] Host headers', {
+    host: hostHeader,
+    xForwardedHost,
+    xVercelOriginalHost,
+    xHost,
+    allHeaders: Object.keys(req.headers)
+  });
+  // #endregion
+  
+  // Tentar múltiplos headers (Vercel pode usar diferentes)
+  let host = '';
+  if (Array.isArray(hostHeader)) {
+    host = hostHeader[0] || '';
+  } else if (hostHeader) {
+    host = hostHeader;
+  } else if (xForwardedHost) {
+    host = Array.isArray(xForwardedHost) ? xForwardedHost[0] : xForwardedHost;
+  } else if (xVercelOriginalHost) {
+    host = Array.isArray(xVercelOriginalHost) ? xVercelOriginalHost[0] : xVercelOriginalHost;
+  } else if (xHost) {
+    host = Array.isArray(xHost) ? xHost[0] : xHost;
+  }
+  
+  // #region agent log
+  console.log('[DEBUG] Host extracted', { host, originalHost: hostHeader });
   // #endregion
   
   const subdomain = extractSubdomain(host);
