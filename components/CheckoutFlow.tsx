@@ -333,18 +333,25 @@ export const CheckoutFlow: React.FC<Props> = ({
 
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isStep3Valid || !selectedDomain) return;
+    
+    // Validar Step 3 e domínio (considerando domínio próprio)
+    const hasValidDomain = hasCustomDomain 
+      ? customDomainValue.length > 0 
+      : selectedDomain !== null;
+    
+    if (!isStep3Valid || !hasValidDomain) {
+      if (!hasValidDomain) {
+        setError(hasCustomDomain 
+          ? 'Por favor, informe seu domínio próprio.' 
+          : 'Por favor, escolha um domínio válido.');
+      }
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
 
     try {
-      if (!selectedDomain) {
-        setError('Por favor, escolha um domínio válido.');
-        setIsLoading(false);
-        return;
-      }
-
       // Se tem domínio próprio, usar o valor informado; senão, usar o subdomínio verificado
       const finalDomain = hasCustomDomain 
         ? customDomainValue 
@@ -1067,7 +1074,11 @@ export const CheckoutFlow: React.FC<Props> = ({
                 <div className="pt-4">
                   <button 
                     type="submit" 
-                    disabled={isLoading || !isStep3Valid}
+                    disabled={
+                      isLoading || 
+                      !isStep3Valid || 
+                      (hasCustomDomain ? !customDomainValue : !selectedDomain)
+                    }
                     className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
                   >
                     {isLoading ? (
