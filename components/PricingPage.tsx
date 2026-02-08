@@ -60,24 +60,78 @@ export const PricingPage: React.FC<Props> = ({
   }, [landingPageId, initialViewMode, selectedDomain]);
 
   // Auto-select a dummy plan if jumping straight to checkout/dashboard in dev mode
+  // Também seleciona um plano padrão quando voltar do Stripe com canceled=true
+  // IMPORTANTE: Este useEffect deve executar ANTES de sincronizar o viewMode
   useEffect(() => {
-    if ((initialViewMode === 'checkout' || initialViewMode === 'dashboard') && !selectedPlan) {
-       setSelectedPlan({
-        id: 'pro',
-        name: 'Profissional',
-        price: 'R$ 197',
-        oldPrice: 'R$ 297',
-        rawPrice: 197,
-        period: '/mês',
-        features: [],
-        cta: '',
-        popular: true,
-        color: 'border-blue-500',
-        description: 'Para especialistas que buscam autoridade.'
-       });
-       setConfirmedDomain('www.drteste.com.br');
+    // Só executar se initialViewMode for 'checkout' ou 'dashboard'
+    if (initialViewMode !== 'checkout' && initialViewMode !== 'dashboard') {
+      return;
     }
+    
+    // Primeiro, tentar restaurar o plano do localStorage (se voltou do Stripe)
+    // Fazer isso mesmo se já tem plano selecionado, para garantir que está correto
+    try {
+      const savedState = localStorage.getItem('checkout_state');
+      if (savedState) {
+        const parsedState = JSON.parse(savedState);
+        if (parsedState.selectedPlan) {
+          setSelectedPlan(parsedState.selectedPlan);
+          if (parsedState.billingPeriod) {
+            setBillingPeriod(parsedState.billingPeriod);
+          }
+          return; // Não continuar para selecionar plano padrão
+        }
+      }
+    } catch (error) {
+      console.warn('Erro ao restaurar plano do localStorage:', error);
+    }
+    
+    // Se já tem plano selecionado e não encontrou no localStorage, não fazer nada
+    if (selectedPlan) {
+      return;
+    }
+    
+    // Se não encontrou no localStorage e não tem plano, selecionar plano padrão
+    setSelectedPlan({
+      id: 'pro',
+      name: 'Profissional',
+      price: 'R$ 197',
+      oldPrice: 'R$ 297',
+      rawPrice: 197,
+      period: '/mês',
+      features: [],
+      cta: '',
+      popular: true,
+      color: 'border-blue-500',
+      description: 'Para especialistas que buscam autoridade.'
+    });
+    setConfirmedDomain('www.drteste.com.br');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialViewMode]);
+
+  // Sincronizar viewMode quando initialViewMode mudar (ex: quando voltar do Stripe com canceled=true)
+  // IMPORTANTE: Só sincronizar quando initialViewMode mudar de 'plans' para 'checkout' ou 'dashboard'
+  // Não sobrescrever mudanças manuais do usuário (quando seleciona um plano)
+  const prevInitialViewModeRef = React.useRef(initialViewMode);
+  useEffect(() => {
+    // Só sincronizar se o initialViewMode mudou E se mudou para 'checkout' ou 'dashboard'
+    // Não sincronizar se mudou para 'plans' (isso permitiria mudanças manuais)
+    if (prevInitialViewModeRef.current !== initialViewMode) {
+      // Só sincronizar se mudou para 'checkout' ou 'dashboard' (mudanças externas)
+      // Não sincronizar se mudou para 'plans' (permite mudanças manuais do usuário)
+      if (initialViewMode === 'checkout' || initialViewMode === 'dashboard') {
+        if (viewMode !== initialViewMode) {
+          setViewMode(initialViewMode);
+        }
+      }
+      
+      prevInitialViewModeRef.current = initialViewMode;
+    } else if (initialViewMode === 'checkout' && viewMode !== 'checkout') {
+      // Se initialViewMode já é 'checkout' mas viewMode não está sincronizado, sincronizar
+      // Isso pode acontecer quando o componente é montado com initialViewMode='checkout'
+      setViewMode('checkout');
+    }
+  }, [initialViewMode, viewMode]);
 
   const scrollToPlans = () => {
     const element = document.getElementById('plans-section');
@@ -87,15 +141,6 @@ export const PricingPage: React.FC<Props> = ({
   };
 
   const handleSelectPlan = (plan: Plan) => {
-    // Log para debug - verificar o plano e billingPeriod no momento da seleção
-    console.log('PricingPage: Plano selecionado', {
-      planId: plan.id,
-      planName: plan.name,
-      planPrice: plan.price,
-      billingPeriod: billingPeriod,
-      planObject: JSON.stringify(plan, null, 2),
-    });
-    
     // Importar e usar trackPlanSelect e trackCheckoutStart
     import('../services/google-analytics').then(({ trackPlanSelect, trackCheckoutStart }) => {
       trackPlanSelect(plan.name, plan.price);

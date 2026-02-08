@@ -134,34 +134,140 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [hasAppliedRecommendedTheme, setHasAppliedRecommendedTheme] = useState(false);
 
-  // Detectar se está na rota /checkout e ajustar estado inicial
+  // Flag para indicar que está restaurando estado (evita redirecionamento prematuro)
+  const [isRestoringState, setIsRestoringState] = React.useState(false);
+
+  // Restaurar estado do localStorage quando voltar do Stripe com canceled=true
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const path = window.location.pathname;
-      const searchParams = new URLSearchParams(window.location.search);
-      const canceled = searchParams.get('canceled') === 'true';
+    if (typeof window === 'undefined') return;
+    
+    const path = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+    const canceled = searchParams.get('canceled') === 'true';
+    const fullUrl = window.location.href;
+    
+    // Verificar se voltou do Stripe (canceled=true) em qualquer rota
+    if (canceled) {
+      setIsRestoringState(true);
       
-      if (path === '/checkout') {
-        // Se foi cancelado, apenas redirecionar para home (o CheckoutRoute já faz isso)
-        if (canceled) {
-          return;
+      // Se não está na rota /checkout, redirecionar para lá
+      if (path !== '/checkout') {
+        window.location.href = '/checkout?canceled=true';
+        return;
+      }
+      
+      try {
+        const savedState = localStorage.getItem('checkout_state');
+        if (savedState) {
+          const parsedState = JSON.parse(savedState);
+          
+          // Restaurar estado do App
+          setState(prev => ({
+            ...prev,
+            step: parsedState.step || 5,
+            briefing: parsedState.briefing || prev.briefing,
+            generatedContent: parsedState.content || prev.generatedContent,
+            designSettings: parsedState.design || prev.designSettings,
+            sectionVisibility: parsedState.visibility || prev.sectionVisibility,
+            layoutVariant: parsedState.layoutVariant || prev.layoutVariant,
+            photoUrl: parsedState.photoUrl || prev.photoUrl,
+            aboutPhotoUrl: parsedState.aboutPhotoUrl || prev.aboutPhotoUrl,
+          }));
+          
+          // Fechar a home (SaaSLanding) para mostrar o checkout
+          setShowSaaSIntro(false);
+          
+          // Restaurar pricingViewMode
+          if (parsedState.pricingViewMode) {
+            setPricingViewMode(parsedState.pricingViewMode);
+          }
+          
+          // Marcar que a restauração foi concluída após um pequeno delay
+          setTimeout(() => {
+            setIsRestoringState(false);
+          }, 500);
+          
+          // Não limpar o localStorage imediatamente - deixar o PricingPage ler também
+          // Limpar após um delay para garantir que o PricingPage tenha tempo de ler
+          setTimeout(() => {
+            localStorage.removeItem('checkout_state');
+          }, 2000);
+        } else {
+          setIsRestoringState(false);
         }
-        
-        // Se está na rota /checkout sem dados, redirecionar para home
-        if (!state.generatedContent || !state.briefing.name) {
-          console.log('Acesso direto a /checkout sem dados - redirecionando para home');
+      } catch (error) {
+        console.error('Erro ao restaurar estado do localStorage:', error);
+        setIsRestoringState(false);
+      }
+    }
+  }, []); // Executar apenas uma vez quando o componente monta
+
+  // Detectar se está na rota /checkout e ajustar estado inicial
+  // Função para verificar e ajustar o estado do checkout
+  const checkCheckoutRoute = React.useCallback(() => {
+    if (typeof window === 'undefined') return;
+    
+    const path = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+    const canceled = searchParams.get('canceled') === 'true';
+    
+    if (path === '/checkout') {
+      // Se está na rota /checkout sem dados, redirecionar para home
+      // MAS: se canceled=true ou está restaurando estado, não redirecionar ainda
+      if (!state.generatedContent || !state.briefing.name) {
+        if (canceled || isRestoringState) {
+          // Se foi cancelado ou está restaurando, dar mais tempo para o estado ser restaurado
+          // Não redirecionar - aguardar que o estado seja restaurado
+          // O useEffect de restauração vai atualizar o estado
+          return;
+        } else {
           window.location.href = '/';
           return;
         }
-        
-        // Se está na rota /checkout com dados, mostrar PricingPage no modo checkout
-        if (state.step !== 5) {
-          setState(prev => ({ ...prev, step: 5 }));
-        }
+      }
+      
+      // Se está na rota /checkout com dados (incluindo quando canceled=true),
+      // mostrar PricingPage no modo checkout para permitir que o usuário veja o input do cupom
+      if (state.step !== 5) {
+        setState(prev => ({ ...prev, step: 5 }));
+      }
+      if (pricingViewMode !== 'checkout') {
         setPricingViewMode('checkout');
       }
     }
-  }, [state.generatedContent, state.briefing.name, state.step]);
+  }, [state.generatedContent, state.briefing.name, state.step, pricingViewMode, isRestoringState]);
+
+  // Executar quando as dependências mudarem
+  useEffect(() => {
+    checkCheckoutRoute();
+  }, [checkCheckoutRoute]);
+
+  // Escutar mudanças na URL (quando volta do Stripe)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Executar imediatamente
+    checkCheckoutRoute();
+    
+    // Escutar eventos de navegação
+    const handlePopState = () => {
+      setTimeout(checkCheckoutRoute, 100); // Pequeno delay para garantir que a URL foi atualizada
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    
+    // Também verificar periodicamente quando na rota /checkout (fallback)
+    const interval = setInterval(() => {
+      if (window.location.pathname === '/checkout') {
+        checkCheckoutRoute();
+      }
+    }, 500);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      clearInterval(interval);
+    };
+  }, [checkCheckoutRoute]);
 
   // Inicializar Google Analytics
   useEffect(() => {

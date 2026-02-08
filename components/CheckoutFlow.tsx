@@ -114,13 +114,15 @@ export const CheckoutFlow: React.FC<Props> = ({
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error) {
-          console.error('Erro ao verificar autenticação no CheckoutFlow:', error);
+          // Não logar erro se for apenas sessão ausente (usuário ainda não autenticado)
+          if (error.message && !error.message.includes('Auth session missing')) {
+            console.error('Erro ao verificar autenticação no CheckoutFlow:', error);
+          }
           setIsAuthenticated(false);
           return;
         }
         
         if (user && user.id) {
-          console.log('CheckoutFlow: Usuário já autenticado, pulando para Step 2');
           setIsAuthenticated(true);
           // Usar email do usuário autenticado apenas se o campo email estiver vazio
           // Caso contrário, manter o email que o usuário digitou
@@ -130,13 +132,15 @@ export const CheckoutFlow: React.FC<Props> = ({
           // Se já está autenticado, avançar automaticamente para o Step 2 (domínio)
           setCurrentStep(2);
         } else {
-          console.log('CheckoutFlow: Usuário não autenticado, iniciando no Step 1');
           setIsAuthenticated(false);
           // Garantir que está no Step 1 se não estiver autenticado
           setCurrentStep(1);
         }
-      } catch (err) {
-        console.error('Erro ao verificar autenticação:', err);
+      } catch (err: any) {
+        // Não logar erro se for apenas sessão ausente (usuário ainda não autenticado)
+        if (err?.message && !err.message.includes('Auth session missing')) {
+          console.error('Erro ao verificar autenticação:', err);
+        }
         setIsAuthenticated(false);
       }
     };
@@ -366,14 +370,6 @@ export const CheckoutFlow: React.FC<Props> = ({
         // #endregion
       }
       
-      console.log('CheckoutFlow: Domínios determinados', {
-        finalDomain, // Para criar landing page (subdomínio apenas)
-        chosenDomainForEmail, // Para email (domínio completo)
-        selectedDomain,
-        domainExtension,
-        hasCustomDomain,
-        customDomainValue,
-      });
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:361',message:'HYP-A: chosenDomainForEmail final criado',data:{chosenDomainForEmail,finalDomain,selectedDomain,domainExtension},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
       // #endregion
@@ -387,13 +383,6 @@ export const CheckoutFlow: React.FC<Props> = ({
       // Usar billingPeriod diretamente da prop (vem do toggle do PricingPage)
       const period: 'monthly' | 'annual' = billingPeriod;
       
-      // Log para debug - verificar se o billingPeriod está correto
-      console.log('CheckoutFlow: BillingPeriod recebido', {
-        billingPeriodFromProp: initialBillingPeriod,
-        billingPeriodUsed: period,
-        planId: plan.id,
-        planName: plan.name,
-      });
       
       // Validar que temos um email válido
       if (!email || !email.includes('@')) {
@@ -402,21 +391,6 @@ export const CheckoutFlow: React.FC<Props> = ({
         return;
       }
 
-      // Log para debug - verificar se o plano está correto
-      console.log('CheckoutFlow: Criando checkout session', {
-        planId: plan.id,
-        planName: plan.name,
-        planPrice: plan.price,
-        billingPeriod: period,
-        billingPeriodFromProp: initialBillingPeriod,
-        userEmail: email,
-        userId: user.id,
-        userEmailFromAuth: user.email,
-        emailState: email, // Email do estado local
-        emailMatches: email === user.email,
-        // Log completo do objeto plan para debug
-        planObject: JSON.stringify(plan, null, 2),
-      });
       
       // Verificar se o email está vazio ou inválido
       if (!email || !email.includes('@')) {
@@ -442,13 +416,11 @@ export const CheckoutFlow: React.FC<Props> = ({
 
       if (existingLp) {
         // Landing page já existe, usar ela
-        console.log('CheckoutFlow: Landing page já existe, usando existente', existingLp);
         landingPageId = existingLp.id;
         landingPageSubdomain = existingLp.subdomain;
         landingPageCustomDomain = existingLp.custom_domain;
       } else {
         // Criar nova landing page
-        console.log('CheckoutFlow: Criando nova landing page antes do pagamento');
         
         // Preparar subdomínio
         let finalSubdomain: string;
@@ -507,22 +479,9 @@ export const CheckoutFlow: React.FC<Props> = ({
           about_photo_url: uploadedAboutPhotoUrl || null,
         });
 
-        console.log('CheckoutFlow: Landing page criada com sucesso', {
-          landingPageId,
-          subdomain: landingPageSubdomain,
-          customDomain: landingPageCustomDomain,
-        });
       }
 
       // Criar Checkout Session no Stripe
-      console.log('CheckoutFlow: Enviando dados para createCheckoutSession', {
-        finalDomain, // Subdomínio apenas (para criar landing page)
-        chosenDomainForEmail, // Domínio completo escolhido (para email e dashboard)
-        hasCustomDomain,
-        customDomainValue,
-        selectedDomain,
-        domainExtension,
-      });
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:507',message:'HYP-B: Antes de enviar para createCheckoutSession',data:{chosenDomain:chosenDomainForEmail,domain:finalDomain,hasCustomDomain},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
       // #endregion
@@ -556,6 +515,27 @@ export const CheckoutFlow: React.FC<Props> = ({
 
       // Track início do checkout
       trackCheckoutStep(3, 'Redirecionando para Stripe Checkout');
+      
+      // Salvar estado no localStorage antes de redirecionar para o Stripe
+      // Isso permite restaurar o estado quando o usuário voltar com canceled=true
+      try {
+        const stateToSave = {
+          briefing,
+          content,
+          design,
+          visibility,
+          layoutVariant,
+          photoUrl,
+          aboutPhotoUrl,
+          step: 5,
+          pricingViewMode: 'checkout',
+          selectedPlan: plan,
+          billingPeriod: period,
+        };
+        localStorage.setItem('checkout_state', JSON.stringify(stateToSave));
+      } catch (saveError) {
+        console.warn('Erro ao salvar estado no localStorage:', saveError);
+      }
       
       // Redirecionar para Stripe Checkout
       if (checkoutSession.url) {
@@ -605,18 +585,6 @@ export const CheckoutFlow: React.FC<Props> = ({
     }
   };
 
-  // Debug: Log current state
-  useEffect(() => {
-    console.log('CheckoutFlow State:', {
-      currentStep,
-      isAuthenticated,
-      isLoading,
-      isSendingCode,
-      isVerifyingCode,
-      isCheckingDomain,
-      isDomainAvailable
-    });
-  }, [currentStep, isAuthenticated, isLoading, isSendingCode, isVerifyingCode, isCheckingDomain, isDomainAvailable]);
 
   return (
     <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[600px] border border-gray-200 animate-fade-in">

@@ -56,19 +56,7 @@ const DevRoute: React.FC = () => {
 
 // Componente wrapper para rota /checkout - renderiza App e detecta parâmetros da URL
 const CheckoutRoute: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const canceled = searchParams.get('canceled') === 'true';
-  
-  React.useEffect(() => {
-    if (canceled) {
-      console.log('Checkout cancelado pelo usuário - voltando para home');
-      // Redirecionar para home após 2 segundos se foi cancelado
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 2000);
-    }
-  }, [canceled]);
-  
+  // Não redirecionar automaticamente - deixar o App.tsx gerenciar o fluxo
   return <App />;
 };
 
