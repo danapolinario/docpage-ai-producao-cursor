@@ -10,7 +10,7 @@
       "destination": "/api"
     },
     {
-      "source": "/((?!admin|dashboard|assets).*)",
+      "source": "/((?!admin|dashboard|dev|assets).*)",
       "destination": "/api/$1"
     },
     {
@@ -19,6 +19,10 @@
     },
     {
       "source": "/dashboard",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/dev",
       "destination": "/index.html"
     }
   ],
