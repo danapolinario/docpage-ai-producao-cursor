@@ -15,6 +15,8 @@ export interface LandingPageWithUser {
   id: string;
   subdomain: string;
   custom_domain: string | null;
+  chosen_domain?: string | null; // Domínio escolhido pelo usuário (com extensão)
+  display_domain?: string; // Domínio a ser exibido (prioridade: chosen_domain > custom_domain > subdomain.docpage.com.br)
   status: string;
   created_at: string;
   updated_at: string;

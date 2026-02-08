@@ -159,6 +159,66 @@ Deno.serve(async (req) => {
       }
     })
 
+    // Buscar domínios escolhidos do pending_checkouts para cada landing page
+    const landingPageIds = optimizedPages.map((lp: any) => lp.id)
+    const chosenDomainsMap: Record<string, string> = {}
+    
+    if (landingPageIds.length > 0) {
+      try {
+        // Buscar domínios escolhidos por landing_page_id
+        const { data: pendingCheckouts, error: pendingError } = await supabaseAdmin
+          .from('pending_checkouts')
+          .select('landing_page_id, domain, has_custom_domain, custom_domain')
+          .in('landing_page_id', landingPageIds)
+          .not('landing_page_id', 'is', null)
+        
+        if (!pendingError && pendingCheckouts) {
+          pendingCheckouts.forEach((pc: any) => {
+            if (pc.landing_page_id) {
+              // Se tem domínio customizado, usar ele; senão, usar o domínio escolhido (com extensão)
+              const chosenDomain = pc.has_custom_domain && pc.custom_domain
+                ? pc.custom_domain
+                : pc.domain // Este é o domínio escolhido pelo usuário (ex: "testefinaldocpage.com.br")
+              chosenDomainsMap[pc.landing_page_id] = chosenDomain
+            }
+          })
+        }
+        
+        // Se não encontrou por landing_page_id, buscar por user_id como fallback
+        const userIds = [...new Set(optimizedPages.map((lp: any) => lp.user_id).filter(Boolean))]
+        if (userIds.length > 0 && Object.keys(chosenDomainsMap).length < landingPageIds.length) {
+          const { data: pendingByUserId, error: pendingByUserIdError } = await supabaseAdmin
+            .from('pending_checkouts')
+            .select('user_id, domain, has_custom_domain, custom_domain')
+            .in('user_id', userIds)
+            .order('created_at', { ascending: false })
+          
+          if (!pendingByUserIdError && pendingByUserId) {
+            // Criar mapa por user_id
+            const userChosenDomainsMap: Record<string, string> = {}
+            pendingByUserId.forEach((pc: any) => {
+              if (pc.user_id && !userChosenDomainsMap[pc.user_id]) {
+                const chosenDomain = pc.has_custom_domain && pc.custom_domain
+                  ? pc.custom_domain
+                  : pc.domain
+                userChosenDomainsMap[pc.user_id] = chosenDomain
+              }
+            })
+            
+            // Aplicar aos landing pages que não têm domínio escolhido
+            optimizedPages.forEach((lp: any) => {
+              if (!chosenDomainsMap[lp.id] && userChosenDomainsMap[lp.user_id]) {
+                chosenDomainsMap[lp.id] = userChosenDomainsMap[lp.user_id]
+              }
+            })
+          }
+        }
+      } catch (domainError) {
+        console.warn('Erro ao buscar domínios escolhidos do pending_checkouts (não crítico):', domainError)
+        // Não falhar se não conseguir buscar domínios escolhidos
+      }
+    }
+
     // Buscar emails dos usuários de forma eficiente (apenas IDs únicos)
     const userIds = [...new Set(optimizedPages.map((lp: any) => lp.user_id).filter(Boolean))]
     const userEmailsMap: Record<string, string> = {}
@@ -210,13 +270,28 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Adicionar emails e subscriptions aos dados formatados
+    // Adicionar emails, subscriptions e domínios escolhidos aos dados formatados
     const formattedPages = optimizedPages.map((lp: any) => {
       const subscription = subscriptionMap.get(lp.id)
+      const chosenDomain = chosenDomainsMap[lp.id]
+      
+      // Determinar o domínio a ser exibido
+      // Prioridade: 1) chosenDomain (do pending_checkouts), 2) custom_domain, 3) subdomain.docpage.com.br
+      let displayDomain: string
+      if (chosenDomain) {
+        displayDomain = chosenDomain
+      } else if (lp.custom_domain) {
+        displayDomain = lp.custom_domain
+      } else {
+        displayDomain = `${lp.subdomain}.docpage.com.br`
+      }
+      
       return {
         ...lp,
         user_email: userEmailsMap[lp.user_id] || null,
-        subscription: subscription || undefined
+        subscription: subscription || undefined,
+        chosen_domain: chosenDomain || null,
+        display_domain: displayDomain
       }
     })
 

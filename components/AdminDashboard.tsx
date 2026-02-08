@@ -136,15 +136,40 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
   };
 
   // Get URL for landing page
-  const getLandingPageUrl = (subdomain: string) => {
-    return `https://${subdomain}.docpage.com.br`;
+  const getLandingPageUrl = (page: LandingPageWithUser) => {
+    // Prioridade: 1) display_domain, 2) chosen_domain, 3) custom_domain, 4) subdomain.docpage.com.br
+    if (page.display_domain) {
+      return `https://${page.display_domain.replace(/^https?:\/\//, '')}`;
+    } else if (page.chosen_domain) {
+      return `https://${page.chosen_domain.replace(/^https?:\/\//, '')}`;
+    } else if (page.custom_domain) {
+      return `https://${page.custom_domain}`;
+    } else {
+      return `https://${page.subdomain}.docpage.com.br`;
+    }
+  };
+  
+  // Get display domain for landing page
+  const getDisplayDomain = (page: LandingPageWithUser) => {
+    // Prioridade: 1) display_domain, 2) chosen_domain, 3) custom_domain, 4) subdomain.docpage.com.br
+    if (page.display_domain) {
+      return page.display_domain.replace(/^https?:\/\//, '');
+    } else if (page.chosen_domain) {
+      return page.chosen_domain.replace(/^https?:\/\//, '');
+    } else if (page.custom_domain) {
+      return page.custom_domain;
+    } else {
+      return `${page.subdomain}.docpage.com.br`;
+    }
   };
 
   // Filter and search
   const filteredPages = landingPages.filter(page => {
     const matchesStatus = filterStatus === 'all' || page.status === filterStatus;
+    const displayDomain = getDisplayDomain(page);
     const matchesSearch = 
       page.subdomain.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      displayDomain.toLowerCase().includes(searchTerm.toLowerCase()) ||
       page.briefing_data?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       page.briefing_data?.contactEmail?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
@@ -398,18 +423,16 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
                         <div>
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-gray-900">
-                              {page.custom_domain || page.subdomain}
+                              {getDisplayDomain(page)}
                             </p>
-                            {page.custom_domain && (
+                            {(page.custom_domain || page.chosen_domain) && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                Domínio próprio
+                                {page.custom_domain ? 'Domínio próprio' : 'Domínio escolhido'}
                               </span>
                             )}
                           </div>
                           <p className="text-xs text-gray-500">
-                            {page.custom_domain 
-                              ? page.custom_domain 
-                              : getLandingPageUrl(page.subdomain)}
+                            {getLandingPageUrl(page)}
                           </p>
                         </div>
                       </td>
@@ -465,7 +488,7 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
                             </button>
                           )}
                           <a
-                            href={`/${page.subdomain}`}
+                            href={getLandingPageUrl(page)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg transition-colors"
