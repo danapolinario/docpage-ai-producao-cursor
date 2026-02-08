@@ -122,6 +122,10 @@ const handler = async (req: Request): Promise<Response> => {
       cpf,
       landingPageData,
     } = requestBody;
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:124',message:'HYP-C: landingPageData recebido na Edge Function',data:{chosenDomain:landingPageData?.chosenDomain,domain:landingPageData?.domain,hasCustomDomain:landingPageData?.hasCustomDomain,customDomain:landingPageData?.customDomain},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
 
     // LOG CRÍTICO: Verificar exatamente o que foi recebido
     // Usar um único console.log com objeto para garantir que tudo seja exibido
@@ -348,18 +352,30 @@ const handler = async (req: Request): Promise<Response> => {
         // Determinar o domínio a ser salvo
         // Quando hasCustomDomain é false, usar chosenDomain (domínio completo com extensão)
         // Quando hasCustomDomain é true, usar customDomain
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:351',message:'HYP-D: Antes de determinar domainToSave',data:{hasCustomDomain:landingPageData.hasCustomDomain,customDomain:landingPageData.customDomain,chosenDomain:landingPageData.chosenDomain,domain:landingPageData.domain},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
         let domainToSave: string;
         if (landingPageData.hasCustomDomain && landingPageData.customDomain) {
           domainToSave = landingPageData.customDomain;
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:353',message:'HYP-D: Branch hasCustomDomain=true',data:{domainToSave},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+          // #endregion
         } else if (landingPageData.chosenDomain) {
           // Usar chosenDomain quando disponível (domínio completo com extensão: ex: "testefinaldocpage.com.br")
           domainToSave = landingPageData.chosenDomain;
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:356',message:'HYP-D: Branch chosenDomain disponível',data:{domainToSave,chosenDomain:landingPageData.chosenDomain},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+          // #endregion
         } else {
           // Fallback: usar domain (subdomínio apenas) e adicionar extensão padrão
           domainToSave = landingPageData.domain.includes('.') 
             ? landingPageData.domain 
             : `${landingPageData.domain}.com.br`;
           console.warn("stripe-create-checkout: chosenDomain não fornecido, usando domain com extensão padrão");
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:361',message:'HYP-D: Branch fallback domain',data:{domainToSave,domain:landingPageData.domain},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+          // #endregion
         }
         
         console.log("stripe-create-checkout: Salvando domínio no pending_checkouts", {
@@ -369,18 +385,30 @@ const handler = async (req: Request): Promise<Response> => {
           hasCustomDomain: landingPageData.hasCustomDomain,
           customDomain: landingPageData.customDomain,
         });
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:371',message:'HYP-D: domainToSave determinado',data:{domainToSave,chosenDomain:landingPageData.chosenDomain},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
+        
+        const pendingCheckoutData = {
+          user_id: userId,
+          stripe_session_id: session.id,
+          landing_page_data: landingPageData,
+          domain: domainToSave, // Usar chosenDomain se disponível (domínio completo escolhido)
+          has_custom_domain: landingPageData.hasCustomDomain || false,
+          custom_domain: landingPageData.customDomain || null,
+          cpf: cpf || null,
+        };
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:375',message:'HYP-E: Antes de salvar no pending_checkouts',data:{domain:pendingCheckoutData.domain,domainToSave,chosenDomain:landingPageData.chosenDomain},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
         
         const { error: insertError } = await supabase
           .from("pending_checkouts")
-          .insert({
-            user_id: userId,
-            stripe_session_id: session.id,
-            landing_page_data: landingPageData,
-            domain: domainToSave, // Usar chosenDomain se disponível (domínio completo escolhido)
-            has_custom_domain: landingPageData.hasCustomDomain || false,
-            custom_domain: landingPageData.customDomain || null,
-            cpf: cpf || null,
-          });
+          .insert(pendingCheckoutData);
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:382',message:'HYP-E: Após salvar no pending_checkouts',data:{insertError:insertError?.message,domainSalvo:domainToSave},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
         
         if (insertError) {
           console.error("stripe-create-checkout: Erro ao salvar pending_checkout:", insertError);

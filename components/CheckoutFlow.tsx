@@ -337,18 +337,33 @@ export const CheckoutFlow: React.FC<Props> = ({
       
       // Domínio completo escolhido pelo usuário (com extensão) para usar no email
       let chosenDomainForEmail: string;
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:338',message:'HYP-A: Valores antes de criar chosenDomainForEmail',data:{hasCustomDomain,selectedDomain,domainExtension,customDomainValue,finalDomain},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       if (hasCustomDomain) {
         chosenDomainForEmail = customDomainValue;
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:341',message:'HYP-A: Branch hasCustomDomain=true',data:{chosenDomainForEmail},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
       } else if (selectedDomain && domainExtension) {
         chosenDomainForEmail = `${selectedDomain}${domainExtension}`; // Ex: "testefinaldocpage.com.br"
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:343',message:'HYP-A: Branch selectedDomain+domainExtension',data:{chosenDomainForEmail,selectedDomain,domainExtension},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
       } else if (selectedDomain) {
         // Se não tiver extensão, adicionar .com.br como padrão
         chosenDomainForEmail = `${selectedDomain}.com.br`;
         console.warn('CheckoutFlow: domainExtension não definido, usando .com.br como padrão');
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:346',message:'HYP-A: Branch fallback selectedDomain sem extensão',data:{chosenDomainForEmail,selectedDomain},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
       } else {
         // Fallback: usar finalDomain com extensão
         chosenDomainForEmail = `${finalDomain}.com.br`;
         console.warn('CheckoutFlow: selectedDomain não definido, usando finalDomain com .com.br');
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:350',message:'HYP-A: Branch fallback finalDomain',data:{chosenDomainForEmail,finalDomain},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
       }
       
       console.log('CheckoutFlow: Domínios determinados', {
@@ -359,6 +374,9 @@ export const CheckoutFlow: React.FC<Props> = ({
         hasCustomDomain,
         customDomainValue,
       });
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:361',message:'HYP-A: chosenDomainForEmail final criado',data:{chosenDomainForEmail,finalDomain,selectedDomain,domainExtension},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       
       if (!finalDomain) {
         setError('Por favor, informe um domínio válido.');
@@ -505,6 +523,26 @@ export const CheckoutFlow: React.FC<Props> = ({
         selectedDomain,
         domainExtension,
       });
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:507',message:'HYP-B: Antes de enviar para createCheckoutSession',data:{chosenDomain:chosenDomainForEmail,domain:finalDomain,hasCustomDomain},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      
+      const landingPageDataPayload = {
+        briefing,
+        content,
+        design,
+        visibility,
+        layoutVariant,
+        photoUrl,
+        aboutPhotoUrl,
+        domain: finalDomain, // Subdomínio apenas (para criar landing page)
+        chosenDomain: chosenDomainForEmail, // Domínio completo escolhido (com extensão: ex: "testefinaldocpage.com.br")
+        hasCustomDomain,
+        customDomain: hasCustomDomain ? customDomainValue : null,
+      };
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:520',message:'HYP-B: landingPageDataPayload criado',data:{chosenDomain:landingPageDataPayload.chosenDomain,domain:landingPageDataPayload.domain,hasCustomDomain:landingPageDataPayload.hasCustomDomain},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       
       const checkoutSession = await createCheckoutSession({
         planId: plan.id,
@@ -513,19 +551,7 @@ export const CheckoutFlow: React.FC<Props> = ({
         userId: user.id,
         userEmail: email, // SEMPRE usar email informado no Step 1 (campo "Email de Acesso")
         cpf: !hasCustomDomain ? cpf.replace(/\D/g, '') : undefined, // CPF apenas quando não há domínio próprio
-        landingPageData: {
-          briefing,
-          content,
-          design,
-          visibility,
-          layoutVariant,
-          photoUrl,
-          aboutPhotoUrl,
-          domain: finalDomain, // Subdomínio apenas (para criar landing page)
-          chosenDomain: chosenDomainForEmail, // Domínio completo escolhido (com extensão: ex: "testefinaldocpage.com.br")
-          hasCustomDomain,
-          customDomain: hasCustomDomain ? customDomainValue : null,
-        },
+        landingPageData: landingPageDataPayload,
       });
 
       // Track início do checkout
