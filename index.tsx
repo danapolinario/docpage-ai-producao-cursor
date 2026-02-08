@@ -10,6 +10,7 @@ import { DashboardPage } from './components/DashboardPage';
 import { StripeSuccess } from './components/StripeSuccess';
 import { TermsOfService } from './components/TermsOfService';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
+import { useSearchParams } from 'react-router-dom';
 
 // Função para extrair subdomínio do hostname
 function extractSubdomainFromHost(): string | null {
@@ -53,6 +54,24 @@ const DevRoute: React.FC = () => {
   );
 };
 
+// Componente wrapper para rota /checkout - renderiza App e detecta parâmetros da URL
+const CheckoutRoute: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const canceled = searchParams.get('canceled') === 'true';
+  
+  React.useEffect(() => {
+    if (canceled) {
+      console.log('Checkout cancelado pelo usuário - voltando para home');
+      // Redirecionar para home após 2 segundos se foi cancelado
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
+    }
+  }, [canceled]);
+  
+  return <App />;
+};
+
 // Inicializar Google Analytics
 initGoogleAnalytics();
 
@@ -70,6 +89,7 @@ root.render(
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/checkout/success" element={<StripeSuccess />} />
+          <Route path="/checkout" element={<CheckoutRoute />} />
           <Route path="/termos-de-uso" element={<TermsOfService />} />
           <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
           <Route path="/dev" element={<DevRoute />} />

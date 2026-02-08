@@ -10,7 +10,7 @@
       "destination": "/api"
     },
     {
-      "source": "/((?!admin|dashboard|dev|assets).*)",
+      "source": "/((?!admin|dashboard|dev|checkout|assets).*)",
       "destination": "/api/$1"
     },
     {
@@ -23,6 +23,10 @@
     },
     {
       "source": "/dev",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/checkout",
       "destination": "/index.html"
     }
   ],

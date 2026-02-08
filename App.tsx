@@ -134,6 +134,35 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [hasAppliedRecommendedTheme, setHasAppliedRecommendedTheme] = useState(false);
 
+  // Detectar se está na rota /checkout e ajustar estado inicial
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      const searchParams = new URLSearchParams(window.location.search);
+      const canceled = searchParams.get('canceled') === 'true';
+      
+      if (path === '/checkout') {
+        // Se foi cancelado, apenas redirecionar para home (o CheckoutRoute já faz isso)
+        if (canceled) {
+          return;
+        }
+        
+        // Se está na rota /checkout sem dados, redirecionar para home
+        if (!state.generatedContent || !state.briefing.name) {
+          console.log('Acesso direto a /checkout sem dados - redirecionando para home');
+          window.location.href = '/';
+          return;
+        }
+        
+        // Se está na rota /checkout com dados, mostrar PricingPage no modo checkout
+        if (state.step !== 5) {
+          setState(prev => ({ ...prev, step: 5 }));
+        }
+        setPricingViewMode('checkout');
+      }
+    }
+  }, [state.generatedContent, state.briefing.name, state.step]);
+
   // Inicializar Google Analytics
   useEffect(() => {
     initGoogleAnalytics();

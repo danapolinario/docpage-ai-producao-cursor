@@ -74,11 +74,29 @@ const handler = async (req: Request): Promise<Response> => {
 
   if (!stripe) {
     console.error("stripe-create-checkout: STRIPE_SECRET_KEY ausente");
+    const hasKey = !!Deno.env.get("STRIPE_SECRET_KEY");
+    const keyPrefix = Deno.env.get("STRIPE_SECRET_KEY")?.substring(0, 7) || "não encontrada";
     return new Response(
-      JSON.stringify({ error: "Stripe não configurado. STRIPE_SECRET_KEY ausente. Configure no Supabase Dashboard > Settings > Edge Functions > Secrets" }),
+      JSON.stringify({ 
+        error: "Stripe não configurado. STRIPE_SECRET_KEY ausente. Configure no Supabase Dashboard > Settings > Edge Functions > Secrets",
+        debug: {
+          hasKey,
+          keyPrefix,
+          supabaseUrl: SUPABASE_URL ? "configurado" : "ausente",
+          supabaseServiceKey: SUPABASE_SERVICE_ROLE_KEY ? "configurado" : "ausente"
+        }
+      }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
+  
+  // Verificar se a chave é de produção (começa com sk_live_) ou teste (sk_test_)
+  const keyPrefix = STRIPE_SECRET_KEY?.substring(0, 7);
+  console.log("stripe-create-checkout: Stripe configurado", { 
+    keyPrefix,
+    isProduction: keyPrefix === "sk_live",
+    isTest: keyPrefix === "sk_test"
+  });
 
   try {
     console.log("stripe-create-checkout: Parsing request body");
@@ -186,20 +204,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`stripe-create-checkout: Usando Price ID: ${priceId} para ${planId} ${billingPeriod}`);
     console.log(`stripe-create-checkout: Mapeamento verificado - planId: ${planId}, billingPeriod: ${billingPeriod}, priceId: ${priceId}`);
-    
-    // Validação adicional: verificar se o Price ID corresponde ao plano esperado
-    if (planId === 'pro' && billingPeriod === 'annual' && priceId !== 'price_1SwRKV1zmyrvN5yEW4NcN91J') {
-      console.error(`stripe-create-checkout: ERRO - Price ID incorreto para pro/annual. Esperado: price_1SwRKV1zmyrvN5yEW4NcN91J, recebido: ${priceId}`);
-    }
-    if (planId === 'pro' && billingPeriod === 'monthly' && priceId !== 'price_1SwRKy1zmyrvN5yEgOLRU4R8') {
-      console.error(`stripe-create-checkout: ERRO - Price ID incorreto para pro/monthly. Esperado: price_1SwRKy1zmyrvN5yEgOLRU4R8, recebido: ${priceId}`);
-    }
-    if (planId === 'starter' && billingPeriod === 'annual' && priceId !== 'price_1SwRJE1zmyrvN5yEqbtPHdJK') {
-      console.error(`stripe-create-checkout: ERRO - Price ID incorreto para starter/annual. Esperado: price_1SwRJE1zmyrvN5yEqbtPHdJK, recebido: ${priceId}`);
-    }
-    if (planId === 'starter' && billingPeriod === 'monthly' && priceId !== 'price_1SwRK21zmyrvN5yEE7e96JFg') {
-      console.error(`stripe-create-checkout: ERRO - Price ID incorreto para starter/monthly. Esperado: price_1SwRK21zmyrvN5yEE7e96JFg, recebido: ${priceId}`);
-    }
 
     // Verificar cupom/promotion code se fornecido
     let promotionCodeId: string | undefined;
@@ -323,9 +327,12 @@ const handler = async (req: Request): Promise<Response> => {
       customerEmail: sessionParams.customer_email,
       metadataKeys: Object.keys(sessionParams.metadata || {}),
       discounts: sessionParams.discounts,
+      successUrl: sessionParams.success_url,
+      cancelUrl: sessionParams.cancel_url,
     });
     
     try {
+      console.log("stripe-create-checkout: Chamando stripe.checkout.sessions.create...");
       const session = await stripe.checkout.sessions.create(sessionParams);
       console.log("stripe-create-checkout: Session created successfully", { sessionId: session.id, url: session.url });
       
@@ -371,7 +378,27 @@ const handler = async (req: Request): Promise<Response> => {
         code: stripeError.code,
         param: stripeError.param,
         decline_code: stripeError.decline_code,
+        statusCode: stripeError.statusCode,
+        raw: stripeError.raw ? JSON.stringify(stripeError.raw).substring(0, 500) : undefined,
       });
+      
+      // Se for erro de Price ID inválido, retornar erro mais específico
+      if (stripeError.code === 'resource_missing' || stripeError.message?.includes('No such price')) {
+        return new Response(
+          JSON.stringify({ 
+            error: `Price ID inválido ou não encontrado: ${priceId}. Verifique se o Price ID está correto e ativo no Stripe Dashboard (modo Live).`,
+            details: {
+              priceId,
+              planId,
+              billingPeriod,
+              stripeError: stripeError.message,
+              code: stripeError.code
+            }
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      
       throw stripeError;
     }
   } catch (error: any) {
