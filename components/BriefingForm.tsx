@@ -7,6 +7,7 @@ interface Props {
   data: BriefingData;
   onChange: (data: BriefingData) => void;
   onNext: () => void;
+  isDevMode?: boolean;
 }
 
 const SPECIALTIES = ['Cardiologia', 'Dermatologia', 'Pediatria', 'Psicologia', 'Odontologia', 'Ortopedia', 'Ginecologia', 'Nutrição', 'Fisioterapia', 'Oftalmologia', 'Cirurgia Plástica', 'Endocrinologia'];
@@ -14,7 +15,7 @@ const AUDIENCES = ['Idosos', 'Crianças', 'Atletas', 'Mulheres', 'Gestantes', 'E
 const SERVICES = ['Consulta de Rotina', 'Check-up', 'Cirurgia', 'Exames', 'Terapia', 'Clareamento', 'Harmonização Facial', 'Implantes', 'Reabilitação'];
 const STATES = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 
-export const BriefingForm: React.FC<Props> = ({ data, onChange, onNext }) => {
+export const BriefingForm: React.FC<Props> = ({ data, onChange, onNext, isDevMode = false }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     onChange({ ...data, [name]: value });
@@ -52,12 +53,14 @@ export const BriefingForm: React.FC<Props> = ({ data, onChange, onNext }) => {
       
       {/* Form Area */}
       <div className="flex-1 bg-white p-8 rounded-xl shadow-lg border border-gray-100 relative">
-        <button 
-          onClick={fillDemoData}
-          className="absolute top-8 right-8 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full hover:bg-blue-100 transition-colors"
-        >
-          ✨
-        </button>
+        {isDevMode && (
+          <button 
+            onClick={fillDemoData}
+            className="absolute top-8 right-8 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full hover:bg-blue-100 transition-colors"
+          >
+            ✨
+          </button>
+        )}
 
         <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
           <span className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm">1</span>

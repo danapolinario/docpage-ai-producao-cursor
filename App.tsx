@@ -116,7 +116,11 @@ const DUMMY_CONTENT: LandingPageContent = {
   contactAddresses: ['Av. Paulista, 1000, São Paulo - SP']
 };
 
-const App: React.FC = () => {
+interface AppProps {
+  isDevMode?: boolean;
+}
+
+const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   const [showSaaSIntro, setShowSaaSIntro] = useState(true);
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [viewMode, setViewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
@@ -831,7 +835,7 @@ const App: React.FC = () => {
               setShowSaaSIntro(false);
             }
           }}
-          onDevNavigation={handleDevNavigation}
+          onDevNavigation={isDevMode ? handleDevNavigation : undefined}
           onLoginClick={() => {
             console.log('Login clicado na home');
             setShowAuthModal(true);
@@ -965,7 +969,8 @@ const App: React.FC = () => {
             <BriefingForm 
               data={state.briefing} 
               onChange={updateBriefing} 
-              onNext={() => setState(prev => ({ ...prev, step: 1 }))} 
+              onNext={() => setState(prev => ({ ...prev, step: 1 }))}
+              isDevMode={isDevMode}
             />
           </div>
         )}

@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { HelmetProvider } from 'react-helmet-async';
+import { HelmetProvider, Helmet } from 'react-helmet-async';
 import { initGoogleAnalytics } from './services/google-analytics';
 import App from './App';
 import { AdminPage } from './components/AdminPage';
@@ -41,6 +41,18 @@ const RootRoute: React.FC = () => {
   return <App />;
 };
 
+// Componente wrapper para rota /dev - renderiza App com modo dev habilitado
+const DevRoute: React.FC = () => {
+  return (
+    <>
+      <Helmet>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
+      <App isDevMode={true} />
+    </>
+  );
+};
+
 // Inicializar Google Analytics
 initGoogleAnalytics();
 
@@ -60,6 +72,7 @@ root.render(
           <Route path="/checkout/success" element={<StripeSuccess />} />
           <Route path="/termos-de-uso" element={<TermsOfService />} />
           <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
+          <Route path="/dev" element={<DevRoute />} />
           <Route path="/:subdomain" element={<LandingPageViewer />} />
           <Route path="/" element={<RootRoute />} />
         </Routes>
