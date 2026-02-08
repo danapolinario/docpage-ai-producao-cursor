@@ -336,9 +336,29 @@ export const CheckoutFlow: React.FC<Props> = ({
         : selectedDomain; // Subdomínio apenas (ex: "drjoaosilva")
       
       // Domínio completo escolhido pelo usuário (com extensão) para usar no email
-      const chosenDomainForEmail = hasCustomDomain 
-        ? customDomainValue 
-        : `${selectedDomain}${domainExtension}`; // Ex: "drjoaosilva.com.br"
+      let chosenDomainForEmail: string;
+      if (hasCustomDomain) {
+        chosenDomainForEmail = customDomainValue;
+      } else if (selectedDomain && domainExtension) {
+        chosenDomainForEmail = `${selectedDomain}${domainExtension}`; // Ex: "testefinaldocpage.com.br"
+      } else if (selectedDomain) {
+        // Se não tiver extensão, adicionar .com.br como padrão
+        chosenDomainForEmail = `${selectedDomain}.com.br`;
+        console.warn('CheckoutFlow: domainExtension não definido, usando .com.br como padrão');
+      } else {
+        // Fallback: usar finalDomain com extensão
+        chosenDomainForEmail = `${finalDomain}.com.br`;
+        console.warn('CheckoutFlow: selectedDomain não definido, usando finalDomain com .com.br');
+      }
+      
+      console.log('CheckoutFlow: Domínios determinados', {
+        finalDomain, // Para criar landing page (subdomínio apenas)
+        chosenDomainForEmail, // Para email (domínio completo)
+        selectedDomain,
+        domainExtension,
+        hasCustomDomain,
+        customDomainValue,
+      });
       
       if (!finalDomain) {
         setError('Por favor, informe um domínio válido.');

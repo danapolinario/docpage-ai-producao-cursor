@@ -344,13 +344,24 @@ const handler = async (req: Request): Promise<Response> => {
         const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
         
+        // Determinar o domínio a ser salvo
+        const domainToSave = landingPageData.chosenDomain || landingPageData.domain;
+        
+        console.log("stripe-create-checkout: Salvando domínio no pending_checkouts", {
+          chosenDomain: landingPageData.chosenDomain,
+          domain: landingPageData.domain,
+          domainToSave,
+          hasCustomDomain: landingPageData.hasCustomDomain,
+          customDomain: landingPageData.customDomain,
+        });
+        
         const { error: insertError } = await supabase
           .from("pending_checkouts")
           .insert({
             user_id: userId,
             stripe_session_id: session.id,
             landing_page_data: landingPageData,
-            domain: landingPageData.chosenDomain || landingPageData.domain, // Usar chosenDomain se disponível (domínio completo escolhido)
+            domain: domainToSave, // Usar chosenDomain se disponível (domínio completo escolhido)
             has_custom_domain: landingPageData.hasCustomDomain || false,
             custom_domain: landingPageData.customDomain || null,
             cpf: cpf || null,

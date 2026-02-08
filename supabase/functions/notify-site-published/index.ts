@@ -221,18 +221,30 @@ const handler = async (req: Request): Promise<Response> => {
     if (chosenDomain) {
       // Se encontrou o domínio escolhido no pending_checkouts, usar ele
       displayDomain = chosenDomain;
+      console.log('notify-site-published: Usando domínio escolhido do pending_checkouts:', displayDomain);
     } else if (landingPage.custom_domain) {
       // Se tem domínio customizado salvo, usar ele
       displayDomain = landingPage.custom_domain;
+      console.log('notify-site-published: Usando custom_domain da landing page:', displayDomain);
     } else {
       // Fallback: usar subdomínio do docpage.com.br
       displayDomain = `${landingPage.subdomain}.docpage.com.br`;
+      console.log('notify-site-published: Usando fallback subdomain.docpage.com.br:', displayDomain);
     }
 
     // Garantir que o domínio não tenha protocolo
     displayDomain = displayDomain.replace(/^https?:\/\//, '');
+    
+    // Se o domínio não contém extensão (.com.br, .com, etc), adicionar .docpage.com.br
+    // Isso é um fallback de segurança caso o chosenDomain não tenha sido salvo com extensão
+    if (!displayDomain.includes('.') && !displayDomain.includes('docpage')) {
+      console.warn('notify-site-published: Domínio sem extensão detectado, adicionando .docpage.com.br:', displayDomain);
+      displayDomain = `${displayDomain}.docpage.com.br`;
+    }
 
     const siteUrl = `https://${displayDomain}`;
+    
+    console.log('notify-site-published: URL final do site:', siteUrl);
 
     console.log("Tentando enviar email via Resend:", {
       from: "DocPage AI <noreply@docpage.com.br>",

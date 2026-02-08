@@ -169,14 +169,26 @@ export async function getDashboardData(landingPageId: string): Promise<Dashboard
   let displayDomain: string;
   if (chosenDomain) {
     displayDomain = chosenDomain;
+    console.log('dashboard.ts: Usando domínio escolhido do pending_checkouts:', displayDomain);
   } else if (landingPage.custom_domain) {
     displayDomain = landingPage.custom_domain;
+    console.log('dashboard.ts: Usando custom_domain da landing page:', displayDomain);
   } else {
     displayDomain = `${landingPage.subdomain}.docpage.com.br`;
+    console.log('dashboard.ts: Usando fallback subdomain.docpage.com.br:', displayDomain);
   }
 
   // Garantir que o domínio não tenha protocolo
   displayDomain = displayDomain.replace(/^https?:\/\//, '');
+  
+  // Se o domínio não contém extensão (.com.br, .com, etc), adicionar .docpage.com.br
+  // Isso é um fallback de segurança caso o chosenDomain não tenha sido salvo com extensão
+  if (!displayDomain.includes('.') && !displayDomain.includes('docpage')) {
+    console.warn('dashboard.ts: Domínio sem extensão detectado, adicionando .docpage.com.br:', displayDomain);
+    displayDomain = `${displayDomain}.docpage.com.br`;
+  }
+  
+  console.log('dashboard.ts: Domínio final determinado:', displayDomain);
 
   const domainInfo = {
     domain: displayDomain,
