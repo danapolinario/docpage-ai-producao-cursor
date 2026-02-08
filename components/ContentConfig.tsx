@@ -19,7 +19,7 @@ const LOADING_MESSAGES = [
   "Otimizando palavras-chave para o Google (SEO)...",
   "Estruturando oferta de alta conversão...",
   "Escrevendo textos éticos conforme CFM...",
-  "Finalizando sua Landing Page..."
+  "Finalizando seu site..."
 ];
 
 const COMPLIANCE_RULES = [

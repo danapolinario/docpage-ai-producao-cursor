@@ -7,6 +7,8 @@ import { getDashboardData, DashboardData } from '../services/dashboard';
 import { updateLandingPage } from '../services/landing-pages';
 import { supabase } from '../lib/supabase';
 import { trackDashboardView } from '../services/google-analytics';
+import { getUserSubscription } from '../services/subscriptions';
+import { signOut } from '../services/auth';
 
 interface Props {
   doctorName: string;
@@ -98,6 +100,7 @@ export const Dashboard: React.FC<Props> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [subscription, setSubscription] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testimonials, setTestimonials] = useState(content.testimonials || []);
@@ -176,6 +179,16 @@ export const Dashboard: React.FC<Props> = ({
           const data = await getDashboardData(landingPageId);
           console.log('Dados do dashboard carregados com sucesso:', data);
           setDashboardData(data);
+          
+          // Carregar assinatura do usuário
+          try {
+            const userSubscription = await getUserSubscription(user.id);
+            setSubscription(userSubscription);
+          } catch (subError) {
+            console.warn('Erro ao carregar assinatura:', subError);
+            // Continuar sem assinatura
+          }
+          
           setIsLoading(false);
         } catch (err: any) {
           console.error('Erro ao carregar dados do dashboard:', err);
@@ -391,7 +404,10 @@ export const Dashboard: React.FC<Props> = ({
   );
 
   const hasCustomTestimonialsFlag = (dashboardData?.landingPage?.section_visibility as any)?.hasCustomTestimonials;
-  const showTestimonialsWarning = visibility.testimonials && !hasCustomTestimonialsFlag;
+  // Verificar se há depoimentos reais (não padrão)
+  const hasRealTestimonials = testimonials && testimonials.length > 0 && 
+    testimonials.some((t: any) => t.name && t.name !== 'Paciente' && t.text && t.text !== 'Depoimento...');
+  const showTestimonialsWarning = visibility.testimonials && !hasCustomTestimonialsFlag && !hasRealTestimonials;
 
   const handleTestimonialChange = (index: number, field: 'name' | 'text', value: string) => {
     setTestimonials(prev => {
@@ -415,9 +431,13 @@ export const Dashboard: React.FC<Props> = ({
     try {
       setIsSavingTestimonials(true);
 
+      // Verificar se há depoimentos reais
+      const hasRealTestimonials = testimonials && testimonials.length > 0 && 
+        testimonials.some((t: any) => t.name && t.name !== 'Paciente' && t.text && t.text !== 'Depoimento...');
+
       const updatedVisibility = {
         ...(dashboardData.landingPage.section_visibility || {}),
-        hasCustomTestimonials: true,
+        hasCustomTestimonials: hasRealTestimonials, // Marcar como customizado apenas se houver depoimentos reais
         testimonials: testimonials.length > 0 ? true : false, // Ativar seção se houver depoimentos
       };
 
@@ -443,12 +463,14 @@ export const Dashboard: React.FC<Props> = ({
   const handleUpdateContent = async (key: keyof LandingPageContent, value: any) => {
     setLocalContent(prev => ({ ...prev, [key]: value }));
     
-    // Se está editando depoimentos, marcar como customizados
+    // Se está editando depoimentos, verificar se há depoimentos reais antes de marcar como customizados
     let updatedVisibility = localVisibility;
     if (key === 'testimonials') {
+      const hasRealTestimonials = value && Array.isArray(value) && value.length > 0 && 
+        value.some((t: any) => t.name && t.name !== 'Paciente' && t.text && t.text !== 'Depoimento...');
       updatedVisibility = {
         ...localVisibility,
-        hasCustomTestimonials: true, // Marcar como customizado
+        hasCustomTestimonials: hasRealTestimonials, // Marcar como customizado apenas se houver depoimentos reais
       } as any;
       setLocalVisibility(updatedVisibility);
     }
@@ -757,16 +779,6 @@ export const Dashboard: React.FC<Props> = ({
             </div>
          </div>
          
-         <div className="bg-blue-50 border border-blue-100 p-6 rounded-xl flex items-start gap-4">
-            <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
-               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            </div>
-            <div>
-               <h4 className="font-bold text-blue-900 mb-1">Email Profissional</h4>
-               <p className="text-sm text-blue-700">Seu plano inclui 3 contas de email profissional (ex: contato@{domainInfo.domain.replace('www.', '')}). Configure no painel de hospedagem.</p>
-               <button className="mt-3 text-xs font-bold text-blue-600 hover:text-blue-800 underline">Configurar Emails</button>
-            </div>
-         </div>
       </div>
     );
   };
@@ -875,7 +887,8 @@ export const Dashboard: React.FC<Props> = ({
 
   // Funcionalidades por plano
   const getPlanFeatures = () => {
-    const planId = plan.id || plan.name?.toLowerCase() || 'starter';
+    // Usar plan_id da subscription se disponível, senão usar plan prop
+    const planId = subscription?.plan_id || plan.id || plan.name?.toLowerCase() || 'starter';
     
     if (planId.includes('authority') || planId.includes('autoridade')) {
       return {
@@ -1032,7 +1045,16 @@ export const Dashboard: React.FC<Props> = ({
 
           <div className="p-4 border-t border-slate-800">
              <button 
-               onClick={() => window.location.reload()} // Simulator logout
+               onClick={async () => {
+                 try {
+                   await signOut();
+                   window.location.href = '/';
+                 } catch (error) {
+                   console.error('Erro ao fazer logout:', error);
+                   // Redirecionar mesmo em caso de erro
+                   window.location.href = '/';
+                 }
+               }}
                className="flex items-center gap-3 px-4 py-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg w-full transition-colors text-sm font-medium"
              >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
@@ -1056,12 +1078,7 @@ export const Dashboard: React.FC<Props> = ({
                   : 'Redes Sociais'}
              </h1>
              <div className="flex items-center gap-4">
-                {dashboardData?.domainInfo?.renewalDate && (
-                  <div className="text-xs text-right hidden sm:block">
-                     <p className="text-gray-500">Próxima Renovação</p>
-                     <p className="font-bold text-gray-800">{dashboardData.domainInfo.renewalDate}</p>
-                  </div>
-                )}
+                
                 {dashboardData?.landingPage.status === 'published' && (
                   <a 
                     href={`https://${displayDomain}`}
@@ -1185,9 +1202,9 @@ export const Dashboard: React.FC<Props> = ({
                          </svg>
                        </div>
                        <div className="flex-1">
-                         <h3 className="text-sm md:text-base font-bold text-amber-900 mb-1">Depoimentos Ilustrativos</h3>
+                         <h3 className="text-sm md:text-base font-bold text-amber-900 mb-1">Atenção: Seção de Depoimentos Ocultada</h3>
                          <p className="text-xs md:text-sm text-amber-800 leading-relaxed mb-3">
-                           Os depoimentos exibidos no seu site são apenas ilustrativos e não aparecerão para os visitantes enquanto você não adicionar depoimentos reais de seus pacientes.
+                           A seção de depoimentos está oculta para os visitantes enquanto você não adicionar depoimentos reais. Caso você adicione depoimentos reais, esse aviso desaparecerá automaticamente.
                          </p>
                          <button
                            onClick={() => setActiveView('testimonials')}
@@ -1200,7 +1217,7 @@ export const Dashboard: React.FC<Props> = ({
                    </div>
                  )}
 
-                 {/* Plan Features Info Banner */}
+                 {/* Plan Features & Subscription Status (Merged) */}
                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 md:p-6 shadow-sm">
                    <div className="flex items-start gap-3 md:gap-4">
                      <div className="flex-shrink-0 mt-1">
@@ -1209,10 +1226,45 @@ export const Dashboard: React.FC<Props> = ({
                        </svg>
                      </div>
                      <div className="flex-1">
-                       <div className="flex items-center gap-2 mb-2">
-                         <h3 className="text-sm md:text-base font-bold text-blue-900">Funcionalidades do seu plano</h3>
-                         <span className="px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded uppercase">{plan.name}</span>
+                       <div className="flex items-center gap-2 mb-3">
+                         <h3 className="text-sm md:text-base font-bold text-blue-900">Status da Assinatura e Funcionalidades</h3>
+                         {subscription ? (
+                           <>
+                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                               subscription.status === 'active' 
+                                 ? 'bg-green-100 text-green-700' 
+                                 : subscription.status === 'canceled'
+                                 ? 'bg-red-100 text-red-700'
+                                 : subscription.status === 'past_due'
+                                 ? 'bg-yellow-100 text-yellow-700'
+                                 : 'bg-gray-100 text-gray-700'
+                             }`}>
+                               {subscription.status === 'active' ? 'Ativa' : 
+                                subscription.status === 'canceled' ? 'Cancelada' :
+                                subscription.status === 'past_due' ? 'Atrasada' :
+                                subscription.status === 'unpaid' ? 'Não Paga' :
+                                subscription.status === 'trialing' ? 'Período de Teste' : subscription.status}
+                             </span>
+                             <span className="px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded uppercase">
+                               {subscription.plan_id === 'pro' ? 'Profissional' : 'Starter'} - {subscription.billing_period === 'monthly' ? 'Mensal' : 'Anual'}
+                             </span>
+                           </>
+                         ) : (
+                           <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded uppercase">{plan.name}</span>
+                         )}
                        </div>
+                       
+                       {subscription && (
+                         <div className="mb-3 pb-3 border-b border-blue-200">
+                           <p className="text-xs text-blue-700">
+                             {subscription.cancel_at_period_end 
+                               ? `Cancelará em ${new Date(subscription.current_period_end).toLocaleDateString('pt-BR')}`
+                               : `Próxima renovação: ${new Date(subscription.current_period_end).toLocaleDateString('pt-BR')}`
+                             }
+                           </p>
+                         </div>
+                       )}
+                       
                        <p className="text-xs md:text-sm text-blue-800 mb-3 leading-relaxed">
                          {planFeatures.description}
                        </p>
@@ -1228,12 +1280,6 @@ export const Dashboard: React.FC<Props> = ({
                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canViewAdvancedStats ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
                            </svg>
                            <span className={planFeatures.canViewAdvancedStats ? 'text-blue-900' : 'text-gray-500'}>Estatísticas avançadas</span>
-                         </div>
-                         <div className="flex items-center gap-2 text-xs md:text-sm">
-                           <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canManageEmail ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canManageEmail ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
-                           </svg>
-                           <span className={planFeatures.canManageEmail ? 'text-blue-900' : 'text-gray-500'}>Email profissional</span>
                          </div>
                          <div className="flex items-center gap-2 text-xs md:text-sm">
                            <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canAccessSocialMedia ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1378,8 +1424,7 @@ export const Dashboard: React.FC<Props> = ({
                         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-fit">
                            <h3 className="font-bold text-gray-800 mb-4">Seu Site</h3>
                            
-                           <a 
-                             href={dashboardData?.landingPage.status === 'published' 
+                           <a href={dashboardData?.landingPage.status === 'published' 
                                ? `https://${displayDomain}` 
                                : `https://id-preview--0a9faad6-43ab-4990-8403-ac9018697ff1.lovable.app`
                              }

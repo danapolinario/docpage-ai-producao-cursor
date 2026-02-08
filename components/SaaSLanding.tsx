@@ -219,7 +219,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
   
   const prefix = "Sua Presença Digital Médica";
   const suffixes = [
-    " em *5 Minutos*.",
+    " com *Site Profissional em Minutos*.",
     " com *Agenda Cheia*.",
     " no *Topo do Google*.",
     " com *Posts para Instagram*."
@@ -366,7 +366,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
       period: '/mês',
       periodDetail: '(plano anual)',
       description: 'Para especialistas que buscam autoridade e agendamentos.',
-      features: ['Tudo do Starter', 'Estatísticas de acesso avançadas', 'Plano estratégico para otimizar resultados', 'Email Profissional', 'Posts semanais (Redes Sociais)'],
+      features: ['Tudo do Starter', 'Estatísticas de acesso avançadas', 'Sugestões periódicas da nossa equipe para melhoria de desempenho', 'Plano estratégico para otimizar resultados', 'Pacote de posts para Redes Sociais'],
       highlight: true,
       color: 'border-blue-500 ring-2 ring-blue-500 shadow-xl',
       cta: 'Escolher Plano',
@@ -801,7 +801,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
           </div>
 
           <p className="max-w-3xl mx-auto text-lg md:text-xl text-slate-500 mb-10 leading-relaxed">
-            Crie um site profissional que atrai pacientes e respeita 100% as normas éticas. Veja o resultado final grátis, publique e assine apenas quando estiver satisfeito.
+            Crie um site profissional para médicos que atrai pacientes e respeita 100% as normas éticas do CFM. Veja o resultado final grátis em minutos, publique e assine apenas quando estiver satisfeito.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <button 
@@ -839,7 +839,10 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
       <div className="py-24 bg-slate-50 border-y border-slate-200">
         <div className="max-w-7xl mx-auto px-6">
            <div className="text-center mb-16">
-             <h2 className="text-3xl font-bold text-slate-900">Por que escolher o DocPage AI?</h2>
+             <h2 className="text-3xl font-bold text-slate-900">Por que escolher o DocPage AI para criar seu site médico?</h2>
+             <p className="text-slate-600 mt-4 max-w-2xl mx-auto">
+               A melhor plataforma de criação de sites para médicos com marketing médico otimizado e presença online profissional.
+             </p>
            </div>
            
            {/* Desktop View: Grid (Reduced Height & Larger Font) */}
@@ -1053,9 +1056,9 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
       <div id="examples" className="py-24 bg-white border-b border-slate-200 scroll-mt-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Criado com DocPage AI</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Exemplos de Sites Médicos Criados com DocPage AI</h2>
             <p className="text-slate-500 max-w-2xl mx-auto text-lg">
-              Veja o que médicos de diversas especialidades estão criando em menos de 5 minutos.
+              Veja exemplos de sites profissionais para médicos de diversas especialidades criados em poucos minutos com nossa plataforma de criação de landing pages médicas.
             </p>
           </div>
 
@@ -1072,7 +1075,14 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
                 </div>
                 <div className="relative h-64 overflow-hidden">
                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10 opacity-60"></div>
-                   <img src={ex.image} alt={ex.author} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                   <img 
+                     src={ex.image} 
+                     alt={`Site profissional criado com DocPage AI - ${ex.author}, ${ex.specialty}`} 
+                     loading="lazy"
+                     width={800}
+                     height={400}
+                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+                   />
                    <div className="absolute bottom-0 left-0 p-6 z-20 text-white">
                       <p className="text-xs font-bold opacity-80 uppercase tracking-widest mb-1">{ex.specialty}</p>
                       <h3 className="text-xl font-bold">{ex.author}</h3>
@@ -1097,9 +1107,9 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
       <div id="faq" className="py-24 bg-slate-50 border-b border-slate-200">
         <div className="max-w-3xl mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Perguntas Frequentes</h2>
+            <h2 className="text-3xl font-bold mb-4">Perguntas Frequentes sobre o DocPage AI</h2>
             <p className="text-slate-500">
-              Tire suas dúvidas antes de começar.
+              Tire suas dúvidas sobre criação de sites para médicos, marketing médico e nossa plataforma antes de começar.
             </p>
           </div>
           
@@ -1150,8 +1160,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
                A plataforma líder em criação de sites éticos para médicos e profissionais da saúde.
              </p>
              <div className="flex gap-4">
-                <a href="#" className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center hover:bg-blue-600 hover:text-white transition-colors">📸</a>
-                <a href="#" className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center hover:bg-blue-700 hover:text-white transition-colors">in</a>
+                <a href="https://www.instagram.com/docpage.ai" target="_blank" className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center hover:bg-blue-600 hover:text-white transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-instagram" viewBox="0 0 16 16"> <path d="M8 0C5.829 0 5.556.01 4.703.048 3.85.088 3.269.222 2.76.42a3.9 3.9 0 0 0-1.417.923A3.9 3.9 0 0 0 .42 2.76C.222 3.268.087 3.85.048 4.7.01 5.555 0 5.827 0 8.001c0 2.172.01 2.444.048 3.297.04.852.174 1.433.372 1.942.205.526.478.972.923 1.417.444.445.89.719 1.416.923.51.198 1.09.333 1.942.372C5.555 15.99 5.827 16 8 16s2.444-.01 3.298-.048c.851-.04 1.434-.174 1.943-.372a3.9 3.9 0 0 0 1.416-.923c.445-.445.718-.891.923-1.417.197-.509.332-1.09.372-1.942C15.99 10.445 16 10.173 16 8s-.01-2.445-.048-3.299c-.04-.851-.175-1.433-.372-1.941a3.9 3.9 0 0 0-.923-1.417A3.9 3.9 0 0 0 13.24.42c-.51-.198-1.092-.333-1.943-.372C10.443.01 10.172 0 7.998 0zm-.717 1.442h.718c2.136 0 2.389.007 3.232.046.78.035 1.204.166 1.486.275.373.145.64.319.92.599s.453.546.598.92c.11.281.24.705.275 1.485.039.843.047 1.096.047 3.231s-.008 2.389-.047 3.232c-.035.78-.166 1.203-.275 1.485a2.5 2.5 0 0 1-.599.919c-.28.28-.546.453-.92.598-.28.11-.704.24-1.485.276-.843.038-1.096.047-3.232.047s-2.39-.009-3.233-.047c-.78-.036-1.203-.166-1.485-.276a2.5 2.5 0 0 1-.92-.598 2.5 2.5 0 0 1-.6-.92c-.109-.281-.24-.705-.275-1.485-.038-.843-.046-1.096-.046-3.233s.008-2.388.046-3.231c.036-.78.166-1.204.276-1.486.145-.373.319-.64.599-.92s.546-.453.92-.598c.282-.11.705-.24 1.485-.276.738-.034 1.024-.044 2.515-.045zm4.988 1.328a.96.96 0 1 0 0 1.92.96.96 0 0 0 0-1.92m-4.27 1.122a4.109 4.109 0 1 0 0 8.217 4.109 4.109 0 0 0 0-8.217m0 1.441a2.667 2.667 0 1 1 0 5.334 2.667 2.667 0 0 1 0-5.334"/> @DocPage.ai</svg></a>
              </div>
           </div>
 
@@ -1188,8 +1197,16 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
 
         </div>
         
-        <div className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-slate-800 text-center text-xs text-slate-600">
-           © 2026 DocPage AI Tecnologia Ltda. Todos os direitos reservados.
+        <div className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-slate-800">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-600">
+            <div>
+              © 2026 DocPage AI Tecnologia Ltda. Todos os direitos reservados.
+            </div>
+            <div className="flex gap-6">
+              <a href="/termos-de-uso" className="hover:text-white transition-colors">Termos de Uso</a>
+              <a href="/politica-de-privacidade" className="hover:text-white transition-colors">Política de Privacidade</a>
+            </div>
+          </div>
         </div>
       </footer>
 
@@ -1206,7 +1223,127 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
                </button>
              </div>
              <div className="p-8 prose prose-slate max-w-none">
-               {/* Modal content unchanged */}
+               {activeModal === 'terms' ? (
+                 <div className="space-y-6 text-gray-700">
+                   <p className="text-sm text-gray-500 mb-6">Última atualização: {new Date().toLocaleDateString('pt-BR')}</p>
+                   
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Aceitação dos Termos</h2>
+                     <p>
+                       Ao acessar e usar o DocPage AI, você concorda em cumprir e estar vinculado aos seguintes termos e condições de uso.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. Descrição do Serviço</h2>
+                     <p>
+                       O DocPage AI é uma plataforma SaaS que permite a criação de sites profissionais para médicos.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Uso do Serviço</h2>
+                     <p>
+                       Você concorda em usar o serviço apenas para fins legais e de acordo com estes termos. É proibido usar o serviço para qualquer propósito ilegal ou não autorizado.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Conta do Usuário</h2>
+                     <p>
+                       Você é responsável por manter a confidencialidade de sua conta e senha. Você concorda em notificar-nos imediatamente sobre qualquer uso não autorizado de sua conta.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">5. Propriedade Intelectual</h2>
+                     <p>
+                       Todo o conteúdo do DocPage AI, incluindo mas não limitado a textos, gráficos, logos, ícones, imagens e software, é propriedade do DocPage AI ou de seus fornecedores de conteúdo.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">6. Limitação de Responsabilidade</h2>
+                     <p>
+                       O DocPage AI não será responsável por quaisquer danos diretos, indiretos, incidentais, especiais ou consequenciais resultantes do uso ou incapacidade de usar o serviço.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">7. Modificações dos Termos</h2>
+                     <p>
+                       Reservamo-nos o direito de modificar estes termos a qualquer momento. As alterações entrarão em vigor imediatamente após a publicação.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">8. Contato</h2>
+                     <p>
+                       Se você tiver dúvidas sobre estes Termos de Uso, entre em contato conosco através do email: docpageai@gmail.com
+                     </p>
+                   </section>
+                 </div>
+               ) : (
+                 <div className="space-y-6 text-gray-700">
+                   <p className="text-sm text-gray-500 mb-6">Última atualização: {new Date().toLocaleDateString('pt-BR')}</p>
+                   
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Informações que Coletamos</h2>
+                     <p>
+                       Coletamos informações que você nos fornece diretamente, como nome, email, telefone e informações profissionais quando você cria uma conta ou usa nossos serviços.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. Como Usamos suas Informações</h2>
+                     <p>
+                       Usamos as informações coletadas para fornecer, manter e melhorar nossos serviços, processar transações, enviar notificações e comunicar-nos com você.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Compartilhamento de Informações</h2>
+                     <p>
+                       Não vendemos suas informações pessoais. Podemos compartilhar suas informações apenas com prestadores de serviços confiáveis que nos ajudam a operar nossa plataforma.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Segurança dos Dados</h2>
+                     <p>
+                       Implementamos medidas de segurança técnicas e organizacionais apropriadas para proteger suas informações pessoais contra acesso não autorizado, alteração, divulgação ou destruição.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">5. Seus Direitos (LGPD)</h2>
+                     <p>
+                       De acordo com a Lei Geral de Proteção de Dados (LGPD), você tem direito a acessar, corrigir, excluir ou portar seus dados pessoais. Você também pode se opor ao processamento de seus dados.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">6. Cookies e Tecnologias Similares</h2>
+                     <p>
+                       Usamos cookies e tecnologias similares para melhorar sua experiência, analisar como você usa nossos serviços e personalizar conteúdo.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">7. Alterações nesta Política</h2>
+                     <p>
+                       Podemos atualizar esta Política de Privacidade periodicamente. Notificaremos você sobre mudanças significativas publicando a nova política nesta página.
+                     </p>
+                   </section>
+
+                   <section>
+                     <h2 className="text-2xl font-semibold text-gray-900 mb-4">8. Contato</h2>
+                     <p>
+                       Se você tiver dúvidas sobre esta Política de Privacidade ou sobre como tratamos seus dados pessoais, entre em contato conosco através do email: privacidade@docpage.com.br
+                     </p>
+                   </section>
+                 </div>
+               )}
              </div>
              <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end sticky bottom-0">
                <button 

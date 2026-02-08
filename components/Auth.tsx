@@ -295,7 +295,14 @@ export const Auth: React.FC<Props> = ({ onSuccess }) => {
         {/* Info adicional */}
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-xs text-center text-gray-500">
-            Ao continuar, você concorda com nossos Termos de Serviço e Política de Privacidade
+            Ao continuar, você concorda com nossos{' '}
+            <a href="/termos-de-uso" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 underline">
+              Termos de Uso
+            </a>
+            {' '}e{' '}
+            <a href="/politica-de-privacidade" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 underline">
+              Política de Privacidade
+            </a>
           </p>
         </div>
       </div>

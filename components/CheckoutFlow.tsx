@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Plan, BriefingData, LandingPageContent, DesignSettings } from '../types';
-import { processCompletePaymentFlow } from '../services/payment-flow';
+import { createCheckoutSession } from '../services/stripe';
 import { sendOTP, verifyCode, resendOTP } from '../services/auth';
-import { checkDomainAvailability, updateLandingPage } from '../services/landing-pages';
+import { checkDomainAvailability, updateLandingPage, createLandingPage } from '../services/landing-pages';
+import { uploadPhotoFromBase64 } from '../services/storage';
 import SuccessModal from './SuccessModal';
 import { supabase } from '../lib/supabase';
 import { trackCheckoutStep, trackPaymentComplete } from '../services/google-analytics';
 
 interface Props {
   plan: Plan;
+  billingPeriod?: 'monthly' | 'annual';
   briefing: BriefingData;
   content: LandingPageContent;
   design: DesignSettings;
@@ -24,7 +26,8 @@ interface Props {
 type CheckoutStep = 1 | 2 | 3;
 
 export const CheckoutFlow: React.FC<Props> = ({ 
-  plan, 
+  plan,
+  billingPeriod: initialBillingPeriod,
   briefing,
   content,
   design,
@@ -48,7 +51,8 @@ export const CheckoutFlow: React.FC<Props> = ({
   } | null>(null);
   
   // Step 1: Account States
-  const [email, setEmail] = useState(briefing.contactEmail || '');
+  // Não inicializar com briefing.contactEmail - o usuário deve informar o email no Step 1
+  const [email, setEmail] = useState('');
   const [confirmEmail, setConfirmEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -69,31 +73,15 @@ export const CheckoutFlow: React.FC<Props> = ({
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [hasCustomDomain, setHasCustomDomain] = useState(false);
   const [customDomainValue, setCustomDomainValue] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [cpfError, setCpfError] = useState('');
 
   // Step 3: Payment States
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvc, setCvc] = useState('');
-  const [cardName, setCardName] = useState('');
-
-  // Pré-preencher dados fake quando entrar no Step 3
-  useEffect(() => {
-    if (currentStep === 3) {
-      // Pré-preencher apenas se os campos estiverem vazios
-      if (!cardNumber) {
-        setCardNumber('4590 2133 1234 5678'); // Visa test card
-      }
-      if (!expiry) {
-        setExpiry('12/26');
-      }
-      if (!cvc) {
-        setCvc('123');
-      }
-      if (!cardName) {
-        setCardName('João da Silva Santos');
-      }
-    }
-  }, [currentStep, cardNumber, expiry, cvc, cardName]);
+  const [couponCode, setCouponCode] = useState('');
+  // Usar billingPeriod diretamente da prop, não de um estado local
+  // Isso garante que mudanças no toggle do PricingPage sejam refletidas
+  // Se não for fornecido, usar 'annual' como padrão
+  const billingPeriod: 'monthly' | 'annual' = (initialBillingPeriod || 'annual') as 'monthly' | 'annual';
 
   // Validation Logic
   const validateEmails = () => {
@@ -134,7 +122,11 @@ export const CheckoutFlow: React.FC<Props> = ({
         if (user && user.id) {
           console.log('CheckoutFlow: Usuário já autenticado, pulando para Step 2');
           setIsAuthenticated(true);
-          setEmail(user.email || '');
+          // Usar email do usuário autenticado apenas se o campo email estiver vazio
+          // Caso contrário, manter o email que o usuário digitou
+          if (!email && user.email) {
+            setEmail(user.email);
+          }
           // Se já está autenticado, avançar automaticamente para o Step 2 (domínio)
           setCurrentStep(2);
         } else {
@@ -300,22 +292,6 @@ export const CheckoutFlow: React.FC<Props> = ({
     }
   };
 
-  // Step 3: Processar pagamento
-  const handlePaymentFormat = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\D/g, '');
-    val = val.substring(0, 16);
-    val = val.replace(/(\d{4})/g, '$1 ').trim();
-    setCardNumber(val);
-  };
-
-  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\D/g, '');
-    if (val.length >= 2) {
-      val = val.substring(0, 2) + '/' + val.substring(2, 4);
-    }
-    setExpiry(val);
-  };
-
   const isStep1Valid = 
     email.length > 5 &&
     email === confirmEmail &&
@@ -325,26 +301,28 @@ export const CheckoutFlow: React.FC<Props> = ({
     ? customDomainValue.length > 0 
     : (isDomainAvailable === true && selectedDomain !== null);
 
-  const isStep3Valid = 
-    cardNumber.length >= 18 && // accounting for spaces
-    expiry.length === 5 &&
-    cvc.length >= 3 &&
-    cardName.length > 3;
+  const isStep3Valid = true; // Sempre válido, apenas precisa ter domínio selecionado
 
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validar Step 3 e domínio (considerando domínio próprio)
+    // Validar domínio (considerando domínio próprio)
     const hasValidDomain = hasCustomDomain 
       ? customDomainValue.length > 0 
       : selectedDomain !== null;
     
-    if (!isStep3Valid || !hasValidDomain) {
-      if (!hasValidDomain) {
-        setError(hasCustomDomain 
-          ? 'Por favor, informe seu domínio próprio.' 
-          : 'Por favor, escolha um domínio válido.');
-      }
+    if (!hasValidDomain) {
+      setError(hasCustomDomain 
+        ? 'Por favor, informe seu domínio próprio.' 
+        : 'Por favor, escolha um domínio válido.');
+      return;
+    }
+
+    // Verificar se usuário está autenticado
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user || !user.id) {
+      setError('Você precisa estar autenticado para continuar. Por favor, volte ao Step 1.');
       return;
     }
 
@@ -362,56 +340,173 @@ export const CheckoutFlow: React.FC<Props> = ({
         setIsLoading(false);
         return;
       }
+
+      // Usar billingPeriod diretamente da prop (vem do toggle do PricingPage)
+      const period: 'monthly' | 'annual' = billingPeriod;
       
-      // Processar fluxo completo: Pagamento + Landing Page
-      // Usuário já está autenticado no Step 1 (via OTP)
-      const result = await processCompletePaymentFlow({
-        email,
-        name: briefing.name,
-        domain: finalDomain,
-        hasCustomDomain,
-        customDomain: hasCustomDomain ? customDomainValue : null,
+      // Log para debug - verificar se o billingPeriod está correto
+      console.log('CheckoutFlow: BillingPeriod recebido', {
+        billingPeriodFromProp: initialBillingPeriod,
+        billingPeriodUsed: period,
         planId: plan.id,
-        planPrice: plan.rawPrice,
-        briefing,
-        content,
-        design,
-        visibility,
-        layoutVariant,
-        photoUrl,
-        aboutPhotoUrl,
-        cardNumber,
-        expiry,
-        cvc,
-        cardName,
+        planName: plan.name,
+      });
+      
+      // Validar que temos um email válido
+      if (!email || !email.includes('@')) {
+        setError('Por favor, informe um email válido no Step 1.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Log para debug - verificar se o plano está correto
+      console.log('CheckoutFlow: Criando checkout session', {
+        planId: plan.id,
+        planName: plan.name,
+        planPrice: plan.price,
+        billingPeriod: period,
+        billingPeriodFromProp: initialBillingPeriod,
+        userEmail: email,
+        userId: user.id,
+        userEmailFromAuth: user.email,
+        emailState: email, // Email do estado local
+        emailMatches: email === user.email,
+        // Log completo do objeto plan para debug
+        planObject: JSON.stringify(plan, null, 2),
+      });
+      
+      // Verificar se o email está vazio ou inválido
+      if (!email || !email.includes('@')) {
+        console.error('CheckoutFlow: Email inválido ou vazio!', { email, userEmail: user.email });
+        setError('Por favor, informe um email válido no Step 1.');
+        setIsLoading(false);
+        return;
+      }
+
+      // CRIAR LANDING PAGE ANTES DO PAGAMENTO
+      // Verificar se já existe uma landing page para este usuário
+      const { data: existingLp } = await supabase
+        .from('landing_pages')
+        .select('id, subdomain, custom_domain')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let landingPageId: string;
+      let landingPageSubdomain: string;
+      let landingPageCustomDomain: string | null = null;
+
+      if (existingLp) {
+        // Landing page já existe, usar ela
+        console.log('CheckoutFlow: Landing page já existe, usando existente', existingLp);
+        landingPageId = existingLp.id;
+        landingPageSubdomain = existingLp.subdomain;
+        landingPageCustomDomain = existingLp.custom_domain;
+      } else {
+        // Criar nova landing page
+        console.log('CheckoutFlow: Criando nova landing page antes do pagamento');
+        
+        // Preparar subdomínio
+        let finalSubdomain: string;
+        let customDomainToSave: string | null = null;
+
+        if (hasCustomDomain && customDomainValue) {
+          // Domínio próprio - gerar subdomínio temporário único
+          customDomainToSave = customDomainValue.trim();
+          const timestamp = Date.now().toString(36);
+          const emailHash = email.split('@')[0].substring(0, 8).toLowerCase().replace(/[^a-z0-9]/g, '');
+          finalSubdomain = `custom-${emailHash}-${timestamp}`.substring(0, 50);
+        } else {
+          // Usar subdomínio verificado
+          finalSubdomain = finalDomain;
+        }
+
+        // Criar landing page primeiro
+        const newLp = await createLandingPage({
+          subdomain: finalSubdomain,
+          customDomain: customDomainToSave,
+          briefing,
+          content,
+          design,
+          visibility,
+          layoutVariant,
+        });
+        landingPageId = newLp.id;
+        landingPageSubdomain = newLp.subdomain;
+        landingPageCustomDomain = newLp.custom_domain || null;
+
+        // Fazer upload de fotos se necessário (após criar a landing page)
+        let uploadedPhotoUrl = photoUrl;
+        let uploadedAboutPhotoUrl = aboutPhotoUrl;
+
+        if (photoUrl && photoUrl.startsWith('data:')) {
+          try {
+            uploadedPhotoUrl = await uploadPhotoFromBase64(photoUrl, landingPageId, 'profile');
+          } catch (photoError) {
+            console.error('Erro ao fazer upload da foto de perfil:', photoError);
+            // Continuar sem foto se der erro
+          }
+        }
+
+        if (aboutPhotoUrl && aboutPhotoUrl.startsWith('data:')) {
+          try {
+            uploadedAboutPhotoUrl = await uploadPhotoFromBase64(aboutPhotoUrl, landingPageId, 'about');
+          } catch (photoError) {
+            console.error('Erro ao fazer upload da foto do consultório:', photoError);
+            // Continuar sem foto se der erro
+          }
+        }
+
+        // Atualizar landing page com URLs das fotos (sempre atualizar para garantir que as URLs estão salvas)
+        await updateLandingPage(landingPageId, {
+          photo_url: uploadedPhotoUrl || null,
+          about_photo_url: uploadedAboutPhotoUrl || null,
+        });
+
+        console.log('CheckoutFlow: Landing page criada com sucesso', {
+          landingPageId,
+          subdomain: landingPageSubdomain,
+          customDomain: landingPageCustomDomain,
+        });
+      }
+
+      // Criar Checkout Session no Stripe
+      const checkoutSession = await createCheckoutSession({
+        planId: plan.id,
+        billingPeriod: period,
+        couponCode: couponCode.trim() || undefined,
+        userId: user.id,
+        userEmail: email, // SEMPRE usar email informado no Step 1 (campo "Email de Acesso")
+        cpf: !hasCustomDomain ? cpf.replace(/\D/g, '') : undefined, // CPF apenas quando não há domínio próprio
+        landingPageData: {
+          briefing,
+          content,
+          design,
+          visibility,
+          layoutVariant,
+          photoUrl,
+          aboutPhotoUrl,
+          domain: finalDomain,
+          hasCustomDomain,
+          customDomain: hasCustomDomain ? customDomainValue : null,
+        },
       });
 
-      if (result.success && result.landingPageId && result.landingPageUrl) {
-        // Gerar URL completa do domínio (subdomínio + extensão)
-        const fullDomain = `${selectedDomain}${domainExtension}`;
-        
-        // Track pagamento completo
-        trackPaymentComplete(plan.name, plan.rawPrice);
-        
-        // Mostrar modal de sucesso antes de redirecionar
-        setPendingSuccess({
-          landingPageId: result.landingPageId,
-          landingPageUrl: result.landingPageUrl,
-          domain: fullDomain,
-        });
-        setShowSuccessModal(true);
-        setIsLoading(false);
+      // Track início do checkout
+      trackCheckoutStep(3, 'Redirecionando para Stripe Checkout');
+      
+      // Redirecionar para Stripe Checkout
+      if (checkoutSession.url) {
+        window.location.href = checkoutSession.url;
       } else {
-        const errorMessage = result.error || 'Erro ao processar pagamento';
-        setError(errorMessage);
-        onError?.(errorMessage);
-        setIsLoading(false); // Reset loading state on error
+        throw new Error('URL de checkout não retornada');
       }
     } catch (err: any) {
-      const errorMessage = err.message || 'Erro ao processar pagamento';
+      const errorMessage = err.message || 'Erro ao criar sessão de checkout';
       setError(errorMessage);
       onError?.(errorMessage);
-      setIsLoading(false); // Reset loading state on error
+      setIsLoading(false);
     }
   };
 
@@ -922,20 +1017,62 @@ export const CheckoutFlow: React.FC<Props> = ({
                       )}
 
                       {isDomainAvailable === true && (
-                        <div className="flex items-center justify-between text-xs p-3 bg-green-50 border border-green-200 rounded-lg">
-                          <p className="text-green-700 font-medium">Domínio disponível e reservado!</p>
-                          <button 
-                            type="button" 
-                            onClick={() => {
-                              setIsDomainAvailable(null);
-                              setSelectedDomain(null);
-                              setDomainError(null);
-                            }} 
-                            className="text-green-600 hover:text-green-800 underline font-medium"
-                          >
-                            Alterar
-                          </button>
-                        </div>
+                        <>
+                          <div className="flex items-center justify-between text-xs p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <p className="text-green-700 font-medium">Domínio disponível e reservado!</p>
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                setIsDomainAvailable(null);
+                                setSelectedDomain(null);
+                                setDomainError(null);
+                              }} 
+                              className="text-green-600 hover:text-green-800 underline font-medium"
+                            >
+                              Alterar
+                            </button>
+                          </div>
+
+                          {/* Campo de CPF */}
+                          <div className="mt-4 space-y-2">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              CPF <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={cpf ? cpf.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2') : ''}
+                              onChange={(e) => {
+                                // Formatar CPF (apenas números)
+                                const value = e.target.value.replace(/\D/g, '');
+                                if (value.length <= 11) {
+                                  setCpf(value);
+                                  setCpfError('');
+                                }
+                              }}
+                              onBlur={() => {
+                                // Validar CPF quando sair do campo
+                                const cpfDigits = cpf.replace(/\D/g, '');
+                                if (cpfDigits.length !== 11) {
+                                  setCpfError('CPF deve ter 11 dígitos');
+                                } else {
+                                  setCpfError('');
+                                }
+                              }}
+                              className={`w-full p-3 border rounded-lg outline-none ${
+                                cpfError ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:ring-2 focus:ring-blue-500'
+                              }`}
+                              placeholder="000.000.000-00"
+                              maxLength={14}
+                              required
+                            />
+                            {cpfError && (
+                              <p className="text-xs text-red-500">{cpfError}</p>
+                            )}
+                            <p className="text-xs text-gray-500">
+                              Vamos utilizar esse dado pessoal para registrar o domínio escolhido em seu nome.
+                            </p>
+                          </div>
+                        </>
                       )}
                     </>
                   )}
@@ -949,12 +1086,20 @@ export const CheckoutFlow: React.FC<Props> = ({
                       {isDomainAvailable === true && (
                         <button
                           onClick={() => {
+                            // Validar CPF antes de continuar
+                            const cpfDigits = cpf.replace(/\D/g, '');
+                            if (cpfDigits.length !== 11) {
+                              setCpfError('Por favor, informe um CPF válido (11 dígitos)');
+                              return;
+                            }
+                            setCpfError('');
                             trackCheckoutStep(3, 'Dados de pagamento');
                             setCurrentStep(3);
                           }}
-                          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 mt-4"
+                          disabled={cpf.replace(/\D/g, '').length !== 11}
+                          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Continuar para Pagamento →
+                          Próximo →
                         </button>
                       )}
                     </>
@@ -986,17 +1131,7 @@ export const CheckoutFlow: React.FC<Props> = ({
             {currentStep === 3 && (
               <form onSubmit={handleSubmitPayment} className="space-y-6">
                 <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-100 pb-2">3. Pagamento</h3>
-                  
-                  {/* Alerta discreto sobre simulação */}
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-start gap-2">
-                    <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="flex-1">
-                      <strong className="font-semibold">Essa é uma página de simulação de pagamento com dados fictícios.</strong> Não haverá nenhum tipo de cobrança neste momento de teste com usuários.
-                    </p>
-                  </div>
+                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-100 pb-2">3. Finalizar Pagamento</h3>
                   
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
                     <p className="text-blue-900 font-medium mb-1">Domínio selecionado:</p>
@@ -1012,62 +1147,38 @@ export const CheckoutFlow: React.FC<Props> = ({
                     )}
                   </div>
 
-                  <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
-                    <div className="p-3 border-b border-gray-200 flex items-center bg-white">
-                      <svg className="w-6 h-6 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                      <input 
-                        type="text" 
-                        placeholder="Número do Cartão" 
-                        value={cardNumber}
-                        onChange={handlePaymentFormat}
-                        className="w-full outline-none text-gray-700 placeholder-gray-400"
-                        maxLength={19}
-                        required
-                        disabled={isLoading}
-                      />
-                      <div className="flex gap-1 ml-2 opacity-50">
-                        <div className="w-8 h-5 bg-blue-900 rounded"></div>
-                        <div className="w-8 h-5 bg-orange-500 rounded"></div>
-                      </div>
-                    </div>
-                    <div className="flex bg-white">
-                      <div className="w-1/2 p-3 border-r border-gray-200">
-                        <input 
-                          type="text" 
-                          placeholder="MM / AA" 
-                          value={expiry}
-                          onChange={handleExpiryChange}
-                          className="w-full outline-none text-gray-700 placeholder-gray-400"
-                          maxLength={5}
-                          required
-                          disabled={isLoading}
-                        />
-                      </div>
-                      <div className="w-1/2 p-3 flex items-center">
-                        <input 
-                          type="text" 
-                          placeholder="CVC" 
-                          value={cvc}
-                          onChange={(e) => setCvc(e.target.value.replace(/\D/g, '').substring(0,4))}
-                          className="w-full outline-none text-gray-700 placeholder-gray-400"
-                          maxLength={4}
-                          required
-                          disabled={isLoading}
-                        />
-                        <svg className="w-4 h-4 text-gray-400 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Campo de cupom */}
                   <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Código de Cupom (opcional)
+                    </label>
                     <input 
                       type="text" 
-                      value={cardName}
-                      onChange={(e) => setCardName(e.target.value)}
-                      placeholder="Nome como impresso no cartão"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                      placeholder="Ex: CUPOM10"
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                      required
                       disabled={isLoading}
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Tem um cupom de desconto? Digite aqui.
+                    </p>
+                  </div>
+
+                  {/* Informação sobre Stripe Checkout */}
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-sm">
+                    <div className="flex items-start gap-3">
+                      <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      <div>
+                        <p className="font-medium text-green-900 mb-1">Pagamento Seguro</p>
+                        <p className="text-green-700 text-xs">
+                          Você será redirecionado para a página segura do Stripe para finalizar o pagamento. 
+                          Aceitamos cartões de crédito e débito.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1076,7 +1187,6 @@ export const CheckoutFlow: React.FC<Props> = ({
                     type="submit" 
                     disabled={
                       isLoading || 
-                      !isStep3Valid || 
                       (hasCustomDomain ? !customDomainValue : !selectedDomain)
                     }
                     className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
@@ -1084,16 +1194,21 @@ export const CheckoutFlow: React.FC<Props> = ({
                     {isLoading ? (
                       <>
                         <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        Processando Pagamento...
+                        Preparando checkout...
                       </>
                     ) : (
-                      `Pagar ${plan.price}`
+                      <>
+                        Ir para Pagamento Seguro
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </>
                     )}
                   </button>
                   
                   <div className="flex items-center justify-center gap-2 mt-4 text-xs text-gray-400">
                     <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
-                    Pagamento 100% seguro com criptografia SSL.
+                    Pagamento processado pelo Stripe - 100% seguro
                   </div>
 
                   <button

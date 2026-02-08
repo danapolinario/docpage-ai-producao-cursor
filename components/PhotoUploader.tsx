@@ -438,9 +438,9 @@ export const PhotoUploader: React.FC<Props> = ({
             {/* Seção de Foto de Consultório - Desktop (dentro da mesma coluna) */}
             <div className="hidden md:block mt-8 pt-8 border-t border-gray-200 space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">Foto de Consultório</h3>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Sua foto em consultório</h3>
                 <p className="text-gray-600 text-sm">
-                  Opcional: Envie uma foto do consultório ou gere uma imagem por IA.
+                  Opcional: Envie uma foto sua no consultório ou gere uma imagem com nossa IA.
                 </p>
               </div>
 
@@ -814,7 +814,7 @@ export const PhotoUploader: React.FC<Props> = ({
                    <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 pointer-events-none"></div>
                  </button>
                  <p className="text-[10px] text-center text-gray-400 mt-2">
-                   O "Nano Banana Studio" ajustará iluminação e criará a versão de Consultório.
+                   Nossa IA ajustará iluminação e criará a versão de sua foto em consultório.
                  </p>
                </div>
              )}
@@ -835,7 +835,7 @@ export const PhotoUploader: React.FC<Props> = ({
               photoUrl && !isLoading ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200' : 'bg-gray-300 cursor-not-allowed'
             }`}
           >
-            Gerar Landing Page
+            Próximo
           </button>
         </div>
       </div>

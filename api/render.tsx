@@ -75,6 +75,10 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     const ogImage = landingPage.og_image_url || landingPage.about_photo_url || landingPage.photo_url || `${baseUrl}/og-default.png`;
     const ogImageSecure = ogImage.replace('http://', 'https://');
 
+    // Generate SEO-optimized site name for og:site_name
+    // Uses doctor name and specialty for better SEO and branding
+    const siteName = `Dr(a). ${briefing.name || 'Médico'} - ${briefing.specialty || 'Especialista'} | CRM ${briefing.crm || ''}/${briefing.crmState || ''}`;
+
   // Schema.org JSON-LD
   const schemaMarkup = {
     "@context": "https://schema.org",
@@ -175,7 +179,7 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     <meta property="og:image:alt" content="${escapeHtml(briefing.name || 'Médico')} - ${escapeHtml(briefing.specialty || 'Especialista')} | CRM ${briefing.crm || ''}/${briefing.crmState || ''}" />
     <meta property="og:url" content="${escapeHtml(pageUrl)}" />
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="DocPage AI" />
+    <meta property="og:site_name" content="${escapeHtml(siteName)}" />
     <meta property="og:locale" content="pt_BR" />
     <meta property="og:locale:alternate" content="pt_PT" />
     ${briefing.contactPhone ? `<meta property="og:phone_number" content="${escapeHtml(briefing.contactPhone)}" />` : ''}
@@ -187,8 +191,6 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     <meta name="twitter:description" content="${escapeHtml(description)}" />
     <meta name="twitter:image" content="${escapeHtml(ogImage)}" />
     <meta name="twitter:image:alt" content="${escapeHtml(briefing.name || 'Médico')} - ${escapeHtml(briefing.specialty || 'Especialista')}" />
-    <meta name="twitter:site" content="@DocPageAI" />
-    <meta name="twitter:creator" content="@DocPageAI" />
     <meta name="twitter:domain" content="${escapeHtml(landingPage.custom_domain || baseUrl.replace('https://', '').replace('http://', ''))}" />
     
     <!-- Mobile & PWA -->

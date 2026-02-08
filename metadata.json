@@ -1,6 +1,6 @@
 {
-  "name": "DocPage AI - Frontend",
-  "description": "A specialized SaaS for medical professionals to build high-converting landing pages using AI for copywriting and professional photo enhancement.",
+  "name": "DocPage AI",
+  "description": "A specialized SaaS for medical professionals to build high-converting landing pages and websites using AI for copywriting and professional photo enhancement.",
   "requestFramePermissions": [
     "camera"
   ]

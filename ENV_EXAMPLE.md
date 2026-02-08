@@ -24,10 +24,24 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sua-chave-anon-publica-aqui
 GEMINI_API_KEY=sua-chave-gemini-aqui
 
 # ============================================
-# NOTA: RESEND API KEY
+# CONFIGURAÇÃO DO STRIPE (Frontend)
 # ============================================
-# A chave do Resend NÃO vai aqui no .env.local
-# Ela deve ser configurada nas Edge Functions do Supabase
+# Obtenha sua chave pública em: https://dashboard.stripe.com/apikeys
+# Use a chave de TESTE para desenvolvimento e PRODUÇÃO para produção
+
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_51SuWPG1zmyrvN5yEcq4WZP14ZZPM9d10LSt75TSDJXD9pGwcmvCnaccaVK7N6mtjcJki4Lb0QWDJDR0FI9ioERb700bvJjcLJO
+
+# ============================================
+# NOTA: RESEND API KEY e STRIPE SECRET KEY
+# ============================================
+# As chaves secretas NÃO vão aqui no .env.local
+# Elas devem ser configuradas nas Edge Functions do Supabase:
+# 1. Dashboard do Supabase > Settings > Edge Functions
+# 2. Clique em "Add new secret"
+# 3. Adicione:
+#    - RESEND_API_KEY: Sua chave do Resend
+#    - STRIPE_SECRET_KEY: sk_test_51SuWPG1zmyrvN5yEOk6OomUgeTGKE1JYamztnjMkNeoJ6N1N8lokV19FWSH5S0gl3MyKpXoiSKR7X7iOZjDpvBjT00mhFQ5BsU
+#    - STRIPE_WEBHOOK_SECRET: Obtenha após configurar webhook no Stripe Dashboard
 # Veja o guia SETUP_LOCAL.md para mais detalhes
 ```
 
@@ -49,15 +63,32 @@ GEMINI_API_KEY=sua-chave-gemini-aqui
 3. Clique em **"Create API Key"**
 4. Copie a chave gerada → `GEMINI_API_KEY`
 
-### RESEND_API_KEY
+### VITE_STRIPE_PUBLISHABLE_KEY
 
-⚠️ **IMPORTANTE**: A chave do Resend **NÃO** vai no `.env.local`!
+1. Acesse https://dashboard.stripe.com/apikeys
+2. Faça login na sua conta Stripe
+3. Copie a **Publishable key** (chave pública)
+4. Para desenvolvimento, use a chave de **TESTE** (começa com `pk_test_`)
+5. Para produção, use a chave de **PRODUÇÃO** (começa com `pk_live_`)
 
-Ela deve ser configurada no Supabase:
+### RESEND_API_KEY e STRIPE_SECRET_KEY
+
+⚠️ **IMPORTANTE**: As chaves secretas **NÃO** vão no `.env.local`!
+
+Elas devem ser configuradas no Supabase:
 1. Dashboard do Supabase > **Settings** > **Edge Functions**
 2. Clique em **"Add new secret"**
-3. Nome: `RESEND_API_KEY`
-4. Valor: Sua chave do Resend (obtenha em https://resend.com/api-keys)
+3. Adicione os seguintes secrets:
+   - **RESEND_API_KEY**: Sua chave do Resend (obtenha em https://resend.com/api-keys)
+   - **STRIPE_SECRET_KEY**: Sua chave secreta do Stripe (obtenha em https://dashboard.stripe.com/apikeys)
+   - **STRIPE_WEBHOOK_SECRET**: Secret do webhook (obtenha após configurar webhook no Stripe Dashboard)
+
+**Como configurar o webhook do Stripe:**
+1. Acesse https://dashboard.stripe.com/webhooks
+2. Clique em **"Add endpoint"**
+3. URL: `https://[seu-projeto-id].supabase.co/functions/v1/stripe-webhook`
+4. Selecione os eventos: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`, `invoice.payment_failed`
+5. Copie o **Signing secret** e adicione como `STRIPE_WEBHOOK_SECRET` no Supabase
 
 Veja mais detalhes no guia `SETUP_LOCAL.md`.
 
@@ -67,6 +98,7 @@ Veja mais detalhes no guia `SETUP_LOCAL.md`.
 VITE_SUPABASE_URL=https://abcdefghijklmnop.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprbG1ub3AiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTYzODk2NzI5MCwiZXhwIjoxOTU0NTQzMjkwfQ.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 GEMINI_API_KEY=AIzaSyB1234567890abcdefghijklmnopqrstuvwxyz
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_51SuWPG1zmyrvN5yEcq4WZP14ZZPM9d10LSt75TSDJXD9pGwcmvCnaccaVK7N6mtjcJki4Lb0QWDJDR0FI9ioERb700bvJjcLJO
 ```
 
 ## ⚠️ Segurança

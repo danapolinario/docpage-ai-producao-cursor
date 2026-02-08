@@ -9,6 +9,7 @@ import {
   LandingPageStatus 
 } from '../services/admin';
 import { signOut } from '../services/auth';
+import { syncSubscriptionsWithStripe } from '../services/subscriptions';
 
 interface Props {
   onLogout: () => void;
@@ -17,6 +18,17 @@ interface Props {
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   draft: { label: 'Rascunho', color: 'text-gray-600', bg: 'bg-gray-100' },
   published: { label: 'Publicado', color: 'text-green-700', bg: 'bg-green-100' },
+};
+
+const SUBSCRIPTION_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  active: { label: 'Ativa', color: 'text-green-700', bg: 'bg-green-100' },
+  canceled: { label: 'Cancelada', color: 'text-red-700', bg: 'bg-red-100' },
+  past_due: { label: 'Atrasada', color: 'text-yellow-700', bg: 'bg-yellow-100' },
+  unpaid: { label: 'Não Paga', color: 'text-red-700', bg: 'bg-red-100' },
+  trialing: { label: 'Teste', color: 'text-blue-700', bg: 'bg-blue-100' },
+  incomplete: { label: 'Incompleta', color: 'text-orange-700', bg: 'bg-orange-100' },
+  incomplete_expired: { label: 'Incompleta Expirada', color: 'text-red-700', bg: 'bg-red-100' },
+  paused: { label: 'Pausada', color: 'text-gray-700', bg: 'bg-gray-100' },
 };
 
 export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
@@ -29,15 +41,51 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [autoPublishEnabled, setAutoPublishEnabled] = useState(false);
   const [updatingAutoPublish, setUpdatingAutoPublish] = useState(false);
+  const [syncingStripe, setSyncingStripe] = useState(false);
+  const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const loadData = async (syncStripe = false) => {
     try {
       setLoading(true);
+      
+      // Sincronizar com Stripe se solicitado
+      if (syncStripe) {
+        try {
+          setSyncingStripe(true);
+          setSyncSuccess(null);
+          setError(null);
+          const syncResult = await syncSubscriptionsWithStripe();
+          console.log('Sincronização concluída:', syncResult);
+          // Mostrar mensagem de sucesso
+          if (syncResult.updated > 0) {
+            setSyncSuccess(`${syncResult.updated} de ${syncResult.total} assinaturas atualizadas com sucesso!`);
+            setError(null);
+          } else {
+            setSyncSuccess('Nenhuma assinatura precisou ser atualizada.');
+          }
+          // Limpar mensagem após 5 segundos
+          setTimeout(() => setSyncSuccess(null), 5000);
+        } catch (syncError: any) {
+          console.error('Erro ao sincronizar subscriptions com Stripe:', syncError);
+          setError(`Erro ao sincronizar: ${syncError.message || 'Erro desconhecido'}`);
+          setSyncSuccess(null);
+        } finally {
+          setSyncingStripe(false);
+        }
+      }
+      
       const [pages, statsData, autoPublish] = await Promise.all([
         getAllLandingPages(),
         getAdminStats(),
-        getAutoPublishSetting()
+        getAutoPublishSetting(),
       ]);
+      
+      // As subscriptions já vêm junto com as landing pages da função admin-get-pages
+      console.log('Total landing pages:', pages.length);
+      const pagesWithSubs = pages.filter(p => p.subscription);
+      const pagesWithoutSubs = pages.filter(p => !p.subscription);
+      console.log(`Resumo: ${pagesWithSubs.length} landing pages COM subscription, ${pagesWithoutSubs.length} SEM subscription`);
+      
       setLandingPages(pages);
       setStats(statsData);
       setAutoPublishEnabled(autoPublish);
@@ -143,6 +191,18 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Success Message */}
+        {syncSuccess && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <span>{syncSuccess}</span>
+            </div>
+          </div>
+        )}
+
         {/* Error Message */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
@@ -271,15 +331,38 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
                 <option value="published">Publicado</option>
               </select>
             </div>
-            <div className="flex items-end">
+            <div className="flex items-end gap-2">
               <button
-                onClick={loadData}
+                onClick={() => loadData(false)}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 Atualizar
+              </button>
+              <button
+                onClick={() => loadData(true)}
+                disabled={syncingStripe}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Sincronizar status das assinaturas com o Stripe"
+              >
+                {syncingStripe ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Sincronizando...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Sincronizar Stripe
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -294,6 +377,7 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
                   <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Domínio</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Assinatura</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Criado em</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
@@ -301,7 +385,7 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
               <tbody className="divide-y divide-gray-100">
                 {filteredPages.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                       {searchTerm || filterStatus !== 'all' 
                         ? 'Nenhuma landing page encontrada com os filtros aplicados.'
                         : 'Nenhuma landing page cadastrada ainda.'}
@@ -339,6 +423,23 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_LABELS[page.status]?.bg || 'bg-gray-100'} ${STATUS_LABELS[page.status]?.color || 'text-gray-600'}`}>
                           {STATUS_LABELS[page.status]?.label || page.status}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {page.subscription ? (
+                          <div className="space-y-1">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${SUBSCRIPTION_STATUS_LABELS[page.subscription.status]?.bg || 'bg-gray-100'} ${SUBSCRIPTION_STATUS_LABELS[page.subscription.status]?.color || 'text-gray-600'}`}>
+                              {SUBSCRIPTION_STATUS_LABELS[page.subscription.status]?.label || page.subscription.status}
+                            </span>
+                            <div className="text-xs text-gray-500">
+                              <div className="capitalize">{page.subscription.plan_id} - {page.subscription.billing_period === 'monthly' ? 'Mensal' : 'Anual'}</div>
+                              {page.subscription.current_period_end && (
+                                <div>Vence: {new Date(page.subscription.current_period_end).toLocaleDateString('pt-BR')}</div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">Sem assinatura</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
                         {new Date(page.created_at).toLocaleDateString('pt-BR')}

@@ -126,7 +126,7 @@ export const NewSaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onSw
             </div>
             
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-[#0A4D8C] leading-[1.1] drop-shadow-sm">
-              Sua Presença Digital Médica em <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00A86B] to-teal-400">5 Minutos</span>.
+              Sua Presença Digital Médica em <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00A86B] to-teal-400">Poucos Minutos</span>.
             </h1>
             
             <p className="text-lg md:text-xl text-slate-500 max-w-xl mx-auto lg:mx-0 leading-relaxed">
@@ -340,7 +340,7 @@ export const NewSaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onSw
               </div>
 
               {[
-                { label: 'Tempo de criação', agency: '30-60 dias', diy: '7-15 dias', doc: '5 minutos' },
+                { label: 'Tempo de criação', agency: '30-60 dias', diy: '7-15 dias', doc: 'Poucos minutos' },
                 { label: 'Conhecimento técnico', agency: 'Nenhum', diy: 'Médio / Alto', doc: 'Zero' },
                 { label: 'Compliance CFM', agency: 'Manual (se souberem)', diy: 'Você decide', doc: 'Automático' },
                 { label: 'Custo inicial', agency: 'R$ 5.000+', diy: 'R$ 0', doc: 'R$ 0' },
@@ -590,7 +590,7 @@ export const NewSaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onSw
           <button onClick={onStart} className="px-12 py-5 bg-[#00A86B] text-white rounded-full font-bold text-xl shadow-2xl hover:bg-[#008f5b] hover:scale-105 transition-all">
             Criar Meu Site Grátis
           </button>
-          <p className="mt-6 text-sm text-blue-200 opacity-80">Leva menos de 5 minutos</p>
+          <p className="mt-6 text-sm text-blue-200 opacity-80">Leva poucos minutos</p>
         </div>
       </section>
 
@@ -602,9 +602,8 @@ export const NewSaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onSw
             <span className="font-bold text-white">DocPage AI</span>
           </div>
           <div className="flex gap-6">
-            <a href="#" className="hover:text-white transition-colors">Termos de Uso</a>
-            <a href="#" className="hover:text-white transition-colors">Política de Privacidade</a>
-            <a href="#" className="hover:text-white transition-colors">Compliance CFM</a>
+            <a href="/termos-de-uso" className="hover:text-white transition-colors">Termos de Uso</a>
+            <a href="/politica-de-privacidade" className="hover:text-white transition-colors">Política de Privacidade</a>
           </div>
           <div className="text-slate-600">
             © 2026 DocPage AI

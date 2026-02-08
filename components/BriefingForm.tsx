@@ -56,7 +56,7 @@ export const BriefingForm: React.FC<Props> = ({ data, onChange, onNext }) => {
           onClick={fillDemoData}
           className="absolute top-8 right-8 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full hover:bg-blue-100 transition-colors"
         >
-          ✨ Preencher Exemplo
+          ✨
         </button>
 
         <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">

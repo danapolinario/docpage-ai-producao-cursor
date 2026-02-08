@@ -87,6 +87,15 @@ export const PricingPage: React.FC<Props> = ({
   };
 
   const handleSelectPlan = (plan: Plan) => {
+    // Log para debug - verificar o plano e billingPeriod no momento da seleção
+    console.log('PricingPage: Plano selecionado', {
+      planId: plan.id,
+      planName: plan.name,
+      planPrice: plan.price,
+      billingPeriod: billingPeriod,
+      planObject: JSON.stringify(plan, null, 2),
+    });
+    
     // Importar e usar trackPlanSelect e trackCheckoutStart
     import('../services/google-analytics').then(({ trackPlanSelect, trackCheckoutStart }) => {
       trackPlanSelect(plan.name, plan.price);
@@ -167,9 +176,9 @@ export const PricingPage: React.FC<Props> = ({
       features: [
         'Tudo do Starter',
         'Estatísticas de acesso avançadas',
+        'Sugestões periódicas da nossa equipe para melhoria de desempenho',
         'Plano estratégico para otimizar resultados',
-        'Email Profissional',
-        'Posts semanais (Redes Sociais)'
+        'Pacote de posts para Redes Sociais'
       ],
       cta: 'Assinar Profissional',
       popular: true,
@@ -270,7 +279,8 @@ export const PricingPage: React.FC<Props> = ({
     return (
       <div className="min-h-screen bg-gray-50 py-12 px-4">
         <CheckoutFlow 
-          plan={selectedPlan} 
+          plan={selectedPlan}
+          billingPeriod={billingPeriod}
           briefing={briefing}
           content={content}
           design={design}

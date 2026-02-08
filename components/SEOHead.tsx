@@ -55,6 +55,10 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   const ogImage = ogImageUrl || aboutPhotoUrl || photoUrl || `${baseUrl}/og-default.png`;
   const ogImageSecure = ogImage.replace('http://', 'https://');
   
+  // Generate SEO-optimized site name for og:site_name
+  // Uses doctor name and specialty for better SEO and branding
+  const siteName = `Dr(a). ${briefing.name} - ${briefing.specialty} | CRM ${briefing.crm}/${briefing.crmState}`;
+  
   // Schema.org JSON-LD
   const schemaMarkup = {
     "@context": "https://schema.org",
@@ -114,6 +118,71 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
     value === undefined ? undefined : value
   ));
 
+  // Atualizar metatags diretamente no DOM como fallback (para garantir que funcionem no localhost)
+  React.useEffect(() => {
+    // Função helper para atualizar ou criar meta tag por property
+    const updateOrCreateOGMeta = (property: string, content: string) => {
+      const existing = document.querySelector(`meta[property="${property}"]`);
+      if (existing) {
+        existing.setAttribute('content', content);
+      } else {
+        const meta = document.createElement('meta');
+        meta.setAttribute('property', property);
+        meta.setAttribute('content', content);
+        document.head.appendChild(meta);
+      }
+    };
+
+    // Função helper para atualizar ou criar meta tag por name
+    const updateOrCreateNameMeta = (name: string, content: string) => {
+      const existing = document.querySelector(`meta[name="${name}"]`);
+      if (existing) {
+        existing.setAttribute('content', content);
+      } else {
+        const meta = document.createElement('meta');
+        meta.setAttribute('name', name);
+        meta.setAttribute('content', content);
+        document.head.appendChild(meta);
+      }
+    };
+
+    // Atualizar title
+    const titleTag = document.querySelector('title');
+    if (titleTag) {
+      titleTag.textContent = title;
+    }
+
+    // Atualizar todas as tags Open Graph
+    updateOrCreateOGMeta('og:title', title);
+    updateOrCreateOGMeta('og:description', description);
+    updateOrCreateOGMeta('og:image', ogImage);
+    updateOrCreateOGMeta('og:image:secure_url', ogImageSecure);
+    updateOrCreateOGMeta('og:image:alt', `${briefing.name} - ${briefing.specialty} | CRM ${briefing.crm}/${briefing.crmState}`);
+    updateOrCreateOGMeta('og:url', pageUrl);
+    updateOrCreateOGMeta('og:site_name', siteName);
+
+    // Atualizar tags Twitter
+    updateOrCreateNameMeta('twitter:title', title);
+    updateOrCreateNameMeta('twitter:description', description);
+    updateOrCreateNameMeta('twitter:image', ogImage);
+    updateOrCreateNameMeta('twitter:image:alt', `${briefing.name} - ${briefing.specialty}`);
+
+    // Atualizar tags SEO básicas
+    updateOrCreateNameMeta('description', description);
+    updateOrCreateNameMeta('keywords', keywords);
+    updateOrCreateNameMeta('author', briefing.name);
+
+    // Remover tags Twitter do DocPage se existirem
+    const twitterSite = document.querySelector('meta[name="twitter:site"]');
+    const twitterCreator = document.querySelector('meta[name="twitter:creator"]');
+    if (twitterSite && twitterSite.getAttribute('content') === '@DocPageAI') {
+      twitterSite.remove();
+    }
+    if (twitterCreator && twitterCreator.getAttribute('content') === '@DocPageAI') {
+      twitterCreator.remove();
+    }
+  }, [title, description, keywords, ogImage, ogImageSecure, siteName, pageUrl, briefing.name, briefing.specialty, briefing.crm, briefing.crmState]);
+
   return (
     <Helmet>
       {/* ============================================ */}
@@ -147,7 +216,7 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
       <meta property="og:image:alt" content={`${briefing.name} - ${briefing.specialty} | CRM ${briefing.crm}/${briefing.crmState}`} />
       <meta property="og:url" content={pageUrl} />
       <meta property="og:type" content="website" />
-      <meta property="og:site_name" content="DocPage AI" />
+      <meta property="og:site_name" content={siteName} />
       <meta property="og:locale" content="pt_BR" />
       <meta property="og:locale:alternate" content="pt_PT" />
       {briefing.contactPhone && (
@@ -165,8 +234,6 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={ogImage} />
       <meta name="twitter:image:alt" content={`${briefing.name} - ${briefing.specialty}`} />
-      <meta name="twitter:site" content="@DocPageAI" />
-      <meta name="twitter:creator" content="@DocPageAI" />
       <meta name="twitter:domain" content={customDomain || 'docpage.com.br'} />
       
       {/* ============================================ */}

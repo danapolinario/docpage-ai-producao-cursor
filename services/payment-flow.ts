@@ -1,13 +1,18 @@
 /**
  * Fluxo completo de pagamento e criação de landing page
  * 
- * Este serviço gerencia todo o processo após o pagamento:
- * 1. Processar pagamento (Stripe)
- * 2. Criar conta do usuário (se não existir)
- * 3. Autenticar usuário
- * 4. Criar landing page no Supabase
- * 5. Fazer upload de fotos (se houver)
- * 6. Publicar landing page
+ * DEPRECATED: Este serviço não é mais usado no fluxo principal.
+ * O pagamento agora é processado via Stripe Checkout e o webhook
+ * (stripe-webhook Edge Function) cria automaticamente a landing page
+ * após o pagamento ser confirmado.
+ * 
+ * Este arquivo é mantido apenas para compatibilidade com código legado.
+ * 
+ * NOVO FLUXO:
+ * 1. Usuário cria checkout session via createCheckoutSession()
+ * 2. Usuário é redirecionado para Stripe Checkout
+ * 3. Após pagamento, Stripe envia webhook para stripe-webhook
+ * 4. Webhook cria subscription e landing page automaticamente
  */
 
 // Não precisamos mais de signUp/signIn aqui, o usuário já está autenticado no Step 1
@@ -48,12 +53,19 @@ export interface PaymentFlowResult {
 
 /**
  * Processar fluxo completo: Pagamento + Criação de Conta + Landing Page
+ * 
+ * DEPRECATED: Esta função não é mais usada. O pagamento é processado
+ * via Stripe Checkout e o webhook cria a landing page automaticamente.
+ * 
+ * Mantida apenas para compatibilidade.
  */
 export async function processCompletePaymentFlow(
   data: PaymentFlowData
 ): Promise<PaymentFlowResult> {
+  console.warn('processCompletePaymentFlow está deprecated. Use Stripe Checkout + webhook.');
+  
   try {
-    // 1. Processar pagamento com Stripe
+    // 1. Processar pagamento com Stripe (deprecated)
     const paymentResult = await processPayment({
       planId: data.planId,
       planPrice: data.planPrice,

@@ -181,11 +181,44 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Adicionar emails aos dados formatados
-    const formattedPages = optimizedPages.map((lp: any) => ({
-      ...lp,
-      user_email: userEmailsMap[lp.user_id] || null
-    }))
+    // Buscar subscriptions e criar mapa por landing_page_id
+    const { data: subscriptions, error: subscriptionsError } = await supabaseAdmin
+      .from('subscriptions')
+      .select('id, landing_page_id, status, plan_id, billing_period, current_period_end')
+      .not('landing_page_id', 'is', null)
+      .order('created_at', { ascending: false })
+
+    if (subscriptionsError) {
+      console.warn('Erro ao buscar subscriptions (não crítico):', subscriptionsError)
+    }
+
+    // Criar mapa de landing_page_id -> subscription
+    const subscriptionMap = new Map<string, any>()
+    if (subscriptions) {
+      subscriptions.forEach((sub: any) => {
+        if (sub.landing_page_id) {
+          // Se já existe uma subscription para esta landing page, manter a mais recente
+          if (!subscriptionMap.has(sub.landing_page_id)) {
+            subscriptionMap.set(sub.landing_page_id, {
+              status: sub.status,
+              plan_id: sub.plan_id,
+              billing_period: sub.billing_period,
+              current_period_end: sub.current_period_end,
+            })
+          }
+        }
+      })
+    }
+
+    // Adicionar emails e subscriptions aos dados formatados
+    const formattedPages = optimizedPages.map((lp: any) => {
+      const subscription = subscriptionMap.get(lp.id)
+      return {
+        ...lp,
+        user_email: userEmailsMap[lp.user_id] || null,
+        subscription: subscription || undefined
+      }
+    })
 
     return new Response(
       JSON.stringify({ data: formattedPages }),

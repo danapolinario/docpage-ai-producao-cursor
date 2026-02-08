@@ -23,6 +23,12 @@ export interface LandingPageWithUser {
   user_email?: string;
   briefing_data: any;
   content_data: any;
+  subscription?: {
+    status: string;
+    plan_id: string;
+    billing_period: string;
+    current_period_end: string;
+  };
 }
 
 export type LandingPageStatus = 'draft' | 'published';
