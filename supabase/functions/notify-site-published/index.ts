@@ -55,6 +55,62 @@ const handler = async (req: Request): Promise<Response> => {
       .eq("id", landingPageId)
       .single();
 
+    // Buscar o domínio escolhido pelo usuário na etapa de checkout (pode estar em pending_checkouts)
+    let chosenDomain: string | null = null;
+    if (landingPage && landingPage.user_id) {
+      console.log('notify-site-published: Buscando domínio escolhido no pending_checkouts', {
+        landingPageId,
+        userId: landingPage.user_id,
+      });
+      
+      // Buscar em pending_checkouts pelo landing_page_id primeiro, depois pelo user_id
+      let pendingCheckout = null;
+      
+      // Tentar buscar pelo landing_page_id primeiro (mais específico)
+      const { data: byLandingPageId } = await supabase
+        .from("pending_checkouts")
+        .select("domain, has_custom_domain, custom_domain")
+        .eq("landing_page_id", landingPageId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (byLandingPageId) {
+        pendingCheckout = byLandingPageId;
+        console.log('notify-site-published: Domínio encontrado por landing_page_id:', pendingCheckout);
+      } else {
+        // Se não encontrou, buscar pelo user_id
+        const { data: byUserId } = await supabase
+          .from("pending_checkouts")
+          .select("domain, has_custom_domain, custom_domain")
+          .eq("user_id", landingPage.user_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (byUserId) {
+          pendingCheckout = byUserId;
+          console.log('notify-site-published: Domínio encontrado por user_id:', pendingCheckout);
+        } else {
+          console.log('notify-site-published: Nenhum domínio encontrado no pending_checkouts');
+        }
+      }
+      
+      if (pendingCheckout) {
+        // Se tem domínio customizado, usar ele; senão, usar o domínio escolhido (com extensão)
+        chosenDomain = pendingCheckout.has_custom_domain && pendingCheckout.custom_domain
+          ? pendingCheckout.custom_domain
+          : pendingCheckout.domain; // Este é o domínio escolhido pelo usuário (ex: "testefinaldocpage.com.br")
+        
+        console.log('notify-site-published: Domínio escolhido determinado:', {
+          chosenDomain,
+          hasCustomDomain: pendingCheckout.has_custom_domain,
+          customDomain: pendingCheckout.custom_domain,
+          domain: pendingCheckout.domain,
+        });
+      }
+    }
+
     if (error || !landingPage) {
       console.error("Erro ao buscar landing page:", error);
       return new Response(
@@ -122,6 +178,7 @@ const handler = async (req: Request): Promise<Response> => {
       landingPageId,
       subdomain: landingPage.subdomain,
       customDomain: landingPage.custom_domain,
+      chosenDomain, // Adicionar o domínio escolhido nos logs
       userId: landingPage.user_id,
       userEmail: user?.user?.email || 'NÃO ENCONTRADO',
       briefingName: briefing.name,
@@ -158,10 +215,22 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Usar formato subdomínio: https://xxx.docpage.com.br
-    const displayDomain = landingPage.custom_domain
-      ? landingPage.custom_domain
-      : `${landingPage.subdomain}.docpage.com.br`;
+    // Usar o domínio escolhido pelo usuário na etapa de checkout
+    // Prioridade: 1) chosenDomain (do pending_checkouts), 2) custom_domain, 3) subdomain.docpage.com.br
+    let displayDomain: string;
+    if (chosenDomain) {
+      // Se encontrou o domínio escolhido no pending_checkouts, usar ele
+      displayDomain = chosenDomain;
+    } else if (landingPage.custom_domain) {
+      // Se tem domínio customizado salvo, usar ele
+      displayDomain = landingPage.custom_domain;
+    } else {
+      // Fallback: usar subdomínio do docpage.com.br
+      displayDomain = `${landingPage.subdomain}.docpage.com.br`;
+    }
+
+    // Garantir que o domínio não tenha protocolo
+    displayDomain = displayDomain.replace(/^https?:\/\//, '');
 
     const siteUrl = `https://${displayDomain}`;
 

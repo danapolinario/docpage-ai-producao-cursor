@@ -27,6 +27,7 @@ export interface CreateCheckoutSessionData {
     photoUrl?: string | null;
     aboutPhotoUrl?: string | null;
     domain: string;
+    chosenDomain?: string; // Domínio completo escolhido pelo usuário (com extensão) para usar no email
     hasCustomDomain?: boolean;
     customDomain?: string | null;
   };

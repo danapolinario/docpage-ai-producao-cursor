@@ -350,7 +350,7 @@ const handler = async (req: Request): Promise<Response> => {
             user_id: userId,
             stripe_session_id: session.id,
             landing_page_data: landingPageData,
-            domain: landingPageData.domain,
+            domain: landingPageData.chosenDomain || landingPageData.domain, // Usar chosenDomain se disponível (domínio completo escolhido)
             has_custom_domain: landingPageData.hasCustomDomain || false,
             custom_domain: landingPageData.customDomain || null,
             cpf: cpf || null,

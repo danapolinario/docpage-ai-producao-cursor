@@ -335,6 +335,11 @@ export const CheckoutFlow: React.FC<Props> = ({
         ? customDomainValue 
         : selectedDomain; // Subdomínio apenas (ex: "drjoaosilva")
       
+      // Domínio completo escolhido pelo usuário (com extensão) para usar no email
+      const chosenDomainForEmail = hasCustomDomain 
+        ? customDomainValue 
+        : `${selectedDomain}${domainExtension}`; // Ex: "drjoaosilva.com.br"
+      
       if (!finalDomain) {
         setError('Por favor, informe um domínio válido.');
         setIsLoading(false);
@@ -487,7 +492,8 @@ export const CheckoutFlow: React.FC<Props> = ({
           layoutVariant,
           photoUrl,
           aboutPhotoUrl,
-          domain: finalDomain,
+          domain: finalDomain, // Subdomínio apenas (para criar landing page)
+          chosenDomain: chosenDomainForEmail, // Domínio completo escolhido (para email)
           hasCustomDomain,
           customDomain: hasCustomDomain ? customDomainValue : null,
         },
