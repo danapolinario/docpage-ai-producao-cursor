@@ -53,6 +53,7 @@ interface CreateCheckoutRequest {
     photoUrl?: string | null;
     aboutPhotoUrl?: string | null;
     domain: string;
+    chosenDomain?: string; // Domínio completo escolhido pelo usuário (com extensão) para usar no email
     hasCustomDomain?: boolean;
     customDomain?: string | null;
   };
@@ -345,7 +346,21 @@ const handler = async (req: Request): Promise<Response> => {
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
         
         // Determinar o domínio a ser salvo
-        const domainToSave = landingPageData.chosenDomain || landingPageData.domain;
+        // Quando hasCustomDomain é false, usar chosenDomain (domínio completo com extensão)
+        // Quando hasCustomDomain é true, usar customDomain
+        let domainToSave: string;
+        if (landingPageData.hasCustomDomain && landingPageData.customDomain) {
+          domainToSave = landingPageData.customDomain;
+        } else if (landingPageData.chosenDomain) {
+          // Usar chosenDomain quando disponível (domínio completo com extensão: ex: "testefinaldocpage.com.br")
+          domainToSave = landingPageData.chosenDomain;
+        } else {
+          // Fallback: usar domain (subdomínio apenas) e adicionar extensão padrão
+          domainToSave = landingPageData.domain.includes('.') 
+            ? landingPageData.domain 
+            : `${landingPageData.domain}.com.br`;
+          console.warn("stripe-create-checkout: chosenDomain não fornecido, usando domain com extensão padrão");
+        }
         
         console.log("stripe-create-checkout: Salvando domínio no pending_checkouts", {
           chosenDomain: landingPageData.chosenDomain,

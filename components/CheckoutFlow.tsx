@@ -497,6 +497,15 @@ export const CheckoutFlow: React.FC<Props> = ({
       }
 
       // Criar Checkout Session no Stripe
+      console.log('CheckoutFlow: Enviando dados para createCheckoutSession', {
+        finalDomain, // Subdomínio apenas (para criar landing page)
+        chosenDomainForEmail, // Domínio completo escolhido (para email e dashboard)
+        hasCustomDomain,
+        customDomainValue,
+        selectedDomain,
+        domainExtension,
+      });
+      
       const checkoutSession = await createCheckoutSession({
         planId: plan.id,
         billingPeriod: period,
@@ -513,7 +522,7 @@ export const CheckoutFlow: React.FC<Props> = ({
           photoUrl,
           aboutPhotoUrl,
           domain: finalDomain, // Subdomínio apenas (para criar landing page)
-          chosenDomain: chosenDomainForEmail, // Domínio completo escolhido (para email)
+          chosenDomain: chosenDomainForEmail, // Domínio completo escolhido (com extensão: ex: "testefinaldocpage.com.br")
           hasCustomDomain,
           customDomain: hasCustomDomain ? customDomainValue : null,
         },
