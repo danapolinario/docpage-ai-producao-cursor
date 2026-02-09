@@ -15,9 +15,9 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Servir arquivos estáticos do build
+// Servir arquivos estáticos do build (mas NÃO o index.html na raiz)
 const distPath = join(__dirname, '../dist');
-app.use(express.static(distPath));
+app.use(express.static(distPath, { index: false })); // index: false impede servir index.html automaticamente
 
 // Middleware para parsear JSON
 app.use(express.json());
@@ -58,12 +58,15 @@ app.use((req, res, next) => {
 });
 
 // Rota raiz - verificar se é subdomínio ou servir SPA principal
+// IMPORTANTE: Esta rota deve vir ANTES do express.static servir o index.html
 app.get('/', async (req, res) => {
   const subdomain = (req as any).subdomain;
   
   if (subdomain) {
     // É um subdomínio - buscar landing page
     try {
+      console.log(`[SSR] Tentando renderizar landing page para subdomínio: ${subdomain}`);
+      
       // Buscar landing page no Supabase
       const { data: landingPage, error } = await supabase
         .from('landing_pages')
@@ -72,16 +75,21 @@ app.get('/', async (req, res) => {
         .single();
 
       if (error || !landingPage) {
+        console.log(`[SSR] Landing page não encontrada para subdomínio: ${subdomain}`, error?.message);
         // Se não encontrar, servir SPA normal
         return res.sendFile(join(distPath, 'index.html'));
       }
 
+      console.log(`[SSR] Landing page encontrada: ${landingPage.id}, renderizando...`);
+      
       // Permitir acesso mesmo se não publicado (para preview via subdomain)
       // Renderizar com SSR
       const html = await renderLandingPage(landingPage, req);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.send(html);
-    } catch (error) {
-      console.error('Erro ao renderizar SSR:', error);
+    } catch (error: any) {
+      console.error('[SSR] Erro ao renderizar SSR:', error?.message || error);
+      console.error('[SSR] Stack:', error?.stack);
       // Em caso de erro, servir SPA normal
       res.sendFile(join(distPath, 'index.html'));
     }

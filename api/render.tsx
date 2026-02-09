@@ -59,20 +59,48 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     const briefing = landingPage.briefing_data || {} as any;
     const content = landingPage.content_data || {} as any;
 
+    // Função para verificar se meta tag é genérica do DocPage AI
+    const isGenericDocPageMeta = (value: string | null | undefined): boolean => {
+      if (!value) return false;
+      const lower = value.toLowerCase();
+      return (
+        lower.includes('docpage ai') ||
+        lower.includes('crie site profissional para médicos') ||
+        lower.includes('seo otimizado') ||
+        lower.includes('com ia') ||
+        lower.includes('teste grátis') ||
+        lower.includes('plataforma para médicos')
+      );
+    };
+
     // Gerar tags SEO com valores seguros
-    const title = landingPage.meta_title || 
-      `${briefing.name || 'Médico'} - ${briefing.specialty || 'Especialista'} | CRM ${briefing.crm || ''}/${briefing.crmState || ''}`;
+    // Ignorar meta_title se for genérico do DocPage AI
+    const title = (landingPage.meta_title && !isGenericDocPageMeta(landingPage.meta_title))
+      ? landingPage.meta_title
+      : `${briefing.name || 'Médico'} - ${briefing.specialty || 'Especialista'} | CRM ${briefing.crm || ''}/${briefing.crmState || ''}`;
     
-    const rawDescription = landingPage.meta_description || content.subheadline || 
-      `Dr(a). ${briefing.name || 'Médico'}, ${briefing.specialty || 'Especialista'} - CRM ${briefing.crm || ''}/${briefing.crmState || ''}. ${briefing.crmState || ''}. Agende sua consulta online.`;
+    // Ignorar meta_description se for genérica do DocPage AI
+    const rawDescription = (landingPage.meta_description && !isGenericDocPageMeta(landingPage.meta_description))
+      ? landingPage.meta_description
+      : (content.subheadline || 
+        `Dr(a). ${briefing.name || 'Médico'}, ${briefing.specialty || 'Especialista'} - CRM ${briefing.crm || ''}/${briefing.crmState || ''}. ${briefing.crmState || ''}. Agende sua consulta online.`);
     const description = rawDescription.length > 160 
       ? rawDescription.substring(0, 157) + '...' 
       : rawDescription;
     
-    const keywords = landingPage.meta_keywords?.join(', ') || 
-      `${briefing.name || 'Médico'}, ${briefing.specialty || 'Especialista'}, médico ${briefing.crmState || ''}, CRM ${briefing.crm || ''}, consulta médica, agendar consulta, ${briefing.mainServices?.split(',').slice(0, 3).join(', ') || ''}`;
+    // Ignorar meta_keywords se forem genéricas do DocPage AI
+    const hasGenericKeywords = landingPage.meta_keywords && landingPage.meta_keywords.length > 0
+      ? landingPage.meta_keywords.some(kw => isGenericDocPageMeta(kw))
+      : false;
+    const keywords = (landingPage.meta_keywords && !hasGenericKeywords)
+      ? landingPage.meta_keywords.join(', ')
+      : `${briefing.name || 'Médico'}, ${briefing.specialty || 'Especialista'}, médico ${briefing.crmState || ''}, CRM ${briefing.crm || ''}, consulta médica, agendar consulta, ${briefing.mainServices?.split(',').slice(0, 3).join(', ') || ''}`;
     
-    const ogImage = landingPage.og_image_url || landingPage.about_photo_url || landingPage.photo_url || `${baseUrl}/og-default.png`;
+    // Prioridade para imagem OG: og_image_url > about_photo_url > photo_url > fallback
+    // Ignorar og_image_url se for genérico (og-default.png)
+    const ogImage = (landingPage.og_image_url && !landingPage.og_image_url.includes('og-default.png'))
+      ? landingPage.og_image_url
+      : (landingPage.about_photo_url || landingPage.photo_url || `${baseUrl}/og-default.png`);
     const ogImageSecure = ogImage.replace('http://', 'https://');
 
     // Generate SEO-optimized site name for og:site_name

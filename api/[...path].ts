@@ -102,10 +102,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).send('Not found');
       }
 
-      if (landingPage.status !== 'published') {
-        console.log('[SUBDOMAIN DEBUG] Landing page not published, status:', landingPage.status);
-        return res.status(404).send('Not found');
-      }
+      // Permitir acesso mesmo se não publicado (para preview via subdomain)
+      // Removido: if (landingPage.status !== 'published')
 
       // Criar objeto req compatível para renderLandingPage
       const mockReq = {
