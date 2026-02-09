@@ -306,13 +306,6 @@ async function upsertSubscription(
       },
     };
 
-    console.log(`stripe-webhook: Dados preparados para insert/update`, {
-      hasUserId: !!subscriptionData.user_id,
-      hasLandingPageId: !!subscriptionData.landing_page_id,
-      hasCustomerId: !!subscriptionData.stripe_customer_id,
-      hasSubscriptionId: !!subscriptionData.stripe_subscription_id,
-      status: subscriptionData.status,
-    });
 
     // Verificar se subscription já existe
     const { data: existing, error: findError } = await supabase
@@ -364,10 +357,6 @@ async function upsertSubscription(
         });
         throw new Error(`Erro ao criar subscription: ${insertError.message}`);
       }
-      console.log(`stripe-webhook: Subscription criada com sucesso`, {
-        subscriptionId: inserted?.[0]?.id,
-        stripeSubscriptionId: subscription.id,
-      });
     }
   } catch (error: any) {
     console.error("stripe-webhook: Erro ao criar/atualizar subscription:", {

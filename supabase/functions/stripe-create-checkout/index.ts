@@ -268,28 +268,13 @@ const handler = async (req: Request): Promise<Response> => {
       // Se for um Coupon ID, usar coupon
       if (promotionCodeId.startsWith('promo_')) {
         sessionParams.discounts = [{ promotion_code: promotionCodeId }];
-        console.log("stripe-create-checkout: Promotion Code aplicado ao session params:", promotionCodeId);
       } else {
         sessionParams.discounts = [{ coupon: promotionCodeId }];
-        console.log("stripe-create-checkout: Coupon aplicado ao session params:", promotionCodeId);
       }
     }
 
-    console.log("stripe-create-checkout: Creating Stripe session", { 
-      priceId, 
-      hasPromotionCode: !!promotionCodeId,
-      promotionCodeId: promotionCodeId,
-      customerEmail: sessionParams.customer_email,
-      metadataKeys: Object.keys(sessionParams.metadata || {}),
-      discounts: sessionParams.discounts,
-      successUrl: sessionParams.success_url,
-      cancelUrl: sessionParams.cancel_url,
-    });
-    
     try {
-      console.log("stripe-create-checkout: Chamando stripe.checkout.sessions.create...");
       const session = await stripe.checkout.sessions.create(sessionParams);
-      console.log("stripe-create-checkout: Session created successfully", { sessionId: session.id, url: session.url });
       
       // Salvar dados completos da landing page na tabela pending_checkouts
       // Isso evita truncamento na metadata do Stripe (limite de 500 chars)
