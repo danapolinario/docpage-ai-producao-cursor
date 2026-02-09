@@ -60,14 +60,6 @@ interface CreateCheckoutRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  console.log("stripe-create-checkout: Request received", {
-    method: req.method,
-    url: req.url,
-    hasAuthHeader: !!req.headers.get("authorization"),
-    hasApikeyHeader: !!req.headers.get("apikey"),
-    origin: req.headers.get("origin"),
-  });
-  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -168,7 +160,6 @@ const handler = async (req: Request): Promise<Response> => {
     // Verificar cupom/promotion code se fornecido
     let promotionCodeId: string | undefined;
     if (couponCode) {
-      console.log(`stripe-create-checkout: Verificando cupom/promotion code: ${couponCode}`);
       
       // Se começa com "promo_", é um Promotion Code ID - usar diretamente
       if (couponCode.trim().startsWith('promo_')) {
@@ -256,12 +247,6 @@ const handler = async (req: Request): Promise<Response> => {
       },
     };
     
-    console.log("stripe-create-checkout: Session params configurados", {
-      priceId,
-      planName: displayName,
-      planId,
-      billingPeriod,
-    });
 
     if (promotionCodeId) {
       // Se for um Promotion Code (começa com promo_), usar promotion_code
