@@ -43,12 +43,15 @@ function extractSubdomain(host: string): string | null {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Garantir que host seja string - verificar múltiplos headers do Vercel
+  // IMPORTANTE: Vercel pode passar o host em diferentes headers dependendo da configuração
   const hostHeader = req.headers.host;
   const xForwardedHost = req.headers['x-forwarded-host'];
   const xVercelOriginalHost = req.headers['x-vercel-original-host'];
   const xHost = req.headers['x-host'];
+  const xForwardedFor = req.headers['x-forwarded-for'];
   
   // Tentar múltiplos headers (Vercel pode usar diferentes)
+  // Prioridade: host > x-forwarded-host > x-vercel-original-host > x-host
   let host = '';
   if (Array.isArray(hostHeader)) {
     host = hostHeader[0] || '';
@@ -62,26 +65,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     host = Array.isArray(xHost) ? xHost[0] : xHost;
   }
   
-  console.log('[SUBDOMAIN DEBUG] Headers (index):', {
+  // Log detalhado para debug
+  console.log('[SSR DEBUG] ============================================');
+  console.log('[SSR DEBUG] Request URL:', req.url);
+  console.log('[SSR DEBUG] All headers:', JSON.stringify(req.headers, null, 2));
+  console.log('[SSR DEBUG] Host headers:', {
     hostHeader,
     xForwardedHost,
     xVercelOriginalHost,
     xHost,
+    xForwardedFor,
     finalHost: host
   });
   
   const subdomain = extractSubdomain(host);
   
-  console.log('[SUBDOMAIN DEBUG] Subdomain extraction (index):', {
+  console.log('[SSR DEBUG] Subdomain extraction:', {
     host,
     subdomain,
     hostname: host.split(':')[0],
-    endsWithCheck: host.split(':')[0].toLowerCase().endsWith('.docpage.com.br')
+    endsWithCheck: host.split(':')[0].toLowerCase().endsWith('.docpage.com.br'),
+    parts: host.split(':')[0].split('.')
   });
+  console.log('[SSR DEBUG] ============================================');
   
   // Se for subdomínio, renderizar SSR
   if (subdomain) {
-    console.log('[SUBDOMAIN DEBUG] Subdomain detected, querying database (index):', subdomain);
+    console.log('[SSR] ✓ Subdomínio detectado, renderizando SSR:', subdomain);
     try {
       const { data: landingPage, error } = await supabase
         .from('landing_pages')
@@ -89,16 +99,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq('subdomain', subdomain)
         .single();
 
-      console.log('[SUBDOMAIN DEBUG] Database query result (index):', {
+      console.log('[SSR] Resultado da query:', {
         subdomain,
         found: !!landingPage,
         error: error?.message,
         status: landingPage?.status,
-        landingPageId: landingPage?.id
+        landingPageId: landingPage?.id,
+        hasMetaTitle: !!landingPage?.meta_title,
+        metaTitle: landingPage?.meta_title?.substring(0, 50)
       });
 
       if (error || !landingPage) {
-        console.log('[SUBDOMAIN DEBUG] Landing page not found (index), returning 404');
+        console.log('[SSR] ✗ Landing page não encontrada, retornando 404');
         return res.status(404).send('Not found');
       }
 
@@ -115,11 +127,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         headers: req.headers,
       };
 
+      console.log('[SSR] Renderizando HTML com dados do médico...');
       const html = await renderLandingPage(landingPage, mockReq);
-      res.setHeader('Content-Type', 'text/html');
+      
+      // Verificar se o HTML gerado contém dados do médico (não genérico)
+      const hasDoctorName = html.includes(landingPage.briefing_data?.name || '');
+      const hasGenericDocPage = html.includes('DocPage AI - Crie Site Profissional');
+      
+      console.log('[SSR] Verificação do HTML gerado:', {
+        hasDoctorName,
+        hasGenericDocPage,
+        htmlLength: html.length,
+        firstChars: html.substring(0, 200)
+      });
+      
+      if (hasGenericDocPage && !hasDoctorName) {
+        console.error('[SSR] ⚠️ ATENÇÃO: HTML gerado ainda contém dados genéricos!');
+      }
+      
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       return res.send(html);
-    } catch (error) {
-      console.error('Erro ao renderizar SSR:', error);
+    } catch (error: any) {
+      console.error('[SSR] ✗ Erro ao renderizar SSR:', error?.message || error);
+      console.error('[SSR] Stack:', error?.stack);
       return res.status(500).send('Internal Server Error');
     }
   }

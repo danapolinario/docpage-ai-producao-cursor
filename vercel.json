@@ -37,6 +37,10 @@
         {
           "key": "X-Forwarded-Host",
           "value": "$host"
+        },
+        {
+          "key": "Host",
+          "value": "$host"
         }
       ]
     }

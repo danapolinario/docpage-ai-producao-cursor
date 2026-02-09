@@ -43,12 +43,15 @@ function extractSubdomain(host: string): string | null {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Garantir que host seja string - verificar múltiplos headers do Vercel
+  // IMPORTANTE: Vercel pode passar o host em diferentes headers dependendo da configuração
   const hostHeader = req.headers.host;
   const xForwardedHost = req.headers['x-forwarded-host'];
   const xVercelOriginalHost = req.headers['x-vercel-original-host'];
   const xHost = req.headers['x-host'];
+  const xForwardedFor = req.headers['x-forwarded-for'];
   
   // Tentar múltiplos headers (Vercel pode usar diferentes)
+  // Prioridade: host > x-forwarded-host > x-vercel-original-host > x-host
   let host = '';
   if (Array.isArray(hostHeader)) {
     host = hostHeader[0] || '';
@@ -62,22 +65,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     host = Array.isArray(xHost) ? xHost[0] : xHost;
   }
   
-  console.log('[SUBDOMAIN DEBUG] Headers:', {
+  // Log detalhado para debug
+  console.log('[SSR DEBUG] ============================================');
+  console.log('[SSR DEBUG] Request URL:', req.url);
+  console.log('[SSR DEBUG] Path query:', req.query.path);
+  console.log('[SSR DEBUG] All headers:', JSON.stringify(req.headers, null, 2));
+  console.log('[SSR DEBUG] Host headers:', {
     hostHeader,
     xForwardedHost,
     xVercelOriginalHost,
     xHost,
+    xForwardedFor,
     finalHost: host
   });
   
   const subdomain = extractSubdomain(host);
   
-  console.log('[SUBDOMAIN DEBUG] Subdomain extraction:', {
+  console.log('[SSR DEBUG] Subdomain extraction:', {
     host,
     subdomain,
     hostname: host.split(':')[0],
-    endsWithCheck: host.split(':')[0].toLowerCase().endsWith('.docpage.com.br')
+    endsWithCheck: host.split(':')[0].toLowerCase().endsWith('.docpage.com.br'),
+    parts: host.split(':')[0].split('.')
   });
+  console.log('[SSR DEBUG] ============================================');
   
   // Se for subdomínio, renderizar SSR
   if (subdomain) {
