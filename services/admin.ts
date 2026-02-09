@@ -69,20 +69,43 @@ export async function adminLogin(email: string, password: string) {
  */
 export async function checkIsAdmin(): Promise<boolean> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     
-    if (!user) return false;
+    if (userError || !user) {
+      console.log('checkIsAdmin: Usuário não autenticado', { userError });
+      return false;
+    }
     
+    // Usar maybeSingle() ao invés de single() para evitar erro se não encontrar registro
     const { data, error } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
       .eq('role', 'admin')
-      .single();
+      .maybeSingle();
     
-    return !!data;
+    if (error) {
+      console.error('checkIsAdmin: Erro ao verificar role admin:', error);
+      // Se o erro for de RLS ou permissão, tentar usar a função RPC como fallback
+      try {
+        const { data: hasRole, error: rpcError } = await supabase.rpc('has_role', {
+          _user_id: user.id,
+          _role: 'admin'
+        });
+        if (!rpcError && hasRole) {
+          return true;
+        }
+      } catch (rpcErr) {
+        console.error('checkIsAdmin: Erro ao usar função RPC:', rpcErr);
+      }
+      return false;
+    }
+    
+    const isAdmin = !!data;
+    console.log('checkIsAdmin: Resultado', { userId: user.id, email: user.email, isAdmin });
+    return isAdmin;
   } catch (error) {
-    console.error('Error checking admin status:', error);
+    console.error('checkIsAdmin: Erro inesperado ao verificar admin status:', error);
     return false;
   }
 }

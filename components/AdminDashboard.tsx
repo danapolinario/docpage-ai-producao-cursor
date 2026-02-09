@@ -139,31 +139,26 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
   const getLandingPageUrl = (page: LandingPageWithUser) => {
     const isPublished = page.status === 'published';
     
-    // Se tem chosen_domain (domínio novo escolhido pelo usuário)
-    if (page.chosen_domain) {
-      if (isPublished) {
-        // Publicado: usar domínio escolhido completo (com extensão)
-        return `https://${page.chosen_domain.replace(/^https?:\/\//, '')}`;
-      } else {
-        // Não publicado: usar subdomain baseado no nome do domínio
-        const domainName = page.chosen_domain
-          .replace(/^https?:\/\//, '')
-          .replace(/^www\./, '')
-          .replace(/\.(com\.br|com|med\.br|net|org|br)$/, '')
-          .toLowerCase();
-        return `https://${domainName}.docpage.com.br`;
-      }
+    // Se é domínio novo (has_custom_domain === false) e tem chosen_domain
+    // Para domínio novo, SEMPRE usar exatamente o que o usuário digitou (independente do status)
+    if (page.has_custom_domain === false && page.chosen_domain) {
+      return `https://${page.chosen_domain.replace(/^https?:\/\//, '')}`;
+    }
+    
+    // Se tem chosen_domain mas não é domínio próprio (fallback para casos onde has_custom_domain não está definido)
+    if (page.chosen_domain && page.has_custom_domain !== true && !page.custom_domain) {
+      // Para domínio novo, usar exatamente o que o usuário digitou
+      return `https://${page.chosen_domain.replace(/^https?:\/\//, '')}`;
     }
     
     // Se tem custom_domain (domínio próprio)
-    if (page.custom_domain) {
+    if (page.custom_domain || page.has_custom_domain === true) {
       if (isPublished) {
-        return `https://${page.custom_domain}`;
+        return `https://${page.custom_domain || page.chosen_domain?.replace(/^https?:\/\//, '') || ''}`;
       } else {
         const domainName = page.custom_domain
-          .replace(/^www\./, '')
-          .replace(/\.(com\.br|com|med\.br|net|org|br)$/, '')
-          .toLowerCase();
+          ? page.custom_domain.replace(/^www\./, '').replace(/\.(com\.br|com|med\.br|net|org|br)$/, '').toLowerCase()
+          : page.chosen_domain?.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\.(com\.br|com|med\.br|net|org|br)$/, '').toLowerCase() || '';
         return `https://${domainName}.docpage.com.br`;
       }
     }
@@ -172,11 +167,13 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
     return `https://${page.subdomain}.docpage.com.br`;
   };
   
-  // Get display domain for landing page
+  // Get display domain for landing page (exatamente como o usuário digitou)
   const getDisplayDomain = (page: LandingPageWithUser) => {
-    // Prioridade: 1) chosen_domain (do pending_checkouts - sempre com extensão)
-    // 2) custom_domain (se houver)
-    // 3) subdomain.docpage.com.br (fallback)
+    // Usar display_domain se disponível (já vem formatado da API)
+    if (page.display_domain) {
+      return page.display_domain.replace(/^https?:\/\//, '');
+    }
+    // Fallback: prioridade: 1) chosen_domain, 2) custom_domain, 3) subdomain.docpage.com.br
     if (page.chosen_domain) {
       return page.chosen_domain.replace(/^https?:\/\//, '');
     } else if (page.custom_domain) {
@@ -185,16 +182,51 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
       return `${page.subdomain}.docpage.com.br`;
     }
   };
+  
+  // Get domain type label (domínio próprio ou domínio novo)
+  const getDomainTypeLabel = (page: LandingPageWithUser) => {
+    // Se has_custom_domain está definido, usar ele
+    if (page.has_custom_domain !== undefined) {
+      return page.has_custom_domain ? 'Domínio próprio' : 'Domínio novo';
+    }
+    // Fallback: se tem custom_domain, é próprio; senão, é novo
+    return page.custom_domain ? 'Domínio próprio' : 'Domínio novo';
+  };
+  
+  // Format CPF for display
+  const formatCPF = (cpf: string | null | undefined) => {
+    if (!cpf) return 'N/A';
+    const digits = cpf.replace(/\D/g, '');
+    if (digits.length !== 11) return cpf;
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+  };
+  
+  // Format WhatsApp for display
+  const formatWhatsApp = (whatsapp: string | null | undefined) => {
+    if (!whatsapp) return 'N/A';
+    // Remover caracteres não numéricos e formatar
+    const digits = whatsapp.replace(/\D/g, '');
+    if (digits.length === 11) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+    } else if (digits.length === 10) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    }
+    return whatsapp;
+  };
 
   // Filter and search
   const filteredPages = landingPages.filter(page => {
     const matchesStatus = filterStatus === 'all' || page.status === filterStatus;
     const displayDomain = getDisplayDomain(page);
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch = 
-      page.subdomain.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      displayDomain.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      page.briefing_data?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      page.briefing_data?.contactEmail?.toLowerCase().includes(searchTerm.toLowerCase());
+      page.subdomain.toLowerCase().includes(searchLower) ||
+      displayDomain.toLowerCase().includes(searchLower) ||
+      page.briefing_data?.name?.toLowerCase().includes(searchLower) ||
+      page.user_email?.toLowerCase().includes(searchLower) ||
+      page.whatsapp?.toLowerCase().includes(searchLower) ||
+      (page.cpf && page.cpf.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, ''))) ||
+      page.briefing_data?.contactEmail?.toLowerCase().includes(searchLower);
     return matchesStatus && matchesSearch;
   });
 
@@ -444,25 +476,47 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
                     <tr key={page.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col gap-1">
                             <p className="font-medium text-gray-900">
                               {getDisplayDomain(page)}
                             </p>
-                            {(page.custom_domain || page.chosen_domain) && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                {page.custom_domain ? 'Domínio próprio' : 'Domínio escolhido'}
-                              </span>
-                            )}
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium w-fit ${
+                              page.has_custom_domain 
+                                ? 'bg-blue-100 text-blue-800' 
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {getDomainTypeLabel(page)}
+                            </span>
                           </div>
-                          <p className="text-xs text-gray-500">
-                            {getLandingPageUrl(page)}
-                          </p>
+                          {/* Para domínio novo, mostrar exatamente o que o usuário digitou */}
+                          {page.has_custom_domain === false && page.chosen_domain ? (
+                            <p className="text-xs text-gray-500 mt-1">
+                              {`https://${page.chosen_domain.replace(/^https?:\/\//, '')}`}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-gray-500 mt-1">
+                              {getLandingPageUrl(page)}
+                            </p>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div>
+                        <div className="space-y-1">
                           <p className="font-medium text-gray-900">{page.briefing_data?.name || 'N/A'}</p>
-                          <p className="text-xs text-gray-500">{page.briefing_data?.contactEmail || 'N/A'}</p>
+                          <div className="text-xs text-gray-600 space-y-0.5">
+                            <p>
+                              <span className="font-medium">E-mail:</span>{' '}
+                              <span className="text-gray-500">{page.user_email || 'N/A'}</span>
+                            </p>
+                            <p>
+                              <span className="font-medium">WhatsApp:</span>{' '}
+                              <span className="text-gray-500">{formatWhatsApp(page.whatsapp)}</span>
+                            </p>
+                            <p>
+                              <span className="font-medium">CPF:</span>{' '}
+                              <span className="text-gray-500">{formatCPF(page.cpf)}</span>
+                            </p>
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">

@@ -906,7 +906,7 @@ export const CheckoutFlow: React.FC<Props> = ({
                   )}
 
                   {!hasCustomDomain && (
-                    <label className="block text-xs font-medium text-gray-700">Qual será o endereço do seu site?</label>
+                    <label className="block text-xs font-medium text-gray-700">Qual será o endereço do seu site? (Incluir a extensão. Ex: .com.br)</label>
                   )}
 
                   {hasCustomDomain ? (
