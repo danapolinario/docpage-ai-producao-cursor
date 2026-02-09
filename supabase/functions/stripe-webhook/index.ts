@@ -197,19 +197,26 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
         custom_domain: existingLandingPage.custom_domain,
       });
       
-      // Atualizar chosen_domain se ainda não estiver preenchido
+      // SEMPRE atualizar chosen_domain se temos o valor (mesmo que já tenha um valor)
+      // Isso garante que o domínio escolhido seja sempre o mais recente de pending_checkouts
       if (chosenDomainToSave) {
         const { error: updateError } = await supabase
           .from("landing_pages")
           .update({ chosen_domain: chosenDomainToSave })
-          .eq("id", existingLandingPage.id)
-          .is("chosen_domain", null);
+          .eq("id", existingLandingPage.id);
         
         if (updateError) {
           console.warn(`stripe-webhook: Erro ao atualizar chosen_domain na landing page existente:`, updateError);
         } else {
           console.log(`stripe-webhook: chosen_domain atualizado na landing page existente:`, chosenDomainToSave);
         }
+      } else {
+        console.warn(`stripe-webhook: chosenDomainToSave é null, não foi possível atualizar chosen_domain`);
+        console.warn(`stripe-webhook: Dados disponíveis:`, {
+          domain,
+          hasCustomDomain,
+          customDomain,
+        });
       }
       
       landingPage = existingLandingPage;

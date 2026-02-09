@@ -51,65 +51,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { data: landingPage, error } = await supabase
       .from("landing_pages")
-      .select("id, subdomain, custom_domain, briefing_data, user_id")
+      .select("id, subdomain, custom_domain, chosen_domain, briefing_data, user_id")
       .eq("id", landingPageId)
       .single();
-
-    // Buscar o domínio escolhido pelo usuário na etapa de checkout (pode estar em pending_checkouts)
-    let chosenDomain: string | null = null;
-    if (landingPage && landingPage.user_id) {
-      console.log('notify-site-published: Buscando domínio escolhido no pending_checkouts', {
-        landingPageId,
-        userId: landingPage.user_id,
-      });
-      
-      // Buscar em pending_checkouts pelo landing_page_id primeiro, depois pelo user_id
-      let pendingCheckout = null;
-      
-      // Tentar buscar pelo landing_page_id primeiro (mais específico)
-      const { data: byLandingPageId } = await supabase
-        .from("pending_checkouts")
-        .select("domain, has_custom_domain, custom_domain")
-        .eq("landing_page_id", landingPageId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (byLandingPageId) {
-        pendingCheckout = byLandingPageId;
-        console.log('notify-site-published: Domínio encontrado por landing_page_id:', pendingCheckout);
-      } else {
-        // Se não encontrou, buscar pelo user_id
-        const { data: byUserId } = await supabase
-          .from("pending_checkouts")
-          .select("domain, has_custom_domain, custom_domain")
-          .eq("user_id", landingPage.user_id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (byUserId) {
-          pendingCheckout = byUserId;
-          console.log('notify-site-published: Domínio encontrado por user_id:', pendingCheckout);
-        } else {
-          console.log('notify-site-published: Nenhum domínio encontrado no pending_checkouts');
-        }
-      }
-      
-      if (pendingCheckout) {
-        // Se tem domínio customizado, usar ele; senão, usar o domínio escolhido (com extensão)
-        chosenDomain = pendingCheckout.has_custom_domain && pendingCheckout.custom_domain
-          ? pendingCheckout.custom_domain
-          : pendingCheckout.domain; // Este é o domínio escolhido pelo usuário (ex: "testefinaldocpage.com.br")
-        
-        console.log('notify-site-published: Domínio escolhido determinado:', {
-          chosenDomain,
-          hasCustomDomain: pendingCheckout.has_custom_domain,
-          customDomain: pendingCheckout.custom_domain,
-          domain: pendingCheckout.domain,
-        });
-      }
-    }
 
     if (error || !landingPage) {
       console.error("Erro ao buscar landing page:", error);
@@ -121,6 +65,140 @@ const handler = async (req: Request): Promise<Response> => {
         },
       );
     }
+
+    // Determinar o domínio escolhido pelo usuário
+    // SEMPRE deve ser o domínio completo escolhido (com extensão), seja domínio próprio ou novo
+    // NUNCA usar subdomain.docpage.com.br se o usuário escolheu um domínio
+    let displayDomain: string | null = null;
+    
+    console.log('============================================');
+    console.log('notify-site-published: INICIANDO determinação do domínio');
+    console.log('notify-site-published: Dados da landing page:', {
+      landingPageId,
+      subdomain: landingPage.subdomain,
+      custom_domain: landingPage.custom_domain,
+      chosen_domain: landingPage.chosen_domain,
+      user_id: landingPage.user_id,
+    });
+    console.log('============================================');
+    
+    // Prioridade 1: chosen_domain da landing_pages (campo que armazena o domínio escolhido)
+    if (landingPage.chosen_domain) {
+      displayDomain = landingPage.chosen_domain;
+      console.log('notify-site-published: ✓✓✓ Usando chosen_domain da landing_pages:', displayDomain);
+    } 
+    // Prioridade 2: custom_domain (domínio próprio informado pelo usuário)
+    else if (landingPage.custom_domain) {
+      displayDomain = landingPage.custom_domain;
+      console.log('notify-site-published: ✓✓✓ Usando custom_domain da landing page:', displayDomain);
+    }
+    
+    // Prioridade 3: Buscar de pending_checkouts (fallback para casos antigos)
+    // IMPORTANTE: SEMPRE buscar em pending_checkouts se chosen_domain estiver NULL
+    // Isso garante que mesmo landing pages antigas tenham o domínio correto
+    if (!displayDomain && landingPage.user_id) {
+      console.log('notify-site-published: chosen_domain está NULL, buscando em pending_checkouts...');
+      console.log('notify-site-published: Buscando domínio escolhido no pending_checkouts (fallback)', {
+        landingPageId,
+        userId: landingPage.user_id,
+      });
+      
+      // Buscar em pending_checkouts pelo landing_page_id primeiro, depois pelo user_id
+      let pendingCheckout = null;
+      
+      // Tentar buscar pelo landing_page_id primeiro (mais específico)
+      const { data: byLandingPageId, error: errorById } = await supabase
+        .from("pending_checkouts")
+        .select("domain, has_custom_domain, custom_domain")
+        .eq("landing_page_id", landingPageId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (errorById) {
+        console.error('notify-site-published: Erro ao buscar por landing_page_id:', errorById);
+      }
+      
+      if (byLandingPageId) {
+        pendingCheckout = byLandingPageId;
+        console.log('notify-site-published: Domínio encontrado por landing_page_id:', pendingCheckout);
+      } else {
+        // Se não encontrou, buscar pelo user_id (mais recente primeiro)
+        const { data: byUserId, error: errorByUserId } = await supabase
+          .from("pending_checkouts")
+          .select("domain, has_custom_domain, custom_domain")
+          .eq("user_id", landingPage.user_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (errorByUserId) {
+          console.error('notify-site-published: Erro ao buscar por user_id:', errorByUserId);
+        }
+        
+        if (byUserId) {
+          pendingCheckout = byUserId;
+          console.log('notify-site-published: Domínio encontrado por user_id:', pendingCheckout);
+        } else {
+          console.log('notify-site-published: Nenhum registro encontrado em pending_checkouts');
+        }
+      }
+      
+      if (pendingCheckout) {
+        // Se tem domínio customizado, usar ele; senão, usar o domínio escolhido (com extensão)
+        const domainFromPending = pendingCheckout.has_custom_domain && pendingCheckout.custom_domain
+          ? pendingCheckout.custom_domain
+          : pendingCheckout.domain; // Este é o domínio escolhido pelo usuário (ex: "meudominio.com.br")
+        
+        // Validar que o domínio tem extensão antes de usar
+        if (domainFromPending && (domainFromPending.includes('.com.br') || domainFromPending.includes('.med.br') || domainFromPending.includes('.com') || domainFromPending.includes('.br'))) {
+          displayDomain = domainFromPending;
+          console.log('notify-site-published: ✓ Domínio escolhido determinado de pending_checkouts:', displayDomain);
+          
+          // IMPORTANTE: Atualizar chosen_domain na landing page para evitar buscar novamente
+          // Isso garante que futuras chamadas já tenham o chosen_domain preenchido
+          const { error: updateError } = await supabase
+            .from("landing_pages")
+            .update({ chosen_domain: domainFromPending })
+            .eq("id", landingPageId);
+          
+          if (updateError) {
+            console.warn('notify-site-published: Erro ao atualizar chosen_domain na landing page:', updateError);
+          } else {
+            console.log('notify-site-published: ✓ chosen_domain atualizado na landing page:', domainFromPending);
+            // Atualizar o objeto landingPage localmente para refletir a mudança
+            landingPage.chosen_domain = domainFromPending;
+          }
+        } else {
+          console.warn('notify-site-published: Domínio de pending_checkouts sem extensão válida:', domainFromPending);
+        }
+      }
+    }
+    
+    // Se ainda não encontrou, usar subdomain como último recurso
+    // MAS apenas se realmente não houver nenhum domínio escolhido (casos muito antigos)
+    if (!displayDomain) {
+      displayDomain = `${landingPage.subdomain}.docpage.com.br`;
+      console.error('============================================');
+      console.error('notify-site-published: ⚠⚠⚠ ERRO: Usando fallback subdomain.docpage.com.br');
+      console.error('notify-site-published: ⚠ Isso indica que chosen_domain não foi salvo corretamente');
+      console.error('notify-site-published: ⚠ Dados disponíveis:', {
+        chosen_domain: landingPage.chosen_domain,
+        custom_domain: landingPage.custom_domain,
+        subdomain: landingPage.subdomain,
+        user_id: landingPage.user_id,
+      });
+      console.error('============================================');
+    }
+
+    // Log final do displayDomain determinado - SEMPRE APARECERÁ
+    console.log('============================================');
+    console.log('notify-site-published: displayDomain FINAL determinado:', displayDomain);
+    console.log('notify-site-published: chosen_domain:', landingPage.chosen_domain);
+    console.log('notify-site-published: custom_domain:', landingPage.custom_domain);
+    console.log('notify-site-published: subdomain:', landingPage.subdomain);
+    console.log('notify-site-published: URL que será enviada no email:', `https://${displayDomain}`);
+    console.log('============================================');
 
     if (!landingPage.user_id) {
       console.error("Landing page sem user_id:", landingPageId);
@@ -174,11 +252,25 @@ const handler = async (req: Request): Promise<Response> => {
     const briefing: any = landingPage.briefing_data || {};
     const doctorName = briefing.name || "Doutor(a)";
 
-    console.log('Dados da landing page para notificação:', {
+    // Log ANTES de determinar displayDomain (para debug)
+    console.log('notify-site-published: Dados da landing page ANTES de determinar displayDomain:', {
+      landingPageId,
+      subdomain: landingPage.subdomain,
+      custom_domain: landingPage.custom_domain,
+      chosen_domain: landingPage.chosen_domain,
+      user_id: landingPage.user_id,
+    });
+    
+    // displayDomain já foi determinado acima, mas vamos garantir que está correto
+    // Log DEPOIS de determinar displayDomain
+    console.log('notify-site-published: displayDomain determinado:', displayDomain);
+    
+    console.log('notify-site-published: Dados completos para notificação:', {
       landingPageId,
       subdomain: landingPage.subdomain,
       customDomain: landingPage.custom_domain,
-      chosenDomain, // Adicionar o domínio escolhido nos logs
+      chosenDomain: landingPage.chosen_domain,
+      displayDomain, // Domínio que será usado no email
       userId: landingPage.user_id,
       userEmail: user?.user?.email || 'NÃO ENCONTRADO',
       briefingName: briefing.name,
@@ -215,36 +307,29 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Usar o domínio escolhido pelo usuário na etapa de checkout
-    // Prioridade: 1) chosenDomain (do pending_checkouts), 2) custom_domain, 3) subdomain.docpage.com.br
-    let displayDomain: string;
-    if (chosenDomain) {
-      // Se encontrou o domínio escolhido no pending_checkouts, usar ele
-      displayDomain = chosenDomain;
-      console.log('notify-site-published: Usando domínio escolhido do pending_checkouts:', displayDomain);
-    } else if (landingPage.custom_domain) {
-      // Se tem domínio customizado salvo, usar ele
-      displayDomain = landingPage.custom_domain;
-      console.log('notify-site-published: Usando custom_domain da landing page:', displayDomain);
-    } else {
-      // Fallback: usar subdomínio do docpage.com.br
-      displayDomain = `${landingPage.subdomain}.docpage.com.br`;
-      console.log('notify-site-published: Usando fallback subdomain.docpage.com.br:', displayDomain);
-    }
-
     // Garantir que o domínio não tenha protocolo
     displayDomain = displayDomain.replace(/^https?:\/\//, '');
     
-    // Se o domínio não contém extensão (.com.br, .com, etc), adicionar .docpage.com.br
-    // Isso é um fallback de segurança caso o chosenDomain não tenha sido salvo com extensão
+    // Validar que o domínio escolhido tem extensão (não deve ser apenas o subdomain)
+    // Se não tiver extensão e não for docpage.com.br, pode ser um problema nos dados
     if (!displayDomain.includes('.') && !displayDomain.includes('docpage')) {
-      console.warn('notify-site-published: Domínio sem extensão detectado, adicionando .docpage.com.br:', displayDomain);
-      displayDomain = `${displayDomain}.docpage.com.br`;
+      console.error('notify-site-published: ERRO - Domínio escolhido sem extensão detectado:', displayDomain);
+      console.error('notify-site-published: Dados da landing page:', {
+        chosen_domain: landingPage.chosen_domain,
+        custom_domain: landingPage.custom_domain,
+        subdomain: landingPage.subdomain,
+      });
     }
 
     const siteUrl = `https://${displayDomain}`;
     
-    console.log('notify-site-published: URL final do site:', siteUrl);
+    console.log('notify-site-published: ============================================');
+    console.log('notify-site-published: URL FINAL QUE SERÁ ENVIADA NO EMAIL:', siteUrl);
+    console.log('notify-site-published: displayDomain:', displayDomain);
+    console.log('notify-site-published: chosen_domain:', landingPage.chosen_domain);
+    console.log('notify-site-published: custom_domain:', landingPage.custom_domain);
+    console.log('notify-site-published: subdomain:', landingPage.subdomain);
+    console.log('notify-site-published: ============================================');
 
     console.log("Tentando enviar email via Resend:", {
       from: "DocPage AI <noreply@docpage.com.br>",

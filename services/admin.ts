@@ -127,6 +127,8 @@ export async function updateLandingPageStatus(
   }
 
   // Usar supabase.functions.invoke() que adiciona headers automaticamente
+  // A edge function admin-update-status já envia o email de notificação quando status = 'published'
+  // Não precisamos chamar notify-site-published aqui para evitar duplicação
   const { error } = await supabase.functions.invoke('admin-update-status', {
     body: { userId: user.id, landingPageId, status },
   });
@@ -134,43 +136,6 @@ export async function updateLandingPageStatus(
   if (error) {
     console.error('Error updating landing page status:', error);
     throw new Error(error.message || 'Erro ao atualizar status');
-  }
-
-  // Ao publicar, dispara email automático avisando que o site está no ar
-  if (status === 'published') {
-    try {
-      console.log('Enviando email de notificação de publicação (via admin):', landingPageId);
-      const notifyResponse = await fetch(`${FUNCTIONS_BASE_URL}/notify-site-published`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ landingPageId }),
-      });
-      
-      const notifyData = await notifyResponse.json();
-      
-      if (!notifyResponse.ok) {
-        console.error('Erro ao enviar email de notificação (via admin):', {
-          status: notifyResponse.status,
-          statusText: notifyResponse.statusText,
-          error: notifyData.error || notifyData,
-          landingPageId,
-        });
-      } else {
-        console.log('Email de publicação enviado com sucesso (via admin):', {
-          landingPageId,
-          response: notifyData,
-        });
-      }
-    } catch (notifyError: any) {
-      console.error('Error notifying site published:', {
-        landingPageId,
-        error: notifyError.message || notifyError,
-        stack: notifyError.stack,
-      });
-      // Não lançar erro aqui para não quebrar o fluxo do admin
-    }
   }
 }
 
