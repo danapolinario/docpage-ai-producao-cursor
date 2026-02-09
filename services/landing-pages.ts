@@ -318,10 +318,6 @@ export async function createLandingPage(data: {
   // Adicionar CPF se fornecido (limpar formatação, manter apenas números)
   if (data.cpf) {
     insertData.cpf = String(data.cpf).replace(/\D/g, '');
-    console.log('createLandingPage: CPF adicionado ao insert', {
-      cpfOriginal: data.cpf,
-      cpfCleaned: insertData.cpf,
-    });
   }
 
   const { data: landingPage, error } = await supabase

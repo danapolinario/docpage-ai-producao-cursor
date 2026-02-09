@@ -91,17 +91,7 @@ const handler = async (req: Request): Promise<Response> => {
     );
   }
   
-  // Verificar se a chave é de produção (começa com sk_live_) ou teste (sk_test_)
-  const keyPrefix = STRIPE_SECRET_KEY?.substring(0, 7);
-  console.log("stripe-create-checkout: Stripe configurado", { 
-    keyPrefix,
-    isProduction: keyPrefix === "sk_live",
-    isTest: keyPrefix === "sk_test"
-  });
-
   try {
-    console.log("stripe-create-checkout: Parsing request body");
-    
     let requestBody: CreateCheckoutRequest;
     try {
       requestBody = await req.json();
@@ -123,41 +113,6 @@ const handler = async (req: Request): Promise<Response> => {
       landingPageData,
     } = requestBody;
     
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:124',message:'HYP-C: landingPageData recebido na Edge Function',data:{chosenDomain:landingPageData?.chosenDomain,domain:landingPageData?.domain,hasCustomDomain:landingPageData?.hasCustomDomain,customDomain:landingPageData?.customDomain},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
-
-    // LOG CRÍTICO: Verificar exatamente o que foi recebido
-    // Usar um único console.log com objeto para garantir que tudo seja exibido
-    const debugInfo = {
-      "=== DADOS RECEBIDOS ===": "",
-      planId: planId,
-      planIdType: typeof planId,
-      billingPeriod: billingPeriod,
-      billingPeriodType: typeof billingPeriod,
-      userId: userId,
-      userEmail: userEmail,
-      "PLAN_PRICE_MAP": PLAN_PRICE_MAP,
-      "Price ID esperado": PLAN_PRICE_MAP[planId]?.[billingPeriod],
-      "Mapeamento starter/annual": PLAN_PRICE_MAP.starter?.annual,
-      "Mapeamento starter/monthly": PLAN_PRICE_MAP.starter?.monthly,
-      "Mapeamento pro/annual": PLAN_PRICE_MAP.pro?.annual,
-      "Mapeamento pro/monthly": PLAN_PRICE_MAP.pro?.monthly,
-    };
-    console.log(JSON.stringify(debugInfo, null, 2));
-
-    console.log("stripe-create-checkout: Request parsed", {
-      planId,
-      billingPeriod,
-      hasCouponCode: !!couponCode,
-      userId,
-      userEmail,
-      hasCpf: !!cpf,
-      hasLandingPageData: !!landingPageData,
-      // Log do mapeamento para debug
-      expectedPriceId: PLAN_PRICE_MAP[planId]?.[billingPeriod],
-      allPriceIds: JSON.stringify(PLAN_PRICE_MAP, null, 2),
-    });
 
     // Validar userEmail
     if (!userEmail || !userEmail.includes('@')) {
@@ -218,7 +173,6 @@ const handler = async (req: Request): Promise<Response> => {
       // Se começa com "promo_", é um Promotion Code ID - usar diretamente
       if (couponCode.trim().startsWith('promo_')) {
         promotionCodeId = couponCode.trim();
-        console.log(`stripe-create-checkout: Usando Promotion Code ID diretamente: ${promotionCodeId}`);
       } else {
         // Tentar buscar como Promotion Code pelo código (ex: "CUMPOM10")
         try {
@@ -232,7 +186,6 @@ const handler = async (req: Request): Promise<Response> => {
           
           if (foundPromo) {
             promotionCodeId = foundPromo.id;
-            console.log(`stripe-create-checkout: Promotion Code encontrado pelo código "${couponCode}": ${promotionCodeId}`);
           } else {
             // Se não encontrou como Promotion Code, tentar como Coupon
             try {
@@ -240,7 +193,6 @@ const handler = async (req: Request): Promise<Response> => {
               if (coupon.valid) {
                 // Para coupons, usar diretamente o ID do coupon
                 promotionCodeId = coupon.id;
-                console.log(`stripe-create-checkout: Coupon válido encontrado: ${promotionCodeId}`);
               }
             } catch (couponError: any) {
               // Tentar buscar na lista de coupons
@@ -250,7 +202,6 @@ const handler = async (req: Request): Promise<Response> => {
               );
               if (foundCoupon) {
                 promotionCodeId = foundCoupon.id;
-                console.log(`stripe-create-checkout: Coupon encontrado na lista: ${promotionCodeId}`);
               } else {
                 console.warn("stripe-create-checkout: Cupom/Promotion Code não encontrado:", couponCode);
               }
@@ -267,7 +218,6 @@ const handler = async (req: Request): Promise<Response> => {
     const successUrl = `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${origin}/checkout?canceled=true`;
 
-    console.log("stripe-create-checkout: URLs configuradas", { origin, successUrl, cancelUrl });
 
     // Determinar nome do plano para exibição no Stripe
     const planName = planId === 'pro' ? 'Profissional' : 'Starter';
@@ -352,42 +302,19 @@ const handler = async (req: Request): Promise<Response> => {
         // Determinar o domínio a ser salvo
         // Quando hasCustomDomain é false, usar chosenDomain (domínio completo com extensão)
         // Quando hasCustomDomain é true, usar customDomain
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:351',message:'HYP-D: Antes de determinar domainToSave',data:{hasCustomDomain:landingPageData.hasCustomDomain,customDomain:landingPageData.customDomain,chosenDomain:landingPageData.chosenDomain,domain:landingPageData.domain},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         let domainToSave: string;
         if (landingPageData.hasCustomDomain && landingPageData.customDomain) {
           domainToSave = landingPageData.customDomain;
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:353',message:'HYP-D: Branch hasCustomDomain=true',data:{domainToSave},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
         } else if (landingPageData.chosenDomain) {
           // Usar chosenDomain quando disponível (domínio completo com extensão: ex: "testefinaldocpage.com.br")
           domainToSave = landingPageData.chosenDomain;
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:356',message:'HYP-D: Branch chosenDomain disponível',data:{domainToSave,chosenDomain:landingPageData.chosenDomain},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
         } else {
           // Fallback: usar domain (subdomínio apenas) e adicionar extensão padrão
           domainToSave = landingPageData.domain.includes('.') 
             ? landingPageData.domain 
             : `${landingPageData.domain}.com.br`;
           console.warn("stripe-create-checkout: chosenDomain não fornecido, usando domain com extensão padrão");
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:361',message:'HYP-D: Branch fallback domain',data:{domainToSave,domain:landingPageData.domain},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
         }
-        
-        console.log("stripe-create-checkout: Salvando domínio no pending_checkouts", {
-          chosenDomain: landingPageData.chosenDomain,
-          domain: landingPageData.domain,
-          domainToSave,
-          hasCustomDomain: landingPageData.hasCustomDomain,
-          customDomain: landingPageData.customDomain,
-        });
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:371',message:'HYP-D: domainToSave determinado',data:{domainToSave,chosenDomain:landingPageData.chosenDomain},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         
         const pendingCheckoutData = {
           user_id: userId,
@@ -399,23 +326,9 @@ const handler = async (req: Request): Promise<Response> => {
           cpf: cpf ? cpf.replace(/\D/g, '') : null, // Garantir que CPF seja apenas números
         };
         
-        console.log("stripe-create-checkout: Salvando CPF no pending_checkouts", {
-          hasCpf: !!cpf,
-          cpfRaw: cpf,
-          cpfCleaned: pendingCheckoutData.cpf,
-          hasCustomDomain: landingPageData.hasCustomDomain,
-        });
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:375',message:'HYP-E: Antes de salvar no pending_checkouts',data:{domain:pendingCheckoutData.domain,domainToSave,chosenDomain:landingPageData.chosenDomain},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
-        
         const { error: insertError } = await supabase
           .from("pending_checkouts")
           .insert(pendingCheckoutData);
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:382',message:'HYP-E: Após salvar no pending_checkouts',data:{insertError:insertError?.message,domainSalvo:domainToSave},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
         
         if (insertError) {
           console.error("stripe-create-checkout: Erro ao salvar pending_checkout:", insertError);

@@ -73,11 +73,6 @@ export const StripeSuccess: React.FC<StripeSuccessProps> = ({ onSuccess }) => {
         // Buscar CPF de pending_checkouts usando session_id e atualizar landing page se necessário
         // Isso é uma solução alternativa caso o webhook não esteja funcionando
         if (!landingPage.cpf && sessionId) {
-          console.log('StripeSuccess: Buscando CPF de pending_checkouts para atualizar landing page...', {
-            sessionId,
-            landingPageId: landingPage.id,
-          });
-          
           try {
             const { data: pendingCheckout, error: pendingError } = await supabase
               .from('pending_checkouts')
@@ -86,11 +81,6 @@ export const StripeSuccess: React.FC<StripeSuccessProps> = ({ onSuccess }) => {
               .maybeSingle();
             
             if (pendingCheckout && pendingCheckout.cpf && !pendingError) {
-              console.log('StripeSuccess: CPF encontrado em pending_checkouts, atualizando landing page...', {
-                cpf: pendingCheckout.cpf,
-                landingPageId: landingPage.id,
-              });
-              
               // Limpar CPF (apenas números)
               const cpfCleaned = String(pendingCheckout.cpf).replace(/\D/g, '');
               
@@ -101,15 +91,7 @@ export const StripeSuccess: React.FC<StripeSuccessProps> = ({ onSuccess }) => {
               
               if (updateError) {
                 console.error('StripeSuccess: Erro ao atualizar CPF na landing page:', updateError);
-              } else {
-                console.log('StripeSuccess: CPF atualizado com sucesso na landing page');
               }
-            } else {
-              console.log('StripeSuccess: CPF não encontrado em pending_checkouts ou já existe na landing page', {
-                hasPendingCheckout: !!pendingCheckout,
-                hasCpf: !!pendingCheckout?.cpf,
-                error: pendingError?.message,
-              });
             }
           } catch (cpfError: any) {
             console.error('StripeSuccess: Erro ao buscar/atualizar CPF:', cpfError);

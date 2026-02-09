@@ -24,12 +24,6 @@ const corsHeaders = {
 // Criar landing page após pagamento confirmado
 async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
   try {
-    console.log(`stripe-webhook: createLandingPageFromCheckout iniciado`, {
-      sessionId: session.id,
-      hasMetadata: !!session.metadata,
-      metadataKeys: session.metadata ? Object.keys(session.metadata) : [],
-    });
-    
     const userId = session.metadata?.userId;
     if (!userId) {
       throw new Error("userId não encontrado na metadata da sessão");
@@ -42,7 +36,6 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
     let customDomain = session.metadata?.customDomain || null;
     let pendingCheckout: any = null;
     
-    console.log(`stripe-webhook: Tentando recuperar dados de pending_checkouts...`);
     const { data: pendingCheckoutData, error: pendingError } = await supabase
       .from("pending_checkouts")
       .select("*")
@@ -54,15 +47,6 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
     
     if (pendingCheckoutData && !pendingError) {
       pendingCheckout = pendingCheckoutData;
-      console.log(`stripe-webhook: Dados encontrados em pending_checkouts`, {
-        pendingCheckoutId: pendingCheckout.id,
-        hasLandingPageData: !!pendingCheckout.landing_page_data,
-        hasCpf: !!pendingCheckout.cpf,
-        cpf: pendingCheckout.cpf,
-        cpfType: typeof pendingCheckout.cpf,
-        cpfLength: pendingCheckout.cpf?.length,
-      });
-      
       // Usar dados completos da tabela
       landingPageData = pendingCheckout.landing_page_data;
       domain = pendingCheckout.domain || domain;
@@ -70,24 +54,10 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
       customDomain = pendingCheckout.custom_domain || customDomain;
       // Garantir que CPF seja apenas números (limpar qualquer formatação)
       cpfFromPending = pendingCheckout.cpf ? String(pendingCheckout.cpf).replace(/\D/g, '') : null;
-      
-      console.log(`stripe-webhook: CPF processado`, {
-        cpfOriginal: pendingCheckout.cpf,
-        cpfProcessed: cpfFromPending,
-        hasCpf: !!cpfFromPending,
-      });
     } else {
-      console.log(`stripe-webhook: Dados não encontrados em pending_checkouts, tentando metadata`, {
-        pendingError: pendingError?.message,
-      });
       
       // Fallback: tentar usar metadata (pode estar truncado)
       const landingPageDataStr = session.metadata?.landingPageData;
-      console.log(`stripe-webhook: Verificando landingPageData na metadata`, {
-        hasLandingPageData: !!landingPageDataStr,
-        landingPageDataLength: landingPageDataStr?.length || 0,
-        landingPageDataPreview: landingPageDataStr?.substring(0, 100) || "N/A",
-      });
       
       if (!landingPageDataStr) {
         throw new Error("Dados da landing page não encontrados na metadata nem em pending_checkouts");
@@ -95,11 +65,6 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
 
       try {
         landingPageData = JSON.parse(landingPageDataStr);
-        console.log(`stripe-webhook: landingPageData parseado da metadata com sucesso`, {
-          hasBriefing: !!landingPageData.briefing,
-          hasContent: !!landingPageData.content,
-          hasDesign: !!landingPageData.design,
-        });
       } catch (parseError: any) {
         console.error(`stripe-webhook: Erro ao fazer parse do landingPageData da metadata:`, {
           error: parseError.message,
@@ -109,11 +74,6 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
       }
     }
     
-    console.log(`stripe-webhook: Dados do domínio`, {
-      domain,
-      hasCustomDomain,
-      customDomain,
-    });
 
     // Determinar chosen_domain (domínio completo escolhido pelo usuário com extensão)
     // Este valor vem de pending_checkouts.domain e sempre deve ter extensão completa
@@ -177,7 +137,6 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
       if (!isAvailable) {
         const timestamp = Date.now().toString(36);
         finalSubdomain = `${baseSubdomain}-${timestamp}`.substring(0, 50);
-        console.log(`stripe-webhook: Subdomain não disponível após 10 tentativas, usando fallback: ${finalSubdomain}`);
       }
     } else {
       // Domínio normal
@@ -192,11 +151,6 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
 
     // IMPORTANTE: Buscar landing page existente do usuário ANTES de criar nova
     // A landing page já foi criada no CheckoutFlow antes do pagamento
-    console.log(`stripe-webhook: Buscando landing page existente do usuário...`, {
-      userId,
-      cpfFromPending,
-      hasCpf: !!cpfFromPending,
-    });
     const { data: existingLandingPage, error: findError } = await supabase
       .from("landing_pages")
       .select("id, subdomain, custom_domain, cpf, chosen_domain")
@@ -209,25 +163,8 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
 
     if (existingLandingPage && !findError) {
       // Landing page já existe - usar ela
-      console.log(`stripe-webhook: Landing page existente encontrada antes da atualização`, {
-        landingPageId: existingLandingPage.id,
-        subdomain: existingLandingPage.subdomain,
-        custom_domain: existingLandingPage.custom_domain,
-        cpfAtual: existingLandingPage.cpf,
-        hasCpfAtual: !!existingLandingPage.cpf,
-        chosenDomainAtual: existingLandingPage.chosen_domain,
-      });
-      
       // SEMPRE atualizar chosen_domain e CPF se temos os valores (mesmo que já tenham valores)
       // Isso garante que o domínio escolhido e CPF sejam sempre os mais recentes de pending_checkouts
-      console.log(`stripe-webhook: Preparando para atualizar landing page existente`, {
-        landingPageId: existingLandingPage.id,
-        chosenDomainToSave,
-        cpfFromPending,
-        hasCpf: !!cpfFromPending,
-        cpfLength: cpfFromPending?.length,
-      });
-      
       const updateData: any = {};
       if (chosenDomainToSave) {
         updateData.chosen_domain = chosenDomainToSave;
@@ -236,61 +173,23 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
         updateData.cpf = cpfFromPending;
       }
       
-      console.log(`stripe-webhook: Dados para atualizar:`, updateData);
-      
       if (Object.keys(updateData).length > 0) {
-        const { data: updatedLandingPage, error: updateError } = await supabase
+        const { error: updateError } = await supabase
           .from("landing_pages")
           .update(updateData)
-          .eq("id", existingLandingPage.id)
-          .select("id, cpf, chosen_domain")
-          .single();
+          .eq("id", existingLandingPage.id);
         
         if (updateError) {
-          console.error(`stripe-webhook: Erro ao atualizar dados na landing page existente:`, {
-            error: updateError.message,
-            code: updateError.code,
-            details: updateError.details,
-            updateData,
-          });
-        } else {
-          console.log(`stripe-webhook: Dados atualizados na landing page existente com sucesso:`, {
-            landingPageId: updatedLandingPage?.id,
-            cpfAtualizado: updatedLandingPage?.cpf,
-            hasCpf: !!updatedLandingPage?.cpf,
-            chosenDomainAtualizado: updatedLandingPage?.chosen_domain,
-          });
+          console.error(`stripe-webhook: Erro ao atualizar dados na landing page existente:`, updateError);
         }
-      } else {
-        console.warn(`stripe-webhook: Nenhum dado para atualizar (chosenDomainToSave ou cpfFromPending)`);
-        console.warn(`stripe-webhook: Dados disponíveis:`, {
-          domain,
-          hasCustomDomain,
-          customDomain,
-          chosenDomainToSave,
-          cpfFromPending,
-          hasCpf: !!cpfFromPending,
-        });
       }
       
       landingPage = existingLandingPage;
     } else {
       // Landing page não existe - criar nova (fallback para casos antigos)
-      console.log(`stripe-webhook: Nenhuma landing page existente encontrada, criando nova...`, {
-        findError: findError?.message,
-      });
 
       // Criar slug único
       const slug = `${finalSubdomain}-${Date.now()}`;
-
-      console.log(`stripe-webhook: Preparando para inserir landing page`, {
-        userId,
-        finalSubdomain,
-        customDomainToSave,
-        slug,
-        cpfFromPending,
-        hasCpf: !!cpfFromPending,
-      });
 
       // Criar landing page
       const { data: newLandingPage, error: createError } = await supabase
@@ -313,14 +212,6 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
         })
         .select()
         .single();
-      
-      if (newLandingPage) {
-        console.log(`stripe-webhook: Landing page criada com sucesso`, {
-          landingPageId: newLandingPage.id,
-          cpfSalvo: newLandingPage.cpf,
-          hasCpf: !!newLandingPage.cpf,
-        });
-      }
 
       if (createError) {
         console.error(`stripe-webhook: Erro ao inserir landing page:`, {
@@ -332,10 +223,6 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
         throw new Error(`Erro ao criar landing page: ${createError.message}`);
       }
 
-      console.log(`stripe-webhook: Landing page criada com sucesso`, {
-        landingPageId: newLandingPage?.id,
-        subdomain: newLandingPage?.subdomain,
-      });
       
       landingPage = newLandingPage;
     }
@@ -353,7 +240,6 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
       if (updateError) {
         console.warn(`stripe-webhook: Erro ao marcar pending_checkout como processado:`, updateError);
       } else {
-        console.log(`stripe-webhook: pending_checkout marcado como processado`);
       }
     }
 
@@ -372,24 +258,9 @@ async function upsertSubscription(
   landingPageId?: string
 ) {
   try {
-    console.log(`stripe-webhook: upsertSubscription iniciado`, {
-      subscriptionId: subscription.id,
-      customerId,
-      userId,
-      landingPageId: landingPageId || 'null',
-      status: subscription.status,
-    });
-
     const planId = subscription.metadata?.planId || "starter";
     const billingPeriod = subscription.metadata?.billingPeriod || "monthly";
     const priceId = subscription.items.data[0]?.price.id || "";
-
-    console.log(`stripe-webhook: Dados extraídos da subscription`, {
-      planId,
-      billingPeriod,
-      priceId,
-      hasDiscount: !!subscription.discount,
-    });
 
     // Buscar cupom aplicado (se houver)
     let couponId: string | undefined;
@@ -412,7 +283,6 @@ async function upsertSubscription(
       } else {
         mappedStatus = 'active'; // Default
       }
-      console.log(`stripe-webhook: Status mapeado de ${subscription.status} para ${mappedStatus}`);
     }
 
     const subscriptionData = {
@@ -458,7 +328,6 @@ async function upsertSubscription(
 
     if (existing) {
       // Atualizar
-      console.log(`stripe-webhook: Subscription já existe (${existing.id}), atualizando...`);
       const { data: updated, error: updateError } = await supabase
         .from("subscriptions")
         .update(subscriptionData)
@@ -480,7 +349,6 @@ async function upsertSubscription(
       });
     } else {
       // Criar
-      console.log(`stripe-webhook: Subscription não existe, criando nova...`);
       const { data: inserted, error: insertError } = await supabase
         .from("subscriptions")
         .insert(subscriptionData)
@@ -528,7 +396,6 @@ const handler = async (req: Request): Promise<Response> => {
   
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    console.log("stripe-webhook: OPTIONS request, retornando CORS headers");
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -547,12 +414,6 @@ const handler = async (req: Request): Promise<Response> => {
     // Obter assinatura do webhook do header
     const signature = req.headers.get("stripe-signature");
     if (!signature) {
-      console.error("stripe-webhook: Assinatura do webhook não encontrada no header", {
-        method: req.method,
-        url: req.url,
-        headers: Object.fromEntries(req.headers.entries()),
-      });
-      
       // Se for uma requisição GET (acesso direto via navegador), retornar mensagem informativa
       if (req.method === "GET") {
         return new Response(
@@ -574,18 +435,9 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log("stripe-webhook: Assinatura recebida, obtendo body...");
-
     // Obter body como texto RAW (crucial para validação da assinatura)
     // IMPORTANTE: Não usar req.json() pois isso altera o body e quebra a validação
     const body = await req.text();
-    
-    console.log("stripe-webhook: Body obtido", {
-      bodyLength: body.length,
-      bodyPreview: body.substring(0, 100),
-      hasWebhookSecret: !!STRIPE_WEBHOOK_SECRET,
-      webhookSecretLength: STRIPE_WEBHOOK_SECRET?.length || 0,
-    });
 
     // Validar assinatura do webhook (usar versão assíncrona para Deno/Edge Functions)
     let event: Stripe.Event;
@@ -597,10 +449,6 @@ const handler = async (req: Request): Promise<Response> => {
         signature, 
         STRIPE_WEBHOOK_SECRET
       );
-      console.log("stripe-webhook: Assinatura validada com sucesso", {
-        eventType: event.type,
-        eventId: event.id,
-      });
     } catch (err: any) {
       console.error("stripe-webhook: Erro ao validar assinatura do webhook:", {
         error: err.message,
@@ -620,21 +468,9 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Processar eventos
-    console.log(`stripe-webhook: Processando evento: ${event.type}`);
-    
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        console.log(`stripe-webhook: checkout.session.completed recebido`, {
-          sessionId: session.id,
-          mode: session.mode,
-          hasSubscription: !!session.subscription,
-          hasMetadata: !!session.metadata,
-          metadataKeys: session.metadata ? Object.keys(session.metadata) : [],
-          userId: session.metadata?.userId,
-          hasLandingPageData: !!session.metadata?.landingPageData,
-        });
-        
         // Verificar se é uma subscription
         if (session.mode === "subscription" && session.subscription) {
           console.log(`stripe-webhook: É uma subscription, processando...`);
@@ -643,11 +479,6 @@ const handler = async (req: Request): Promise<Response> => {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
           const userId = session.metadata?.userId;
 
-          console.log(`stripe-webhook: Subscription recuperada`, {
-            subscriptionId: subscription.id,
-            userId,
-            hasUserId: !!userId,
-          });
 
           if (!userId) {
             console.error("stripe-webhook: userId não encontrado na metadata da sessão", {
@@ -662,10 +493,6 @@ const handler = async (req: Request): Promise<Response> => {
           try {
             console.log(`stripe-webhook: Buscando ou criando landing page...`);
             landingPage = await createLandingPageFromCheckout(session);
-            console.log(`stripe-webhook: Landing page obtida com sucesso`, {
-              landingPageId: landingPage?.id,
-              subdomain: landingPage?.subdomain,
-            });
           } catch (error: any) {
             console.error("stripe-webhook: Erro ao buscar/criar landing page:", {
               error: error.message,
@@ -675,7 +502,6 @@ const handler = async (req: Request): Promise<Response> => {
             });
             
             // Se falhar, tentar buscar landing page existente diretamente
-            console.log(`stripe-webhook: Tentando buscar landing page existente como fallback...`);
             const { data: fallbackLandingPage } = await supabase
               .from("landing_pages")
               .select("id, subdomain")
@@ -685,21 +511,11 @@ const handler = async (req: Request): Promise<Response> => {
               .maybeSingle();
             
             if (fallbackLandingPage) {
-              console.log(`stripe-webhook: Landing page encontrada no fallback: ${fallbackLandingPage.id}`);
               landingPage = fallbackLandingPage;
-            } else {
-              console.warn("stripe-webhook: Nenhuma landing page encontrada, subscription será criada sem landing_page_id");
             }
           }
 
           // Criar subscription no banco (sempre associar com landing page se disponível)
-          console.log(`stripe-webhook: Criando/atualizando subscription no banco...`, {
-            hasLandingPage: !!landingPage,
-            landingPageId: landingPage?.id,
-            customerId: session.customer,
-            userId,
-            subscriptionId: subscription.id,
-          });
 
           // Validar customerId
           if (!session.customer || typeof session.customer !== 'string') {
@@ -726,10 +542,6 @@ const handler = async (req: Request): Promise<Response> => {
               userId,
               landingPage?.id || undefined
             );
-            console.log(`stripe-webhook: Subscription criada/atualizada com sucesso`, {
-              landingPageId: landingPage?.id || 'null',
-              subscriptionId: subscription.id,
-            });
           } catch (error: any) {
             console.error("stripe-webhook: Erro ao criar/atualizar subscription:", {
               error: error.message,
@@ -741,11 +553,6 @@ const handler = async (req: Request): Promise<Response> => {
             // NÃO silenciar o erro - propagar para que o webhook retorne erro
             throw error;
           }
-        } else {
-          console.log(`stripe-webhook: Não é uma subscription ou não tem subscription ID`, {
-            mode: session.mode,
-            hasSubscription: !!session.subscription,
-          });
         }
         break;
       }
@@ -753,10 +560,6 @@ const handler = async (req: Request): Promise<Response> => {
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
         
-        console.log(`stripe-webhook: customer.subscription.updated recebido`, {
-          subscriptionId: subscription.id,
-          status: subscription.status,
-        });
         
         // Buscar subscription no banco
         const { data: existingSub } = await supabase
@@ -766,15 +569,9 @@ const handler = async (req: Request): Promise<Response> => {
           .maybeSingle();
 
         if (existingSub) {
-          console.log(`stripe-webhook: Subscription existente encontrada, atualizando...`, {
-            userId: existingSub.user_id,
-            landingPageId: existingSub.landing_page_id,
-          });
-          
           // Se não tem landing_page_id, tentar buscar a mais recente do usuário
           let landingPageId = existingSub.landing_page_id;
           if (!landingPageId) {
-            console.log(`stripe-webhook: Subscription sem landing_page_id, buscando landing page do usuário...`);
             const { data: userLandingPage } = await supabase
               .from("landing_pages")
               .select("id")
@@ -785,7 +582,6 @@ const handler = async (req: Request): Promise<Response> => {
             
             if (userLandingPage) {
               landingPageId = userLandingPage.id;
-              console.log(`stripe-webhook: Landing page encontrada e associada: ${landingPageId}`);
             }
           }
           
@@ -809,7 +605,6 @@ const handler = async (req: Request): Promise<Response> => {
             landingPageId || undefined
           );
         } else {
-          console.warn(`stripe-webhook: Subscription não encontrada no banco para atualização`);
         }
         break;
       }

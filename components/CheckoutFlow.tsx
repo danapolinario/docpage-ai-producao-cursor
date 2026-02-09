@@ -395,15 +395,7 @@ export const CheckoutFlow: React.FC<Props> = ({
       // Usar billingPeriod diretamente da prop (vem do toggle do PricingPage)
       const period: 'monthly' | 'annual' = billingPeriod;
       
-      // Log do CPF antes de enviar
       const cpfToSend = !hasCustomDomain ? cpf.replace(/\D/g, '') : undefined;
-      console.log('CheckoutFlow: Preparando para enviar CPF', {
-        hasCustomDomain,
-        cpfRaw: cpf,
-        cpfToSend,
-        cpfLength: cpfToSend?.length,
-        hasCpf: !!cpfToSend,
-      });
       
       // Validar que temos um email válido
       if (!email || !email.includes('@')) {
@@ -450,11 +442,6 @@ export const CheckoutFlow: React.FC<Props> = ({
         
         // Atualizar CPF na landing page existente se não tiver e tivermos CPF
         if (cpfToSend && !existingLp.cpf) {
-          console.log('CheckoutFlow: Atualizando CPF na landing page existente...', {
-            landingPageId,
-            cpf: cpfToSend,
-          });
-          
           try {
             const { error: updateError } = await supabase
               .from('landing_pages')
@@ -463,8 +450,6 @@ export const CheckoutFlow: React.FC<Props> = ({
             
             if (updateError) {
               console.error('CheckoutFlow: Erro ao atualizar CPF na landing page existente:', updateError);
-            } else {
-              console.log('CheckoutFlow: CPF atualizado com sucesso na landing page existente');
             }
           } catch (cpfUpdateError: any) {
             console.error('CheckoutFlow: Erro ao atualizar CPF:', cpfUpdateError);
@@ -536,10 +521,6 @@ export const CheckoutFlow: React.FC<Props> = ({
       }
 
       // Criar Checkout Session no Stripe
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:507',message:'HYP-B: Antes de enviar para createCheckoutSession',data:{chosenDomain:chosenDomainForEmail,domain:finalDomain,hasCustomDomain},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
-      
       const landingPageDataPayload = {
         briefing,
         content,
@@ -553,9 +534,6 @@ export const CheckoutFlow: React.FC<Props> = ({
         hasCustomDomain,
         customDomain: hasCustomDomain ? customDomainValue : null,
       };
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:520',message:'HYP-B: landingPageDataPayload criado',data:{chosenDomain:landingPageDataPayload.chosenDomain,domain:landingPageDataPayload.domain,hasCustomDomain:landingPageDataPayload.hasCustomDomain},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       
       const checkoutSession = await createCheckoutSession({
         planId: plan.id,

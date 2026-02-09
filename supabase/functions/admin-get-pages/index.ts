@@ -141,23 +141,6 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Log para debug - verificar estrutura dos dados
-    if (landingPages && landingPages.length > 0) {
-      console.log('admin-get-pages: Sample landing page data:', {
-        id: landingPages[0].id,
-        hasCpf: !!landingPages[0].cpf,
-        cpf: landingPages[0].cpf,
-        cpfType: typeof landingPages[0].cpf,
-        cpfLength: landingPages[0].cpf?.length,
-        hasBriefingData: !!landingPages[0].briefing_data,
-        briefingDataKeys: landingPages[0].briefing_data ? Object.keys(landingPages[0].briefing_data) : [],
-        contactPhone: landingPages[0].briefing_data?.contactPhone
-      })
-      
-      // Verificar quantas landing pages têm CPF
-      const pagesWithCpf = landingPages.filter((lp: any) => lp.cpf);
-      console.log(`admin-get-pages: Total de landing pages: ${landingPages.length}, com CPF: ${pagesWithCpf.length}`);
-    }
 
     // Extrair apenas campos necessários do briefing_data para reduzir tamanho
     // Isso evita carregar o objeto JSONB completo na memória
@@ -348,15 +331,6 @@ Deno.serve(async (req) => {
       const whatsapp = lp.briefing_data?.contactPhone || null
       // CPF vem da coluna cpf da tabela landing_pages
       const cpf = lp.cpf || null
-      
-      // Log para debug - verificar se CPF está sendo retornado
-      if (!cpf && lp.id) {
-        console.warn(`admin-get-pages: Landing page ${lp.id} sem CPF`, {
-          landingPageId: lp.id,
-          hasCpfInDb: !!lp.cpf,
-          cpfValue: lp.cpf,
-        });
-      }
       
       return {
         id: lp.id,
