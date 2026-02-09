@@ -59,6 +59,8 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
         hasLandingPageData: !!pendingCheckout.landing_page_data,
         hasCpf: !!pendingCheckout.cpf,
         cpf: pendingCheckout.cpf,
+        cpfType: typeof pendingCheckout.cpf,
+        cpfLength: pendingCheckout.cpf?.length,
       });
       
       // Usar dados completos da tabela
@@ -66,7 +68,14 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
       domain = pendingCheckout.domain || domain;
       hasCustomDomain = pendingCheckout.has_custom_domain || hasCustomDomain;
       customDomain = pendingCheckout.custom_domain || customDomain;
-      cpfFromPending = pendingCheckout.cpf || null; // Recuperar CPF do pending_checkouts
+      // Garantir que CPF seja apenas números (limpar qualquer formatação)
+      cpfFromPending = pendingCheckout.cpf ? String(pendingCheckout.cpf).replace(/\D/g, '') : null;
+      
+      console.log(`stripe-webhook: CPF processado`, {
+        cpfOriginal: pendingCheckout.cpf,
+        cpfProcessed: cpfFromPending,
+        hasCpf: !!cpfFromPending,
+      });
     } else {
       console.log(`stripe-webhook: Dados não encontrados em pending_checkouts, tentando metadata`, {
         pendingError: pendingError?.message,
@@ -183,10 +192,14 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
 
     // IMPORTANTE: Buscar landing page existente do usuário ANTES de criar nova
     // A landing page já foi criada no CheckoutFlow antes do pagamento
-    console.log(`stripe-webhook: Buscando landing page existente do usuário...`);
+    console.log(`stripe-webhook: Buscando landing page existente do usuário...`, {
+      userId,
+      cpfFromPending,
+      hasCpf: !!cpfFromPending,
+    });
     const { data: existingLandingPage, error: findError } = await supabase
       .from("landing_pages")
-      .select("id, subdomain, custom_domain")
+      .select("id, subdomain, custom_domain, cpf, chosen_domain")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -196,14 +209,25 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
 
     if (existingLandingPage && !findError) {
       // Landing page já existe - usar ela
-      console.log(`stripe-webhook: Landing page existente encontrada`, {
+      console.log(`stripe-webhook: Landing page existente encontrada antes da atualização`, {
         landingPageId: existingLandingPage.id,
         subdomain: existingLandingPage.subdomain,
         custom_domain: existingLandingPage.custom_domain,
+        cpfAtual: existingLandingPage.cpf,
+        hasCpfAtual: !!existingLandingPage.cpf,
+        chosenDomainAtual: existingLandingPage.chosen_domain,
       });
       
       // SEMPRE atualizar chosen_domain e CPF se temos os valores (mesmo que já tenham valores)
       // Isso garante que o domínio escolhido e CPF sejam sempre os mais recentes de pending_checkouts
+      console.log(`stripe-webhook: Preparando para atualizar landing page existente`, {
+        landingPageId: existingLandingPage.id,
+        chosenDomainToSave,
+        cpfFromPending,
+        hasCpf: !!cpfFromPending,
+        cpfLength: cpfFromPending?.length,
+      });
+      
       const updateData: any = {};
       if (chosenDomainToSave) {
         updateData.chosen_domain = chosenDomainToSave;
@@ -212,16 +236,30 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
         updateData.cpf = cpfFromPending;
       }
       
+      console.log(`stripe-webhook: Dados para atualizar:`, updateData);
+      
       if (Object.keys(updateData).length > 0) {
-        const { error: updateError } = await supabase
+        const { data: updatedLandingPage, error: updateError } = await supabase
           .from("landing_pages")
           .update(updateData)
-          .eq("id", existingLandingPage.id);
+          .eq("id", existingLandingPage.id)
+          .select("id, cpf, chosen_domain")
+          .single();
         
         if (updateError) {
-          console.warn(`stripe-webhook: Erro ao atualizar dados na landing page existente:`, updateError);
+          console.error(`stripe-webhook: Erro ao atualizar dados na landing page existente:`, {
+            error: updateError.message,
+            code: updateError.code,
+            details: updateError.details,
+            updateData,
+          });
         } else {
-          console.log(`stripe-webhook: Dados atualizados na landing page existente:`, updateData);
+          console.log(`stripe-webhook: Dados atualizados na landing page existente com sucesso:`, {
+            landingPageId: updatedLandingPage?.id,
+            cpfAtualizado: updatedLandingPage?.cpf,
+            hasCpf: !!updatedLandingPage?.cpf,
+            chosenDomainAtualizado: updatedLandingPage?.chosen_domain,
+          });
         }
       } else {
         console.warn(`stripe-webhook: Nenhum dado para atualizar (chosenDomainToSave ou cpfFromPending)`);
@@ -229,7 +267,9 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
           domain,
           hasCustomDomain,
           customDomain,
+          chosenDomainToSave,
           cpfFromPending,
+          hasCpf: !!cpfFromPending,
         });
       }
       
@@ -248,6 +288,8 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
         finalSubdomain,
         customDomainToSave,
         slug,
+        cpfFromPending,
+        hasCpf: !!cpfFromPending,
       });
 
       // Criar landing page
@@ -258,7 +300,7 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
           subdomain: finalSubdomain,
           custom_domain: customDomainToSave,
           chosen_domain: chosenDomainToSave, // Domínio completo escolhido pelo usuário (com extensão)
-          cpf: cpfFromPending || null, // Salvar CPF do pending_checkouts
+          cpf: cpfFromPending || null, // Salvar CPF do pending_checkouts (já limpo, apenas números)
           slug,
           briefing_data: landingPageData.briefing || {},
           content_data: landingPageData.content || {},
@@ -271,6 +313,14 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
         })
         .select()
         .single();
+      
+      if (newLandingPage) {
+        console.log(`stripe-webhook: Landing page criada com sucesso`, {
+          landingPageId: newLandingPage.id,
+          cpfSalvo: newLandingPage.cpf,
+          hasCpf: !!newLandingPage.cpf,
+        });
+      }
 
       if (createError) {
         console.error(`stripe-webhook: Erro ao inserir landing page:`, {

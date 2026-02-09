@@ -395,6 +395,15 @@ export const CheckoutFlow: React.FC<Props> = ({
       // Usar billingPeriod diretamente da prop (vem do toggle do PricingPage)
       const period: 'monthly' | 'annual' = billingPeriod;
       
+      // Log do CPF antes de enviar
+      const cpfToSend = !hasCustomDomain ? cpf.replace(/\D/g, '') : undefined;
+      console.log('CheckoutFlow: Preparando para enviar CPF', {
+        hasCustomDomain,
+        cpfRaw: cpf,
+        cpfToSend,
+        cpfLength: cpfToSend?.length,
+        hasCpf: !!cpfToSend,
+      });
       
       // Validar que temos um email válido
       if (!email || !email.includes('@')) {
@@ -408,6 +417,13 @@ export const CheckoutFlow: React.FC<Props> = ({
       if (!email || !email.includes('@')) {
         console.error('CheckoutFlow: Email inválido ou vazio!', { email, userEmail: user.email });
         setError('Por favor, informe um email válido no Step 1.');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Validar CPF quando não há domínio próprio
+      if (!hasCustomDomain && (!cpf || cpf.replace(/\D/g, '').length !== 11)) {
+        setError('Por favor, informe um CPF válido (11 dígitos) no Step 2.');
         setIsLoading(false);
         return;
       }
@@ -522,7 +538,7 @@ export const CheckoutFlow: React.FC<Props> = ({
         couponCode: couponCode.trim() || undefined,
         userId: user.id,
         userEmail: email, // SEMPRE usar email informado no Step 1 (campo "Email de Acesso")
-        cpf: !hasCustomDomain ? cpf.replace(/\D/g, '') : undefined, // CPF apenas quando não há domínio próprio
+        cpf: cpfToSend, // CPF apenas quando não há domínio próprio (já validado e limpo acima)
         landingPageData: landingPageDataPayload,
       });
 

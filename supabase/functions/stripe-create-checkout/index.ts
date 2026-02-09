@@ -396,8 +396,15 @@ const handler = async (req: Request): Promise<Response> => {
           domain: domainToSave, // Usar chosenDomain se disponível (domínio completo escolhido)
           has_custom_domain: landingPageData.hasCustomDomain || false,
           custom_domain: landingPageData.customDomain || null,
-          cpf: cpf || null,
+          cpf: cpf ? cpf.replace(/\D/g, '') : null, // Garantir que CPF seja apenas números
         };
+        
+        console.log("stripe-create-checkout: Salvando CPF no pending_checkouts", {
+          hasCpf: !!cpf,
+          cpfRaw: cpf,
+          cpfCleaned: pendingCheckoutData.cpf,
+          hasCustomDomain: landingPageData.hasCustomDomain,
+        });
         // #region agent log
         fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stripe-create-checkout/index.ts:375',message:'HYP-E: Antes de salvar no pending_checkouts',data:{domain:pendingCheckoutData.domain,domainToSave,chosenDomain:landingPageData.chosenDomain},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
         // #endregion
