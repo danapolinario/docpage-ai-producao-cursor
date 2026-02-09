@@ -137,24 +137,47 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
 
   // Get URL for landing page
   const getLandingPageUrl = (page: LandingPageWithUser) => {
-    // Prioridade: 1) display_domain, 2) chosen_domain, 3) custom_domain, 4) subdomain.docpage.com.br
-    if (page.display_domain) {
-      return `https://${page.display_domain.replace(/^https?:\/\//, '')}`;
-    } else if (page.chosen_domain) {
-      return `https://${page.chosen_domain.replace(/^https?:\/\//, '')}`;
-    } else if (page.custom_domain) {
-      return `https://${page.custom_domain}`;
-    } else {
-      return `https://${page.subdomain}.docpage.com.br`;
+    const isPublished = page.status === 'published';
+    
+    // Se tem chosen_domain (domínio novo escolhido pelo usuário)
+    if (page.chosen_domain) {
+      if (isPublished) {
+        // Publicado: usar domínio escolhido completo (com extensão)
+        return `https://${page.chosen_domain.replace(/^https?:\/\//, '')}`;
+      } else {
+        // Não publicado: usar subdomain baseado no nome do domínio
+        const domainName = page.chosen_domain
+          .replace(/^https?:\/\//, '')
+          .replace(/^www\./, '')
+          .replace(/\.(com\.br|com|med\.br|net|org|br)$/, '')
+          .toLowerCase();
+        return `https://${domainName}.docpage.com.br`;
+      }
     }
+    
+    // Se tem custom_domain (domínio próprio)
+    if (page.custom_domain) {
+      if (isPublished) {
+        return `https://${page.custom_domain}`;
+      } else {
+        const domainName = page.custom_domain
+          .replace(/^www\./, '')
+          .replace(/\.(com\.br|com|med\.br|net|org|br)$/, '')
+          .toLowerCase();
+        return `https://${domainName}.docpage.com.br`;
+      }
+    }
+    
+    // Fallback: subdomain.docpage.com.br
+    return `https://${page.subdomain}.docpage.com.br`;
   };
   
   // Get display domain for landing page
   const getDisplayDomain = (page: LandingPageWithUser) => {
-    // Prioridade: 1) display_domain, 2) chosen_domain, 3) custom_domain, 4) subdomain.docpage.com.br
-    if (page.display_domain) {
-      return page.display_domain.replace(/^https?:\/\//, '');
-    } else if (page.chosen_domain) {
+    // Prioridade: 1) chosen_domain (do pending_checkouts - sempre com extensão)
+    // 2) custom_domain (se houver)
+    // 3) subdomain.docpage.com.br (fallback)
+    if (page.chosen_domain) {
       return page.chosen_domain.replace(/^https?:\/\//, '');
     } else if (page.custom_domain) {
       return page.custom_domain;

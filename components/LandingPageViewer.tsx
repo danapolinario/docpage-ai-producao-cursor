@@ -80,10 +80,9 @@ export const LandingPageViewer: React.FC = () => {
         if (fetchError) {
           console.error('Error fetching landing page:', fetchError);
           setError('Landing page não encontrada');
-        } else if (data.status !== 'published') {
-          // Landing page existe mas não está publicada
-          setError('Esta landing page ainda não foi publicada');
         } else {
+          // Permitir visualização mesmo se não publicado (para preview via subdomain)
+          // A verificação de status pode ser feita no servidor se necessário
           setLandingPage(data);
         }
       } catch (err) {

@@ -76,11 +76,7 @@ app.get('/', async (req, res) => {
         return res.sendFile(join(distPath, 'index.html'));
       }
 
-      if (landingPage.status !== 'published') {
-        // Se não estiver publicada, servir SPA normal (que mostrará mensagem de erro)
-        return res.sendFile(join(distPath, 'index.html'));
-      }
-
+      // Permitir acesso mesmo se não publicado (para preview via subdomain)
       // Renderizar com SSR
       const html = await renderLandingPage(landingPage, req);
       res.send(html);

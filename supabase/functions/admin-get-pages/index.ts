@@ -121,6 +121,7 @@ Deno.serve(async (req) => {
         id,
         subdomain,
         custom_domain,
+        chosen_domain,
         status,
         created_at,
         updated_at,
@@ -147,6 +148,7 @@ Deno.serve(async (req) => {
         id: lp.id,
         subdomain: lp.subdomain,
         custom_domain: lp.custom_domain,
+        chosen_domain: lp.chosen_domain, // Domínio completo escolhido pelo usuário (com extensão)
         status: lp.status,
         created_at: lp.created_at,
         updated_at: lp.updated_at,
@@ -159,22 +161,34 @@ Deno.serve(async (req) => {
       }
     })
 
-    // Buscar domínios escolhidos do pending_checkouts para cada landing page
+    // Buscar domínios escolhidos
+    // Prioridade: 1) chosen_domain da landing_pages, 2) pending_checkouts (fallback)
     const landingPageIds = optimizedPages.map((lp: any) => lp.id)
     const chosenDomainsMap: Record<string, string> = {}
     
-    if (landingPageIds.length > 0) {
+    // Primeiro, usar chosen_domain diretamente da landing_pages quando disponível
+    optimizedPages.forEach((lp: any) => {
+      if (lp.chosen_domain) {
+        chosenDomainsMap[lp.id] = lp.chosen_domain
+      }
+    })
+    
+    // Fallback: buscar de pending_checkouts para landing pages que não têm chosen_domain
+    const pagesWithoutChosenDomain = optimizedPages.filter((lp: any) => !lp.chosen_domain)
+    const missingLandingPageIds = pagesWithoutChosenDomain.map((lp: any) => lp.id)
+    
+    if (missingLandingPageIds.length > 0) {
       try {
         // Buscar domínios escolhidos por landing_page_id
         const { data: pendingCheckouts, error: pendingError } = await supabaseAdmin
           .from('pending_checkouts')
           .select('landing_page_id, domain, has_custom_domain, custom_domain')
-          .in('landing_page_id', landingPageIds)
+          .in('landing_page_id', missingLandingPageIds)
           .not('landing_page_id', 'is', null)
         
         if (!pendingError && pendingCheckouts) {
           pendingCheckouts.forEach((pc: any) => {
-            if (pc.landing_page_id) {
+            if (pc.landing_page_id && !chosenDomainsMap[pc.landing_page_id]) {
               // Se tem domínio customizado, usar ele; senão, usar o domínio escolhido (com extensão)
               const chosenDomain = pc.has_custom_domain && pc.custom_domain
                 ? pc.custom_domain
@@ -184,9 +198,11 @@ Deno.serve(async (req) => {
           })
         }
         
-        // Se não encontrou por landing_page_id, buscar por user_id como fallback
-        const userIds = [...new Set(optimizedPages.map((lp: any) => lp.user_id).filter(Boolean))]
-        if (userIds.length > 0 && Object.keys(chosenDomainsMap).length < landingPageIds.length) {
+        // Se ainda não encontrou por landing_page_id, buscar por user_id como último recurso
+        const pagesStillMissing = pagesWithoutChosenDomain.filter((lp: any) => !chosenDomainsMap[lp.id])
+        const userIds = [...new Set(pagesStillMissing.map((lp: any) => lp.user_id).filter(Boolean))]
+        
+        if (userIds.length > 0) {
           const { data: pendingByUserId, error: pendingByUserIdError } = await supabaseAdmin
             .from('pending_checkouts')
             .select('user_id, domain, has_custom_domain, custom_domain')
@@ -205,8 +221,8 @@ Deno.serve(async (req) => {
               }
             })
             
-            // Aplicar aos landing pages que não têm domínio escolhido
-            optimizedPages.forEach((lp: any) => {
+            // Aplicar aos landing pages que ainda não têm domínio escolhido
+            pagesStillMissing.forEach((lp: any) => {
               if (!chosenDomainsMap[lp.id] && userChosenDomainsMap[lp.user_id]) {
                 chosenDomainsMap[lp.id] = userChosenDomainsMap[lp.user_id]
               }

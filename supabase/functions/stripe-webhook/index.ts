@@ -101,16 +101,70 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
       customDomain,
     });
 
+    // Determinar chosen_domain (domínio completo escolhido pelo usuário com extensão)
+    // Este valor vem de pending_checkouts.domain e sempre deve ter extensão completa
+    let chosenDomainToSave: string | null = null;
+    if (hasCustomDomain && customDomain) {
+      chosenDomainToSave = customDomain.trim();
+    } else if (domain) {
+      // domain de pending_checkouts já contém o domínio completo com extensão
+      chosenDomainToSave = domain.trim();
+    }
+
     // Gerar subdomínio
     let finalSubdomain: string;
     let customDomainToSave: string | null = null;
 
     if (hasCustomDomain && customDomain) {
-      // Domínio próprio - gerar subdomínio temporário único
+      // Domínio próprio - extrair nome do domínio (sem extensão) para usar como subdomain
       customDomainToSave = customDomain.trim();
-      const timestamp = Date.now().toString(36);
-      const emailHash = (landingPageData.briefing?.contactEmail || "").split("@")[0].substring(0, 8).toLowerCase().replace(/[^a-z0-9]/g, "");
-      finalSubdomain = `custom-${emailHash}-${timestamp}`.substring(0, 50);
+      const domainName = customDomain
+        .replace(/^www\./, "")
+        .replace(/\.(com\.br|com|med\.br|net|org|br)$/, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
+      
+      // Verificar disponibilidade do subdomain gerado
+      let baseSubdomain = domainName;
+      let counter = 0;
+      let isAvailable = false;
+      
+      while (!isAvailable && counter < 10) {
+        const subdomainToCheck = counter === 0 ? baseSubdomain : `${baseSubdomain}-${counter}`;
+        
+        // Verificar disponibilidade usando função SQL
+        const { data: available, error: checkError } = await supabase.rpc('check_subdomain_available', {
+          check_subdomain: subdomainToCheck
+        });
+        
+        if (checkError) {
+          // Se a função RPC falhar, verificar diretamente na tabela
+          const { data: existing } = await supabase
+            .from('landing_pages')
+            .select('id')
+            .eq('subdomain', subdomainToCheck.toLowerCase())
+            .maybeSingle();
+          
+          isAvailable = !existing;
+        } else {
+          isAvailable = available === true;
+        }
+        
+        if (isAvailable) {
+          finalSubdomain = subdomainToCheck;
+        } else {
+          counter++;
+        }
+      }
+      
+      // Se não encontrou disponível após 10 tentativas, usar timestamp como fallback
+      if (!isAvailable) {
+        const timestamp = Date.now().toString(36);
+        finalSubdomain = `${baseSubdomain}-${timestamp}`.substring(0, 50);
+        console.log(`stripe-webhook: Subdomain não disponível após 10 tentativas, usando fallback: ${finalSubdomain}`);
+      }
     } else {
       // Domínio normal
       finalSubdomain = domain
@@ -142,6 +196,22 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
         subdomain: existingLandingPage.subdomain,
         custom_domain: existingLandingPage.custom_domain,
       });
+      
+      // Atualizar chosen_domain se ainda não estiver preenchido
+      if (chosenDomainToSave) {
+        const { error: updateError } = await supabase
+          .from("landing_pages")
+          .update({ chosen_domain: chosenDomainToSave })
+          .eq("id", existingLandingPage.id)
+          .is("chosen_domain", null);
+        
+        if (updateError) {
+          console.warn(`stripe-webhook: Erro ao atualizar chosen_domain na landing page existente:`, updateError);
+        } else {
+          console.log(`stripe-webhook: chosen_domain atualizado na landing page existente:`, chosenDomainToSave);
+        }
+      }
+      
       landingPage = existingLandingPage;
     } else {
       // Landing page não existe - criar nova (fallback para casos antigos)
@@ -166,6 +236,7 @@ async function createLandingPageFromCheckout(session: Stripe.Checkout.Session) {
           user_id: userId,
           subdomain: finalSubdomain,
           custom_domain: customDomainToSave,
+          chosen_domain: chosenDomainToSave, // Domínio completo escolhido pelo usuário (com extensão)
           slug,
           briefing_data: landingPageData.briefing || {},
           content_data: landingPageData.content || {},

@@ -8,7 +8,8 @@ const corsHeaders = {
 };
 
 interface CheckDomainRequest {
-  domain: string;
+  domain: string; // Nome do domínio (sem extensão) ou domínio completo (com extensão)
+  extension?: string; // Extensão opcional (.com.br, .med.br, etc)
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -18,7 +19,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { domain }: CheckDomainRequest = await req.json();
+    const { domain, extension }: CheckDomainRequest = await req.json();
 
     if (!domain) {
       return new Response(
@@ -27,9 +28,26 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Validar formato do domínio (apenas o nome, sem extensão)
-    const domainName = domain.toLowerCase().trim();
+    // Extrair nome do domínio e extensão
+    let domainName: string;
+    let domainExtension: string = extension || '.com.br'; // Padrão .com.br se não especificado
     
+    // Verificar se o domínio já contém extensão
+    const extensionMatch = domain.toLowerCase().trim().match(/\.(com\.br|med\.br|com|br|net|org)$/);
+    if (extensionMatch) {
+      // Domínio já contém extensão
+      domainExtension = extensionMatch[0];
+      domainName = domain.toLowerCase().trim().replace(extensionMatch[0], '');
+    } else {
+      // Apenas nome do domínio
+      domainName = domain.toLowerCase().trim();
+      // Se extension foi fornecido, usar ele; senão, usar .com.br como padrão
+      if (extension) {
+        domainExtension = extension.startsWith('.') ? extension : `.${extension}`;
+      }
+    }
+    
+    // Validar formato do nome do domínio
     if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(domainName)) {
       return new Response(
         JSON.stringify({ 
@@ -50,8 +68,8 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Construir o domínio completo (.com.br)
-    const fullDomain = `${domainName}.com.br`;
+    // Construir o domínio completo com a extensão correta
+    const fullDomain = `${domainName}${domainExtension}`;
     
     console.log(`Verificando domínio via RDAP: ${fullDomain}`);
 

@@ -247,17 +247,43 @@ export const CheckoutFlow: React.FC<Props> = ({
       return;
     }
 
+    // Validação: verificar se contém .com.br ou .med.br quando toggle está desabilitado
+    if (!hasCustomDomain) {
+      const normalizedDomain = domain.toLowerCase().trim();
+      if (!normalizedDomain.includes('.com.br') && !normalizedDomain.includes('.med.br')) {
+        setDomainError('O domínio deve conter .com.br ou .med.br');
+        setIsDomainAvailable(false);
+        return;
+      }
+    }
+
     setIsCheckingDomain(true);
     setDomainError(null);
     setIsDomainAvailable(null);
 
     try {
-      // Normalizar nome do domínio (remover www, extensões, caracteres especiais)
-      const domainName = domain
+      // Normalizar domínio completo (remover www, espaços)
+      const normalizedDomain = domain
         .replace(/^www\./, '')
-        .replace(/\.(com|com\.br|med\.br|br)$/, '')
         .toLowerCase()
-        .trim()
+        .trim();
+
+      // Extrair nome do domínio (sem extensão) e extensão
+      let domainName: string;
+      let extractedExtension: string = '.com.br'; // Padrão
+
+      // Tentar extrair extensão do domínio digitado
+      const extensionMatch = normalizedDomain.match(/\.(com\.br|med\.br|com|br|net|org)$/);
+      if (extensionMatch) {
+        extractedExtension = extensionMatch[0];
+        domainName = normalizedDomain.replace(extensionMatch[0], '');
+      } else {
+        // Se não tiver extensão, usar o que foi digitado
+        domainName = normalizedDomain;
+      }
+
+      // Limpar nome do domínio (remover caracteres especiais)
+      domainName = domainName
         .replace(/[^a-z0-9-]/g, '-') // Substitui caracteres especiais por hífen
         .replace(/-+/g, '-') // Remove hífens duplicados
         .replace(/^-|-$/g, ''); // Remove hífens do início/fim
@@ -271,11 +297,13 @@ export const CheckoutFlow: React.FC<Props> = ({
       }
 
       // Verificar disponibilidade via RDAP do Registro.br
-      const availability = await checkDomainAvailability(domainName);
+      // Passar o nome do domínio e a extensão extraída
+      const availability = await checkDomainAvailability(domainName, extractedExtension);
 
       if (availability.available) {
         setIsDomainAvailable(true);
-        setSelectedDomain(domainName); // Guarda o nome do domínio
+        setSelectedDomain(domainName); // Guarda o nome do domínio (sem extensão)
+        setDomainExtension(extractedExtension); // Guarda a extensão extraída
         // Não avança automaticamente - usuário deve clicar em "Continuar"
       } else {
         setIsDomainAvailable(false);
@@ -339,40 +367,24 @@ export const CheckoutFlow: React.FC<Props> = ({
         ? customDomainValue 
         : selectedDomain; // Subdomínio apenas (ex: "drjoaosilva")
       
-      // Domínio completo escolhido pelo usuário (com extensão) para usar no email
+      // Domínio completo escolhido pelo usuário (com extensão) - SEMPRE deve ter extensão
+      // Este é o valor que será armazenado em pending_checkouts.domain e usado para exibição
       let chosenDomainForEmail: string;
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:338',message:'HYP-A: Valores antes de criar chosenDomainForEmail',data:{hasCustomDomain,selectedDomain,domainExtension,customDomainValue,finalDomain},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       if (hasCustomDomain) {
+        // Domínio próprio: usar o valor informado (já deve ter extensão)
         chosenDomainForEmail = customDomainValue;
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:341',message:'HYP-A: Branch hasCustomDomain=true',data:{chosenDomainForEmail},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
+      } else if (domain && (domain.includes('.com.br') || domain.includes('.med.br') || domain.includes('.com') || domain.includes('.br'))) {
+        // Usar o domínio completo digitado pelo usuário (já contém extensão)
+        chosenDomainForEmail = domain;
       } else if (selectedDomain && domainExtension) {
-        chosenDomainForEmail = `${selectedDomain}${domainExtension}`; // Ex: "testefinaldocpage.com.br"
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:343',message:'HYP-A: Branch selectedDomain+domainExtension',data:{chosenDomainForEmail,selectedDomain,domainExtension},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-      } else if (selectedDomain) {
-        // Se não tiver extensão, adicionar .com.br como padrão
-        chosenDomainForEmail = `${selectedDomain}.com.br`;
-        console.warn('CheckoutFlow: domainExtension não definido, usando .com.br como padrão');
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:346',message:'HYP-A: Branch fallback selectedDomain sem extensão',data:{chosenDomainForEmail,selectedDomain},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
+        // Construir a partir de selectedDomain + domainExtension (extraídos durante verificação)
+        chosenDomainForEmail = `${selectedDomain}${domainExtension}`;
       } else {
-        // Fallback: usar finalDomain com extensão
-        chosenDomainForEmail = `${finalDomain}.com.br`;
-        console.warn('CheckoutFlow: selectedDomain não definido, usando finalDomain com .com.br');
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:350',message:'HYP-A: Branch fallback finalDomain',data:{chosenDomainForEmail,finalDomain},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
+        // Fallback: garantir que sempre tenha extensão
+        const baseDomain = selectedDomain || finalDomain;
+        chosenDomainForEmail = baseDomain.includes('.') ? baseDomain : `${baseDomain}.com.br`;
+        console.warn('CheckoutFlow: Construindo chosenDomain com extensão padrão .com.br');
       }
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/4f26b07b-316f-4349-9d74-50fa5b35a5ad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CheckoutFlow.tsx:361',message:'HYP-A: chosenDomainForEmail final criado',data:{chosenDomainForEmail,finalDomain,selectedDomain,domainExtension},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       
       if (!finalDomain) {
         setError('Por favor, informe um domínio válido.');
@@ -441,6 +453,7 @@ export const CheckoutFlow: React.FC<Props> = ({
         const newLp = await createLandingPage({
           subdomain: finalSubdomain,
           customDomain: customDomainToSave,
+          chosenDomain: chosenDomainForEmail, // Domínio completo escolhido pelo usuário (com extensão)
           briefing,
           content,
           design,
@@ -641,7 +654,7 @@ export const CheckoutFlow: React.FC<Props> = ({
              {selectedDomain && (
                <li className="flex items-start gap-3 text-sm font-bold text-blue-600 animate-fade-in">
                  <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
-                 Domínio: {selectedDomain}{domainExtension}
+                 Domínio: {domain && (domain.includes('.com.br') || domain.includes('.med.br') || domain.includes('.com') || domain.includes('.br')) ? domain : `${selectedDomain}${domainExtension}`}
                </li>
              )}
            </ul>
@@ -937,45 +950,31 @@ export const CheckoutFlow: React.FC<Props> = ({
                             ? 'border-red-500 text-red-700 bg-red-50'
                             : 'border-gray-300 bg-white'
                         }`}
-                        placeholder="drjoaosilva"
+                        placeholder="drjoaosilva.com.br"
                         disabled={isCheckingDomain || isDomainAvailable === true || hasCustomDomain}
                         autoComplete="off"
                         autoCapitalize="off"
                         autoCorrect="off"
                       />
                     </div>
-                    <div className="flex gap-2">
-                      <select 
-                        value={domainExtension}
-                        onChange={(e) => {
-                          setDomainExtension(e.target.value);
-                          setIsDomainAvailable(null);
-                        }}
-                        className="flex-1 bg-gray-50 border border-gray-300 text-gray-700 text-base font-medium px-4 py-4 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        disabled={isDomainAvailable === true || hasCustomDomain}
-                      >
-                        <option>.com.br</option>
-                        <option>.med.br</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={handleCheckDomain}
-                        disabled={isCheckingDomain || !domain || isDomainAvailable === true || domain.length < 3 || hasCustomDomain}
-                        className={`flex-1 inline-flex items-center justify-center px-4 py-4 rounded-lg border text-base font-medium hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
-                          isDomainAvailable === true 
-                            ? 'bg-green-50 text-green-700 border-green-500' 
-                            : 'bg-gray-50 text-gray-700 border-gray-300'
-                        }`}
-                      >
-                        {isCheckingDomain ? (
-                          <svg className="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        ) : isDomainAvailable === true ? (
-                          <span className="flex items-center gap-1">✓ Disponível</span>
-                        ) : (
-                          "Verificar"
-                        )}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCheckDomain}
+                      disabled={isCheckingDomain || !domain || isDomainAvailable === true || domain.length < 3 || hasCustomDomain}
+                      className={`w-full inline-flex items-center justify-center px-4 py-4 rounded-lg border text-base font-medium hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        isDomainAvailable === true 
+                          ? 'bg-green-50 text-green-700 border-green-500' 
+                          : 'bg-gray-50 text-gray-700 border-gray-300'
+                      }`}
+                    >
+                      {isCheckingDomain ? (
+                        <svg className="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                      ) : isDomainAvailable === true ? (
+                        <span className="flex items-center gap-1">✓ Disponível</span>
+                      ) : (
+                        "Verificar"
+                      )}
+                    </button>
                   </div>
 
                   {/* Desktop: Layout horizontal */}
@@ -999,28 +998,16 @@ export const CheckoutFlow: React.FC<Props> = ({
                           ? 'border-red-500 text-red-700 bg-red-50'
                           : 'border-gray-300'
                       }`}
-                      placeholder="drjoaosilva"
+                      placeholder="drjoaosilva.com.br"
                       disabled={isCheckingDomain || isDomainAvailable === true || hasCustomDomain}
                       autoComplete="off"
                       autoCapitalize="off"
                       autoCorrect="off"
                     />
-                    <select 
-                      value={domainExtension}
-                      onChange={(e) => {
-                        setDomainExtension(e.target.value);
-                        setIsDomainAvailable(null);
-                      }}
-                      className="bg-gray-50 border border-l-0 border-gray-300 text-gray-500 text-sm px-2 outline-none"
-                      disabled={isDomainAvailable === true || hasCustomDomain}
-                    >
-                      <option>.com.br</option>
-                      <option>.med.br</option>
-                    </select>
                     <button
                       type="button"
                       onClick={handleCheckDomain}
-                        disabled={isCheckingDomain || !domain || isDomainAvailable === true || domain.length < 3 || hasCustomDomain}
+                      disabled={isCheckingDomain || !domain || isDomainAvailable === true || domain.length < 3 || hasCustomDomain}
                       className={`inline-flex items-center px-4 rounded-r-md border border-l-0 border-gray-300 text-sm font-medium hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
                         isDomainAvailable === true 
                           ? 'bg-green-50 text-green-700 border-green-500' 
@@ -1167,7 +1154,7 @@ export const CheckoutFlow: React.FC<Props> = ({
                     <p className="text-blue-700">
                       {hasCustomDomain 
                         ? customDomainValue 
-                        : `${selectedDomain}${domainExtension}`}
+                        : (domain && (domain.includes('.com.br') || domain.includes('.med.br') || domain.includes('.com') || domain.includes('.br')) ? domain : `${selectedDomain}${domainExtension}`)}
                     </p>
                     {hasCustomDomain && (
                       <p className="text-xs text-blue-600 mt-1 italic">

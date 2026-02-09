@@ -1078,8 +1078,7 @@ export const Dashboard: React.FC<Props> = ({
                   : 'Redes Sociais'}
              </h1>
              <div className="flex items-center gap-4">
-                
-                {dashboardData?.landingPage.status === 'published' && (
+                {displayDomain && (
                   <a 
                     href={`https://${displayDomain}`}
                     target="_blank"
@@ -1424,10 +1423,7 @@ export const Dashboard: React.FC<Props> = ({
                         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-fit">
                            <h3 className="font-bold text-gray-800 mb-4">Seu Site</h3>
                            
-                           <a href={dashboardData?.landingPage.status === 'published' 
-                               ? `https://${displayDomain}` 
-                               : `https://id-preview--0a9faad6-43ab-4990-8403-ac9018697ff1.lovable.app`
-                             }
+                           <a href={displayDomain ? `https://${displayDomain}` : '#'}
                              target="_blank"
                              rel="noopener noreferrer"
                              className="block w-full bg-gray-100 rounded-lg border border-gray-200 relative mb-4 overflow-hidden group cursor-pointer"

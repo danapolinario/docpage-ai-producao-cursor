@@ -107,72 +107,92 @@ export async function getDashboardData(landingPageId: string): Promise<Dashboard
     };
   }
 
-  // Buscar o domínio escolhido pelo usuário na etapa de checkout (pode estar em pending_checkouts)
+  // Buscar o domínio escolhido pelo usuário
+  // Prioridade: 1) chosen_domain da landing_pages, 2) pending_checkouts (fallback)
   let chosenDomain: string | null = null;
-  try {
-    console.log('dashboard.ts: Buscando domínio escolhido no pending_checkouts', {
-      landingPageId,
-      userId: user.id,
-    });
-    
-    // Tentar buscar pelo landing_page_id primeiro (mais específico)
-    let pendingCheckout = null;
-    
-    const { data: byLandingPageId } = await supabase
-      .from("pending_checkouts")
-      .select("domain, has_custom_domain, custom_domain")
-      .eq("landing_page_id", landingPageId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
-    if (byLandingPageId) {
-      pendingCheckout = byLandingPageId;
-      console.log('dashboard.ts: Domínio encontrado por landing_page_id:', pendingCheckout);
-    } else {
-      // Se não encontrou, buscar pelo user_id
-      const { data: byUserId } = await supabase
+  
+  // Primeiro, verificar se a landing page já tem chosen_domain
+  if (landingPage.chosen_domain) {
+    chosenDomain = landingPage.chosen_domain;
+    console.log('dashboard.ts: Usando chosen_domain da landing_pages:', chosenDomain);
+  } else {
+    // Fallback: buscar de pending_checkouts
+    try {
+      console.log('dashboard.ts: Buscando domínio escolhido no pending_checkouts (fallback)', {
+        landingPageId,
+        userId: user.id,
+      });
+      
+      const { data: byLandingPageId } = await supabase
         .from("pending_checkouts")
         .select("domain, has_custom_domain, custom_domain")
-        .eq("user_id", user.id)
+        .eq("landing_page_id", landingPageId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       
-      if (byUserId) {
-        pendingCheckout = byUserId;
-        console.log('dashboard.ts: Domínio encontrado por user_id:', pendingCheckout);
+      if (byLandingPageId) {
+        chosenDomain = byLandingPageId.has_custom_domain && byLandingPageId.custom_domain
+          ? byLandingPageId.custom_domain
+          : byLandingPageId.domain;
+        console.log('dashboard.ts: Domínio encontrado em pending_checkouts:', chosenDomain);
       } else {
-        console.log('dashboard.ts: Nenhum domínio encontrado no pending_checkouts');
+        // Tentar buscar por user_id como último recurso
+        const { data: byUserId } = await supabase
+          .from("pending_checkouts")
+          .select("domain, has_custom_domain, custom_domain")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (byUserId) {
+          chosenDomain = byUserId.has_custom_domain && byUserId.custom_domain
+            ? byUserId.custom_domain
+            : byUserId.domain;
+          console.log('dashboard.ts: Domínio encontrado por user_id em pending_checkouts:', chosenDomain);
+        }
       }
+    } catch (error) {
+      console.warn('Erro ao buscar domínio escolhido do pending_checkouts:', error);
     }
-    
-    if (pendingCheckout) {
-      // Se tem domínio customizado, usar ele; senão, usar o domínio escolhido (com extensão)
-      chosenDomain = pendingCheckout.has_custom_domain && pendingCheckout.custom_domain
-        ? pendingCheckout.custom_domain
-        : pendingCheckout.domain; // Este é o domínio escolhido pelo usuário (ex: "testefinaldocpage.com.br")
-      
-      console.log('dashboard.ts: Domínio escolhido determinado:', {
-        chosenDomain,
-        hasCustomDomain: pendingCheckout.has_custom_domain,
-        customDomain: pendingCheckout.custom_domain,
-        domain: pendingCheckout.domain,
-      });
-    }
-  } catch (error) {
-    console.warn('Erro ao buscar domínio escolhido do pending_checkouts:', error);
   }
 
   // Obter informações do domínio
-  // Prioridade: 1) chosenDomain (do pending_checkouts), 2) custom_domain, 3) subdomain.docpage.com.br
+  // URLs devem mudar baseadas no status de publicação:
+  // - Não publicado: {subdomain}.docpage.com.br (ou {nome-do-dominio}.docpage.com.br se domínio próprio)
+  // - Publicado: Domínio informado pelo usuário (com extensão)
   let displayDomain: string;
+  const isPublished = landingPage.status === 'published';
+  
   if (chosenDomain) {
-    displayDomain = chosenDomain;
-    console.log('dashboard.ts: Usando domínio escolhido do pending_checkouts:', displayDomain);
+    // Se publicado, usar domínio escolhido (com extensão)
+    // Se não publicado, usar subdomain baseado no nome do domínio
+    if (isPublished) {
+      displayDomain = chosenDomain;
+      console.log('dashboard.ts: Publicado - usando domínio escolhido:', displayDomain);
+    } else {
+      // Extrair nome do domínio para criar subdomain (sem extensão)
+      const domainName = chosenDomain
+        .replace(/^www\./, '')
+        .replace(/\.(com\.br|com|med\.br|net|org|br)$/, '')
+        .toLowerCase();
+      displayDomain = `${domainName}.docpage.com.br`;
+      console.log('dashboard.ts: Não publicado - usando subdomain baseado no domínio escolhido:', displayDomain);
+    }
   } else if (landingPage.custom_domain) {
-    displayDomain = landingPage.custom_domain;
-    console.log('dashboard.ts: Usando custom_domain da landing page:', displayDomain);
+    // Mesma lógica para custom_domain
+    if (isPublished) {
+      displayDomain = landingPage.custom_domain;
+      console.log('dashboard.ts: Publicado - usando custom_domain:', displayDomain);
+    } else {
+      const domainName = landingPage.custom_domain
+        .replace(/^www\./, '')
+        .replace(/\.(com\.br|com|med\.br|net|org|br)$/, '')
+        .toLowerCase();
+      displayDomain = `${domainName}.docpage.com.br`;
+      console.log('dashboard.ts: Não publicado - usando subdomain baseado no custom_domain:', displayDomain);
+    }
   } else {
     displayDomain = `${landingPage.subdomain}.docpage.com.br`;
     console.log('dashboard.ts: Usando fallback subdomain.docpage.com.br:', displayDomain);
@@ -181,14 +201,7 @@ export async function getDashboardData(landingPageId: string): Promise<Dashboard
   // Garantir que o domínio não tenha protocolo
   displayDomain = displayDomain.replace(/^https?:\/\//, '');
   
-  // Se o domínio não contém extensão (.com.br, .com, etc), adicionar .docpage.com.br
-  // Isso é um fallback de segurança caso o chosenDomain não tenha sido salvo com extensão
-  if (!displayDomain.includes('.') && !displayDomain.includes('docpage')) {
-    console.warn('dashboard.ts: Domínio sem extensão detectado, adicionando .docpage.com.br:', displayDomain);
-    displayDomain = `${displayDomain}.docpage.com.br`;
-  }
-  
-  console.log('dashboard.ts: Domínio final determinado:', displayDomain);
+  console.log('dashboard.ts: Domínio final determinado:', displayDomain, 'Status:', isPublished ? 'published' : 'draft');
 
   const domainInfo = {
     domain: displayDomain,

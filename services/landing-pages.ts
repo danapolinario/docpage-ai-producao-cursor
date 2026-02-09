@@ -9,6 +9,7 @@ export interface LandingPageRow {
   user_id: string;
   subdomain: string;
   custom_domain: string | null;
+  chosen_domain: string | null; // Domínio completo escolhido pelo usuário (com extensão)
   slug: string;
   briefing_data: BriefingData;
   content_data: LandingPageContent;
@@ -34,11 +35,25 @@ export interface LandingPageRow {
  * Verificar disponibilidade de domínio usando RDAP do Registro.br
  */
 export async function checkDomainAvailability(
-  domain: string
+  domain: string,
+  extension?: string
 ): Promise<{ available: boolean; error?: string; fullDomain?: string }> {
-  // Validação básica
-  const domainName = domain.toLowerCase().trim();
+  // Extrair nome do domínio e extensão se o domínio já contém extensão
+  let domainName: string;
+  let domainExtension: string | undefined = extension;
   
+  // Verificar se o domínio já contém extensão
+  const extensionMatch = domain.toLowerCase().trim().match(/\.(com\.br|med\.br|com|br|net|org)$/);
+  if (extensionMatch) {
+    // Domínio já contém extensão
+    domainExtension = extensionMatch[0];
+    domainName = domain.toLowerCase().trim().replace(extensionMatch[0], '');
+  } else {
+    // Apenas nome do domínio
+    domainName = domain.toLowerCase().trim();
+  }
+  
+  // Validação básica do nome do domínio
   if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(domainName)) {
     return { 
       available: false, 
@@ -68,8 +83,12 @@ export async function checkDomainAvailability(
 
   try {
     // Chamar Edge Function para verificar via RDAP
+    // Passar o nome do domínio e a extensão (se disponível)
     const { data, error } = await supabase.functions.invoke('check-domain-rdap', {
-      body: { domain: domainName }
+      body: { 
+        domain: domainName,
+        extension: domainExtension
+      }
     });
 
     if (error) {
@@ -159,6 +178,7 @@ export function generateSubdomain(name: string): string {
 export async function createLandingPage(data: {
   subdomain: string;
   customDomain?: string | null;
+  chosenDomain?: string | null; // Domínio completo escolhido pelo usuário (com extensão)
   briefing: BriefingData;
   content: LandingPageContent;
   design: DesignSettings;
@@ -287,6 +307,11 @@ export async function createLandingPage(data: {
   // Adicionar custom_domain se fornecido
   if (data.customDomain) {
     insertData.custom_domain = data.customDomain.trim();
+  }
+
+  // Adicionar chosen_domain se fornecido (domínio completo escolhido pelo usuário com extensão)
+  if (data.chosenDomain) {
+    insertData.chosen_domain = data.chosenDomain.trim();
   }
 
   const { data: landingPage, error } = await supabase
