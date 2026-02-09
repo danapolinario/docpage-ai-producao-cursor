@@ -41,15 +41,30 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
   const keywords = landingPage.meta_keywords?.join(', ') || 
     `${landingPage.briefing_data.name}, ${landingPage.briefing_data.specialty}, médico ${landingPage.briefing_data.crmState}, CRM ${landingPage.briefing_data.crm}, consulta médica, agendar consulta, ${landingPage.briefing_data.mainServices?.split(',').slice(0, 3).join(', ') || ''}`;
   
+  // Prioridade para imagem OG: og_image_url > about_photo_url > photo_url > fallback
   const ogImage = landingPage.og_image_url || landingPage.about_photo_url || landingPage.photo_url || `${baseUrl}/og-default.png`;
   const ogImageSecure = ogImage.replace('http://', 'https://');
+  
+  // Detectar tipo de imagem OG
+  const getImageType = (imageUrl: string): string => {
+    const lowerUrl = imageUrl.toLowerCase();
+    if (lowerUrl.includes('.png')) return 'image/png';
+    if (lowerUrl.includes('.jpg') || lowerUrl.includes('.jpeg')) return 'image/jpeg';
+    if (lowerUrl.includes('.webp')) return 'image/webp';
+    return 'image/png'; // default
+  };
+  const ogImageType = getImageType(ogImageSecure);
+  
+  // Favicon: usar foto do médico se disponível, senão usar padrão
+  const faviconImage = landingPage.photo_url || landingPage.about_photo_url || `${baseUrl}/favicon.svg`;
+  const appleTouchIcon = landingPage.photo_url || landingPage.about_photo_url || `${baseUrl}/apple-touch-icon.png`;
 
   // Generate SEO-optimized site name for og:site_name
   // Uses doctor name and specialty for better SEO and branding
   const siteName = `Dr(a). ${landingPage.briefing_data.name} - ${landingPage.briefing_data.specialty} | CRM ${landingPage.briefing_data.crm}/${landingPage.briefing_data.crmState}`;
 
-  // Schema.org JSON-LD
-  const schemaMarkup = {
+  // Schema.org JSON-LD - Physician
+  const physicianSchema = {
     "@context": "https://schema.org",
     "@type": "Physician",
     "@id": pageUrl,
@@ -102,9 +117,46 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     }
   };
 
-  const cleanSchema = JSON.parse(JSON.stringify(schemaMarkup, (key, value) => 
+  // Schema.org JSON-LD - LocalBusiness (MedicalBusiness)
+  const localBusinessSchema = landingPage.briefing_data.addresses?.length > 0 ? {
+    "@context": "https://schema.org",
+    "@type": "MedicalBusiness",
+    "@id": `${pageUrl}#business`,
+    "name": `Consultório ${landingPage.briefing_data.name}`,
+    "description": description,
+    "url": pageUrl,
+    "image": [
+      ogImage,
+      ...(landingPage.about_photo_url ? [landingPage.about_photo_url] : []),
+      ...(landingPage.photo_url ? [landingPage.photo_url] : [])
+    ].filter(Boolean),
+    "telephone": landingPage.briefing_data.contactPhone || landingPage.content_data.contactPhone,
+    "email": landingPage.briefing_data.contactEmail || landingPage.content_data.contactEmail,
+    "address": landingPage.briefing_data.addresses.map((addr: string) => ({
+      "@type": "PostalAddress",
+      "streetAddress": addr,
+      "addressLocality": landingPage.briefing_data.crmState,
+      "addressRegion": landingPage.briefing_data.crmState,
+      "addressCountry": "BR"
+    })),
+    "priceRange": "$$",
+    "areaServed": {
+      "@type": "State",
+      "name": landingPage.briefing_data.crmState
+    },
+    "medicalSpecialty": {
+      "@type": "MedicalSpecialty",
+      "name": landingPage.briefing_data.specialty
+    }
+  } : null;
+
+  const cleanPhysicianSchema = JSON.parse(JSON.stringify(physicianSchema, (key, value) => 
     value === undefined ? undefined : value
   ));
+  
+  const cleanLocalBusinessSchema = localBusinessSchema ? JSON.parse(JSON.stringify(localBusinessSchema, (key, value) => 
+    value === undefined ? undefined : value
+  )) : null;
 
   // Renderizar componente React para string
   const appHtml = renderToString(
@@ -119,6 +171,15 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+    
+    <!-- Resource Hints for Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+    <link rel="dns-prefetch" href="https://cdn.tailwindcss.com" />
+    
+    <!-- Preload Critical Fonts -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" as="style" />
     
     <!-- SEO Base Tags -->
     <title>${escapeHtml(title)}</title>
@@ -137,51 +198,68 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     <meta name="format-detection" content="telephone=yes" />
     
     <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="${escapeHtml(pageUrl)}" />
     <meta property="og:title" content="${escapeHtml(title)}" />
     <meta property="og:description" content="${escapeHtml(description)}" />
-    <meta property="og:image" content="${escapeHtml(ogImage)}" />
+    <meta property="og:image" content="${escapeHtml(ogImageSecure)}" />
     <meta property="og:image:secure_url" content="${escapeHtml(ogImageSecure)}" />
-    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:type" content="${ogImageType}" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="${escapeHtml(landingPage.briefing_data.name)} - ${escapeHtml(landingPage.briefing_data.specialty)} | CRM ${landingPage.briefing_data.crm}/${landingPage.briefing_data.crmState}" />
-    <meta property="og:url" content="${escapeHtml(pageUrl)}" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="${escapeHtml(siteName)}" />
     <meta property="og:locale" content="pt_BR" />
     <meta property="og:locale:alternate" content="pt_PT" />
+    <meta property="og:site_name" content="${escapeHtml(landingPage.briefing_data.name)}" />
     ${landingPage.briefing_data.contactPhone ? `<meta property="og:phone_number" content="${escapeHtml(landingPage.briefing_data.contactPhone)}" />` : ''}
     ${landingPage.briefing_data.contactEmail ? `<meta property="og:email" content="${escapeHtml(landingPage.briefing_data.contactEmail)}" />` : ''}
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="${escapeHtml(pageUrl)}" />
     <meta name="twitter:title" content="${escapeHtml(title)}" />
     <meta name="twitter:description" content="${escapeHtml(description)}" />
-    <meta name="twitter:image" content="${escapeHtml(ogImage)}" />
+    <meta name="twitter:image" content="${escapeHtml(ogImageSecure)}" />
     <meta name="twitter:image:alt" content="${escapeHtml(landingPage.briefing_data.name)} - ${escapeHtml(landingPage.briefing_data.specialty)}" />
-    <meta name="twitter:domain" content="${escapeHtml(landingPage.custom_domain || baseUrl.replace('https://', '').replace('http://', ''))}" />
+    <meta name="twitter:domain" content="${escapeHtml(landingPage.custom_domain ? landingPage.custom_domain.replace(/^https?:\/\//, '') : baseUrl.replace('https://', '').replace('http://', ''))}" />
     
     <!-- Mobile & PWA -->
     <meta name="theme-color" content="#3B82F6" />
-    <meta name="msapplication-TileColor" content="#3B82F6" />
-    <meta name="msapplication-config" content="/browserconfig.xml" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="${escapeHtml(landingPage.briefing_data.name)}" />
-    ${landingPage.photo_url ? `<link rel="apple-touch-icon" href="${escapeHtml(landingPage.photo_url)}" sizes="180x180" />` : ''}
-    <link rel="icon" href="${escapeHtml(landingPage.photo_url || `${baseUrl}/favicon.ico`)}" type="image/x-icon" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="${escapeHtml(faviconImage.includes('.svg') ? faviconImage : `${baseUrl}/favicon.svg`)}" />
+    <link rel="icon" type="image/png" sizes="32x32" href="${escapeHtml(landingPage.photo_url || landingPage.about_photo_url ? faviconImage : `${baseUrl}/favicon-32x32.png`)}" />
+    <link rel="icon" type="image/png" sizes="16x16" href="${escapeHtml(landingPage.photo_url || landingPage.about_photo_url ? faviconImage : `${baseUrl}/favicon-16x16.png`)}" />
+    <link rel="apple-touch-icon" sizes="180x180" href="${escapeHtml(appleTouchIcon)}" />
     
     <!-- Canonical URL -->
     <link rel="canonical" href="${escapeHtml(pageUrl)}" />
     
     <!-- Schema.org JSON-LD (Structured Data) -->
     <script type="application/ld+json">
-      ${JSON.stringify(cleanSchema, null, 2)}
+      ${JSON.stringify(cleanPhysicianSchema, null, 2)}
     </script>
+    ${cleanLocalBusinessSchema ? `<script type="application/ld+json">
+      ${JSON.stringify(cleanLocalBusinessSchema, null, 2)}
+    </script>` : ''}
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/"
+  }
+}
+</script>
     <script>
       tailwind.config = {
         theme: {
