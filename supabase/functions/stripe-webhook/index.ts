@@ -512,12 +512,31 @@ async function upsertSubscription(
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  console.log("============================================");
+  console.log("stripe-webhook: Request recebido", {
+    method: req.method,
+    url: req.url,
+    hasBody: !!req.body,
+    timestamp: new Date().toISOString(),
+    headers: {
+      hasStripeSignature: !!req.headers.get("stripe-signature"),
+      contentType: req.headers.get("content-type"),
+      origin: req.headers.get("origin"),
+    },
+  });
+  console.log("============================================");
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
+    console.log("stripe-webhook: OPTIONS request, retornando CORS headers");
     return new Response(null, { headers: corsHeaders });
   }
 
   if (!stripe || !STRIPE_WEBHOOK_SECRET) {
+    console.error("stripe-webhook: Stripe não configurado", {
+      hasStripe: !!stripe,
+      hasWebhookSecret: !!STRIPE_WEBHOOK_SECRET,
+    });
     return new Response(
       JSON.stringify({ error: "Stripe não configurado" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -528,9 +547,29 @@ const handler = async (req: Request): Promise<Response> => {
     // Obter assinatura do webhook do header
     const signature = req.headers.get("stripe-signature");
     if (!signature) {
-      console.error("stripe-webhook: Assinatura do webhook não encontrada no header");
+      console.error("stripe-webhook: Assinatura do webhook não encontrada no header", {
+        method: req.method,
+        url: req.url,
+        headers: Object.fromEntries(req.headers.entries()),
+      });
+      
+      // Se for uma requisição GET (acesso direto via navegador), retornar mensagem informativa
+      if (req.method === "GET") {
+        return new Response(
+          JSON.stringify({ 
+            message: "Este endpoint é um webhook do Stripe e só pode ser acessado pelo Stripe.",
+            hint: "Configure este URL no Stripe Dashboard → Developers → Webhooks",
+            url: req.url,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      
       return new Response(
-        JSON.stringify({ error: "Assinatura do webhook não encontrada" }),
+        JSON.stringify({ 
+          error: "Assinatura do webhook não encontrada",
+          hint: "Este endpoint deve ser chamado apenas pelo Stripe. Verifique se o webhook está configurado corretamente no Stripe Dashboard."
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

@@ -179,6 +179,7 @@ export async function createLandingPage(data: {
   subdomain: string;
   customDomain?: string | null;
   chosenDomain?: string | null; // Domínio completo escolhido pelo usuário (com extensão)
+  cpf?: string | null; // CPF do usuário (apenas números)
   briefing: BriefingData;
   content: LandingPageContent;
   design: DesignSettings;
@@ -312,6 +313,15 @@ export async function createLandingPage(data: {
   // Adicionar chosen_domain se fornecido (domínio completo escolhido pelo usuário com extensão)
   if (data.chosenDomain) {
     insertData.chosen_domain = data.chosenDomain.trim();
+  }
+
+  // Adicionar CPF se fornecido (limpar formatação, manter apenas números)
+  if (data.cpf) {
+    insertData.cpf = String(data.cpf).replace(/\D/g, '');
+    console.log('createLandingPage: CPF adicionado ao insert', {
+      cpfOriginal: data.cpf,
+      cpfCleaned: insertData.cpf,
+    });
   }
 
   const { data: landingPage, error } = await supabase

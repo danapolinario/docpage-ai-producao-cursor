@@ -432,7 +432,7 @@ export const CheckoutFlow: React.FC<Props> = ({
       // Verificar se já existe uma landing page para este usuário
       const { data: existingLp } = await supabase
         .from('landing_pages')
-        .select('id, subdomain, custom_domain')
+        .select('id, subdomain, custom_domain, cpf')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -447,6 +447,30 @@ export const CheckoutFlow: React.FC<Props> = ({
         landingPageId = existingLp.id;
         landingPageSubdomain = existingLp.subdomain;
         landingPageCustomDomain = existingLp.custom_domain;
+        
+        // Atualizar CPF na landing page existente se não tiver e tivermos CPF
+        if (cpfToSend && !existingLp.cpf) {
+          console.log('CheckoutFlow: Atualizando CPF na landing page existente...', {
+            landingPageId,
+            cpf: cpfToSend,
+          });
+          
+          try {
+            const { error: updateError } = await supabase
+              .from('landing_pages')
+              .update({ cpf: cpfToSend })
+              .eq('id', landingPageId);
+            
+            if (updateError) {
+              console.error('CheckoutFlow: Erro ao atualizar CPF na landing page existente:', updateError);
+            } else {
+              console.log('CheckoutFlow: CPF atualizado com sucesso na landing page existente');
+            }
+          } catch (cpfUpdateError: any) {
+            console.error('CheckoutFlow: Erro ao atualizar CPF:', cpfUpdateError);
+            // Não falhar o fluxo se houver erro ao atualizar CPF
+          }
+        }
       } else {
         // Criar nova landing page
         
@@ -470,6 +494,7 @@ export const CheckoutFlow: React.FC<Props> = ({
           subdomain: finalSubdomain,
           customDomain: customDomainToSave,
           chosenDomain: chosenDomainForEmail, // Domínio completo escolhido pelo usuário (com extensão)
+          cpf: cpfToSend || null, // CPF apenas quando não há domínio próprio (já validado e limpo acima)
           briefing,
           content,
           design,

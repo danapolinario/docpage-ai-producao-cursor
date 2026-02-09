@@ -43,7 +43,7 @@ export const StripeSuccess: React.FC<StripeSuccessProps> = ({ onSuccess }) => {
         // Buscar landing page mais recente do usuário
         const { data: lpData, error: lpError } = await supabase
           .from('landing_pages')
-          .select('id, subdomain, custom_domain')
+          .select('id, subdomain, custom_domain, cpf')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -69,6 +69,53 @@ export const StripeSuccess: React.FC<StripeSuccessProps> = ({ onSuccess }) => {
         }
 
         const landingPage = lpData;
+        
+        // Buscar CPF de pending_checkouts usando session_id e atualizar landing page se necessário
+        // Isso é uma solução alternativa caso o webhook não esteja funcionando
+        if (!landingPage.cpf && sessionId) {
+          console.log('StripeSuccess: Buscando CPF de pending_checkouts para atualizar landing page...', {
+            sessionId,
+            landingPageId: landingPage.id,
+          });
+          
+          try {
+            const { data: pendingCheckout, error: pendingError } = await supabase
+              .from('pending_checkouts')
+              .select('cpf')
+              .eq('stripe_session_id', sessionId)
+              .maybeSingle();
+            
+            if (pendingCheckout && pendingCheckout.cpf && !pendingError) {
+              console.log('StripeSuccess: CPF encontrado em pending_checkouts, atualizando landing page...', {
+                cpf: pendingCheckout.cpf,
+                landingPageId: landingPage.id,
+              });
+              
+              // Limpar CPF (apenas números)
+              const cpfCleaned = String(pendingCheckout.cpf).replace(/\D/g, '');
+              
+              const { error: updateError } = await supabase
+                .from('landing_pages')
+                .update({ cpf: cpfCleaned })
+                .eq('id', landingPage.id);
+              
+              if (updateError) {
+                console.error('StripeSuccess: Erro ao atualizar CPF na landing page:', updateError);
+              } else {
+                console.log('StripeSuccess: CPF atualizado com sucesso na landing page');
+              }
+            } else {
+              console.log('StripeSuccess: CPF não encontrado em pending_checkouts ou já existe na landing page', {
+                hasPendingCheckout: !!pendingCheckout,
+                hasCpf: !!pendingCheckout?.cpf,
+                error: pendingError?.message,
+              });
+            }
+          } catch (cpfError: any) {
+            console.error('StripeSuccess: Erro ao buscar/atualizar CPF:', cpfError);
+            // Não falhar o fluxo se houver erro ao atualizar CPF
+          }
+        }
 
         // Construir URL da landing page
         const landingPageUrl = landingPage.custom_domain 
