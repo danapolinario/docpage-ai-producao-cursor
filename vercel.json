@@ -32,6 +32,16 @@
       "destination": "/index.html"
     },
     {
+      "source": "/index.html",
+      "destination": "/api",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?<subdomain>[^.]+)\\.docpage\\.com\\.br"
+        }
+      ]
+    },
+    {
       "source": "/",
       "destination": "/api"
     },
