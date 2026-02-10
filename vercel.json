@@ -17,29 +17,19 @@
   "rewrites": [
     {
       "source": "/admin",
-      "destination": "/index.html"
+      "destination": "/spa.html"
     },
     {
       "source": "/dashboard",
-      "destination": "/index.html"
+      "destination": "/spa.html"
     },
     {
       "source": "/dev",
-      "destination": "/index.html"
+      "destination": "/spa.html"
     },
     {
       "source": "/checkout",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/index.html",
-      "destination": "/api",
-      "has": [
-        {
-          "type": "host",
-          "value": "(?<subdomain>[^.]+)\\.docpage\\.com\\.br"
-        }
-      ]
+      "destination": "/spa.html"
     },
     {
       "source": "/",

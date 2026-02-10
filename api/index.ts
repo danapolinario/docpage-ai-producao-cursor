@@ -291,18 +291,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
   
-  // Se não for subdomínio, servir index.html (SPA)
+  // Se não for subdomínio, servir spa.html (SPA)
   console.log('[SUBDOMAIN DEBUG] Not a subdomain (index), serving SPA:', {
     host,
     subdomain: null
   });
   
   try {
-    // Tentar múltiplos caminhos possíveis para index.html no Vercel
+    // Tentar múltiplos caminhos possíveis para spa.html no Vercel
+    // spa.html é o index.html renomeado após o build para evitar que o Vercel o sirva diretamente
     const possiblePaths = [
-      join(process.cwd(), 'dist', 'index.html'),
+      join(process.cwd(), 'dist', 'spa.html'),
+      join(process.cwd(), 'dist', 'index.html'), // Fallback caso o plugin não tenha funcionado
+      join(process.cwd(), 'spa.html'),
       join(process.cwd(), 'index.html'),
+      join(__dirname, '..', 'dist', 'spa.html'),
       join(__dirname, '..', 'dist', 'index.html'),
+      join(__dirname, '..', 'spa.html'),
       join(__dirname, '..', 'index.html'),
     ];
     
@@ -312,7 +317,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const indexPath of possiblePaths) {
       try {
         indexHtml = readFileSync(indexPath, 'utf-8');
-        console.log('[SUBDOMAIN DEBUG] index.html encontrado em (index):', indexPath);
+        console.log('[SUBDOMAIN DEBUG] spa.html/index.html encontrado em (index):', indexPath);
         break;
       } catch (err: any) {
         lastError = err;
