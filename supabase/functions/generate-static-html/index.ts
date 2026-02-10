@@ -358,8 +358,45 @@ serve(async (req) => {
       );
     }
 
-    // Gerar HTML
-    const html = await renderLandingPageHTML(landingPage);
+    // Gerar HTML chamando a API do Vercel para garantir que use os assets corretos
+    // Isso garante que o HTML gerado tenha os mesmos caminhos de assets que o SSR dinâmico
+    const vercelUrl = "https://docpage.com.br"; // URL fixa do Vercel
+    const apiUrl = `${vercelUrl}/api`;
+    
+    console.log('[GENERATE STATIC HTML] Chamando API do Vercel para gerar HTML:', apiUrl);
+    console.log('[GENERATE STATIC HTML] Subdomain:', landingPage.subdomain);
+    
+    // Fazer fetch para a API com o subdomain no header
+    const apiResponse = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Host': `${landingPage.subdomain}.docpage.com.br`,
+        'X-Forwarded-Host': `${landingPage.subdomain}.docpage.com.br`,
+        'X-Vercel-Original-Host': `${landingPage.subdomain}.docpage.com.br`,
+        'User-Agent': 'Supabase-Edge-Function/1.0',
+      },
+    });
+    
+    let html: string;
+    
+    if (apiResponse.ok) {
+      html = await apiResponse.text();
+      console.log('[GENERATE STATIC HTML] HTML gerado pela API, tamanho:', html.length);
+      
+      // Verificar se o HTML contém dados do médico (não genérico)
+      const hasDoctorName = html.includes(landingPage.briefing_data?.name || '');
+      const hasGenericDocPage = html.includes('DocPage AI - Crie Site Profissional');
+      
+      if (hasGenericDocPage && !hasDoctorName) {
+        console.warn('[GENERATE STATIC HTML] ⚠️ HTML da API parece genérico, usando função local como fallback');
+        html = await renderLandingPageHTML(landingPage);
+      }
+    } else {
+      const errorText = await apiResponse.text();
+      console.log('[GENERATE STATIC HTML] API retornou erro, usando função local:', apiResponse.status, errorText.substring(0, 200));
+      // Fallback para função local se a API falhar
+      html = await renderLandingPageHTML(landingPage);
+    }
 
     if (!html || html.length === 0) {
       return new Response(
