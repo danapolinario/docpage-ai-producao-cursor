@@ -99,6 +99,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Isso garante que subdomínios sempre passem pelo SSR, mesmo que o Vercel tente servir arquivos estáticos
   if (subdomain) {
     console.log('[SSR] ✓ Subdomínio detectado:', subdomain);
+    console.log('[SSR] Request URL:', req.url);
+    console.log('[SSR] Request Host:', host);
     
     // Primeiro, verificar se existe HTML estático no Storage
     try {
@@ -120,6 +122,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       });
       
+      console.log('[SSR] HEAD response status:', fetchResponse.status);
+      
       if (fetchResponse.ok) {
         // Arquivo existe, fazer fetch completo
         console.log('[SSR] ✓ HTML estático encontrado, fazendo fetch completo');
@@ -129,17 +133,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         });
         
-        if (fullResponse.ok) {
+          if (fullResponse.ok) {
           const htmlText = await fullResponse.text();
           
-          console.log('[SSR] ✓ HTML estático servido com sucesso, tamanho:', htmlText.length);
+          console.log('[SSR] ✓ HTML estático baixado com sucesso, tamanho:', htmlText.length);
+          console.log('[SSR] Primeiros 200 caracteres:', htmlText.substring(0, 200));
           
-          res.setHeader('Content-Type', 'text/html; charset=utf-8');
-          res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600'); // Cache de 1 hora
-          res.setHeader('Vary', 'Host');
-          res.setHeader('X-Content-Type-Options', 'nosniff');
-          res.setHeader('X-Served-From', 'static-html');
-          return res.send(htmlText);
+          // IMPORTANTE: Verificar se o HTML não é o index.html padrão do DocPage
+          // O HTML estático deve conter dados específicos do médico, não o HTML genérico
+          const isDefaultIndex = htmlText.includes('DocPage AI - Crie Site Profissional') && 
+                                 !htmlText.includes('id="root"') && // O HTML estático deve ter id="root"
+                                 htmlText.length < 5000; // HTML estático deve ser maior que o index padrão
+          
+          if (isDefaultIndex) {
+            console.error('[SSR] ⚠️ ATENÇÃO: HTML estático parece ser o index.html padrão!');
+            console.error('[SSR] Continuando com SSR dinâmico...');
+            // Não retornar, continuar com SSR dinâmico
+          } else {
+            console.log('[SSR] ✓ HTML estático validado, servindo...');
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600'); // Cache de 1 hora
+            res.setHeader('Vary', 'Host');
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.setHeader('X-Served-From', 'static-html');
+            res.setHeader('X-Subdomain', subdomain);
+            
+            // Enviar e finalizar resposta
+            res.status(200).send(htmlText);
+            return;
+          }
+        } else {
+          console.log('[SSR] Erro ao fazer fetch completo do HTML estático:', fullResponse.status);
         }
       } else {
         console.log('[SSR] HTML estático não encontrado (status:', fetchResponse.status, ')');

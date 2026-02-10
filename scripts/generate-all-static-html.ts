@@ -14,25 +14,82 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 
-// Carregar variáveis de ambiente (dotenv é opcional)
-// Se dotenv não estiver instalado, use variáveis de ambiente do sistema
-if (typeof process !== 'undefined' && process.env) {
-  // Variáveis já estão disponíveis via process.env
-  // Se quiser usar dotenv, instale: npm install dotenv
-  // e descomente as linhas abaixo:
-  // import dotenv from 'dotenv';
-  // dotenv.config();
+// Carregar variáveis de ambiente do arquivo .env se existir
+try {
+  const envPath = join(process.cwd(), '.env');
+  if (existsSync(envPath)) {
+    const envFile = readFileSync(envPath, 'utf-8');
+    const envLines = envFile.split('\n');
+    
+    for (const line of envLines) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const [key, ...valueParts] = trimmed.split('=');
+        if (key && valueParts.length > 0) {
+          const value = valueParts.join('=').trim().replace(/^["']|["']$/g, '');
+          if (!process.env[key]) {
+            process.env[key] = value;
+          }
+        }
+      }
+    }
+    console.log('✓ Arquivo .env carregado\n');
+  }
+} catch (error: any) {
+  // Arquivo .env não existe ou não pode ser lido - usar variáveis do sistema
+  if (error.code !== 'ENOENT') {
+    console.log('⚠️  Aviso: Não foi possível carregar .env, usando variáveis do sistema\n');
+  }
 }
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+// Tentar carregar variáveis de ambiente de múltiplas fontes
+const supabaseUrl = 
+  process.env.VITE_SUPABASE_URL || 
+  process.env.SUPABASE_URL || 
+  '';
+
+const supabaseServiceKey = 
+  process.env.SUPABASE_SERVICE_ROLE_KEY || 
+  process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY || 
+  '';
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Erro: Variáveis de ambiente não configuradas');
-  console.error('Configure VITE_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no .env');
+  console.error('❌ Erro: Variáveis de ambiente não configuradas\n');
+  console.error('📝 Configure as variáveis de ambiente de uma das seguintes formas:\n');
+  
+  console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.error('Opção 1: Criar arquivo .env na raiz do projeto (RECOMENDADO)\n');
+  console.error('   1. Copie o arquivo .env.example para .env:');
+  console.error('      cp .env.example .env\n');
+  console.error('   2. Edite o arquivo .env e preencha os valores:\n');
+  console.error('      VITE_SUPABASE_URL=https://seu-projeto.supabase.co');
+  console.error('      SUPABASE_SERVICE_ROLE_KEY=sua-service-role-key\n');
+  
+  console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.error('Opção 2: Exportar variáveis no terminal\n');
+  console.error('   export VITE_SUPABASE_URL=https://seu-projeto.supabase.co');
+  console.error('   export SUPABASE_SERVICE_ROLE_KEY=sua-service-role-key');
+  console.error('   npm run generate:static-html\n');
+  
+  console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.error('📍 Onde encontrar os valores:\n');
+  console.error('   1. Acesse: https://supabase.com/dashboard');
+  console.error('   2. Selecione seu projeto');
+  console.error('   3. Vá em Settings > API\n');
+  console.error('   - VITE_SUPABASE_URL: Project URL');
+  console.error('   - SUPABASE_SERVICE_ROLE_KEY: service_role key (secret) ⚠️\n');
+  console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+  console.error('⚠️  IMPORTANTE: A Service Role Key é sensível - NUNCA compartilhe ou commite no git!');
   process.exit(1);
 }
+
+console.log('✓ Variáveis de ambiente configuradas');
+console.log(`  URL: ${supabaseUrl.substring(0, 30)}...`);
+console.log(`  Key: ${supabaseServiceKey.substring(0, 20)}...\n`);
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -58,8 +115,68 @@ async function generateAllStaticHTML() {
 
     console.log(`📋 Encontradas ${landingPages.length} landing pages publicadas\n`);
 
-    const FUNCTIONS_BASE_URL = `${supabaseUrl.replace('/rest/v1', '')}/functions/v1`;
+    // Construir URL da função corretamente
+    let FUNCTIONS_BASE_URL: string;
+    if (supabaseUrl.includes('/rest/v1')) {
+      FUNCTIONS_BASE_URL = supabaseUrl.replace('/rest/v1', '/functions/v1');
+    } else if (supabaseUrl.endsWith('/')) {
+      FUNCTIONS_BASE_URL = `${supabaseUrl}functions/v1`;
+    } else {
+      FUNCTIONS_BASE_URL = `${supabaseUrl}/functions/v1`;
+    }
+    
+    console.log(`🔗 URL da função: ${FUNCTIONS_BASE_URL}/generate-static-html\n`);
+    
     const results: Array<{ landingPageId: string; subdomain: string; success: boolean; error?: string; publicUrl?: string }> = [];
+    
+    // Testar a primeira landing page para verificar se a função está funcionando
+    if (landingPages.length > 0) {
+      const testPage = landingPages[0];
+      console.log(`🧪 Testando função com primeira landing page: ${testPage.subdomain}...`);
+      
+      try {
+        const testResponse = await fetch(`${FUNCTIONS_BASE_URL}/generate-static-html`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'apikey': supabaseServiceKey,
+          },
+          body: JSON.stringify({ landingPageId: testPage.id }),
+        });
+        
+        const testText = await testResponse.text();
+        let testData: any;
+        try {
+          testData = testText ? JSON.parse(testText) : {};
+        } catch {
+          testData = { raw: testText.substring(0, 200) };
+        }
+        
+        console.log(`   Status: ${testResponse.status} ${testResponse.statusText}`);
+        console.log(`   Response: ${JSON.stringify(testData, null, 2).substring(0, 300)}...\n`);
+        
+        if (!testResponse.ok) {
+          console.error('⚠️  A Edge Function está retornando erro. Possíveis causas:\n');
+          console.error('   1. Função não deployada:');
+          console.error('      Execute: supabase functions deploy generate-static-html\n');
+          console.error('   2. Service Role Key incorreta:');
+          console.error('      Verifique em: Supabase Dashboard > Settings > API > service_role\n');
+          console.error('   3. Bucket não permite HTML:');
+          console.error('      Execute a migration: 20260210000001_allow_html_in_storage.sql\n');
+          console.error('   4. Verifique os logs:');
+          console.error('      Supabase Dashboard > Edge Functions > generate-static-html > Logs\n');
+          
+          // Perguntar se quer continuar mesmo assim
+          console.error('❓ Deseja continuar mesmo assim? (Pode ser que a função não esteja deployada)\n');
+        } else {
+          console.log('✓ Função está funcionando! Continuando com todas as landing pages...\n');
+        }
+      } catch (testError: any) {
+        console.error(`   ✗ Erro de rede ao testar: ${testError.message}`);
+        console.error(`   Verifique se a URL está correta: ${FUNCTIONS_BASE_URL}/generate-static-html\n`);
+      }
+    }
 
     // Gerar HTML estático para cada landing page
     for (let i = 0; i < landingPages.length; i++) {
@@ -74,11 +191,23 @@ async function generateAllStaticHTML() {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${supabaseServiceKey}`,
+            'apikey': supabaseServiceKey, // Algumas Edge Functions podem precisar disso
           },
           body: JSON.stringify({ landingPageId: landingPage.id }),
         });
+        
+        // Log detalhado para debug
+        if (!htmlResponse.ok && i === 0) {
+          console.error(`   Headers da resposta:`, Object.fromEntries(htmlResponse.headers.entries()));
+        }
 
-        const htmlData = await htmlResponse.json();
+        let htmlData: any;
+        try {
+          const responseText = await htmlResponse.text();
+          htmlData = responseText ? JSON.parse(responseText) : {};
+        } catch (parseError) {
+          htmlData = { error: `Erro ao parsear resposta: ${htmlResponse.status} ${htmlResponse.statusText}` };
+        }
 
         if (htmlResponse.ok) {
           console.log(`  ✓ Sucesso: ${landingPage.subdomain}`);
@@ -92,12 +221,18 @@ async function generateAllStaticHTML() {
             publicUrl: htmlData.publicUrl
           });
         } else {
-          console.error(`  ✗ Erro: ${landingPage.subdomain} - ${htmlData.error || 'Erro desconhecido'}`);
+          const errorMsg = htmlData.error || htmlData.message || `HTTP ${htmlResponse.status}: ${htmlResponse.statusText}`;
+          console.error(`  ✗ Erro: ${landingPage.subdomain}`);
+          console.error(`    Status: ${htmlResponse.status}`);
+          console.error(`    Detalhes: ${errorMsg}`);
+          if (htmlData.details) {
+            console.error(`    Mais info: ${JSON.stringify(htmlData.details)}`);
+          }
           results.push({
             landingPageId: landingPage.id,
             subdomain: landingPage.subdomain,
             success: false,
-            error: htmlData.error || 'Erro desconhecido'
+            error: errorMsg
           });
         }
       } catch (error: any) {
