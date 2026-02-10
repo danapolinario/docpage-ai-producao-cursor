@@ -38,3 +38,9 @@ verify_jwt = false
 
 [functions.stripe-webhook]
 verify_jwt = false
+
+[functions.generate-static-html]
+verify_jwt = false
+
+[functions.generate-all-static-html]
+verify_jwt = false
