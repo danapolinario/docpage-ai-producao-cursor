@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Se status mudou para 'published', enviar email de notificação
+    // Se status mudou para 'published', enviar email de notificação e gerar HTML estático
     if (status === 'published') {
       try {
         console.log('Enviando email de notificação de publicação (via Edge Function):', landingPageId)
@@ -136,6 +136,45 @@ Deno.serve(async (req) => {
           stack: notifyError.stack,
         })
         // Não falhar a atualização se o email falhar
+      }
+
+      // Gerar HTML estático quando status muda para 'published'
+      try {
+        console.log('Gerando HTML estático para landing page publicada:', landingPageId)
+        const FUNCTIONS_BASE_URL = `${Deno.env.get('SUPABASE_URL')}/functions/v1`
+        const htmlResponse = await fetch(`${FUNCTIONS_BASE_URL}/generate-static-html`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ landingPageId }),
+        })
+        
+        const htmlData = await htmlResponse.json()
+        
+        if (!htmlResponse.ok) {
+          console.error('Erro ao gerar HTML estático:', {
+            status: htmlResponse.status,
+            statusText: htmlResponse.statusText,
+            error: htmlData.error || htmlData,
+            landingPageId,
+          })
+          // Não falhar a atualização se a geração de HTML falhar
+        } else {
+          console.log('HTML estático gerado com sucesso:', {
+            landingPageId,
+            publicUrl: htmlData.publicUrl,
+            subdomain: htmlData.subdomain,
+          })
+        }
+      } catch (htmlError: any) {
+        console.error('Erro ao gerar HTML estático:', {
+          landingPageId,
+          error: htmlError.message || htmlError,
+          stack: htmlError.stack,
+        })
+        // Não falhar a atualização se a geração de HTML falhar
       }
     }
 

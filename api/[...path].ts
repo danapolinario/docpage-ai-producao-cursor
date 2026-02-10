@@ -92,9 +92,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   });
   console.log('[SSR DEBUG] ============================================');
   
-  // Se for subdomínio, renderizar SSR
+  // Se for subdomínio, verificar se existe HTML estático primeiro
   if (subdomain) {
-    console.log('[SUBDOMAIN DEBUG] Subdomain detected, querying database:', subdomain);
+    console.log('[SUBDOMAIN DEBUG] Subdomain detected:', subdomain);
+    
+    // Primeiro, verificar se existe HTML estático no Storage
+    try {
+      const HTML_FOLDER = 'html';
+      const filePath = `${HTML_FOLDER}/${subdomain}.html`;
+      
+      // Tentar buscar HTML estático do Storage
+      const { data: staticHtmlData, error: staticHtmlError } = await supabase.storage
+        .from('landing-pages')
+        .download(filePath);
+
+      if (!staticHtmlError && staticHtmlData) {
+        console.log('[SSR] ✓ HTML estático encontrado, servindo diretamente');
+        const htmlText = await staticHtmlData.text();
+        
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600'); // Cache de 1 hora
+        res.setHeader('Vary', 'Host');
+        res.setHeader('X-Served-From', 'static-html');
+        return res.send(htmlText);
+      } else {
+        console.log('[SSR] HTML estático não encontrado, fazendo SSR dinâmico:', staticHtmlError?.message);
+      }
+    } catch (staticError: any) {
+      console.log('[SSR] Erro ao verificar HTML estático, fazendo SSR dinâmico:', staticError?.message);
+    }
+
+    // Fallback: SSR dinâmico
     try {
       const { data: landingPage, error } = await supabase
         .from('landing_pages')
@@ -151,6 +179,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
+        res.setHeader('X-Served-From', 'ssr-dynamic');
         return res.send(html);
       } catch (renderError: any) {
         console.error('Erro ao renderizar SSR:', renderError);

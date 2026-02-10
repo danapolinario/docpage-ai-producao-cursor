@@ -514,6 +514,13 @@ export async function updateLandingPage(
   id: string,
   updates: Partial<LandingPageRow>
 ): Promise<LandingPageRow> {
+  // Buscar landing page atual para verificar status
+  const { data: currentPage } = await supabase
+    .from('landing_pages')
+    .select('status, briefing_data, content_data, meta_title, meta_description')
+    .eq('id', id)
+    .single();
+
   const { data, error } = await supabase
     .from('landing_pages')
     .update(updates)
@@ -522,6 +529,43 @@ export async function updateLandingPage(
     .single();
 
   if (error) throw error;
+
+  // Verificar se precisa regenerar HTML estático
+  // Regenerar se:
+  // 1. Status é 'published' (ou mudou para 'published')
+  // 2. E algum dado importante foi atualizado (briefing_data, content_data, meta_title, meta_description)
+  const shouldRegenerateHTML = 
+    (data.status === 'published' || updates.status === 'published') &&
+    (
+      updates.briefing_data !== undefined ||
+      updates.content_data !== undefined ||
+      updates.meta_title !== undefined ||
+      updates.meta_description !== undefined ||
+      updates.photo_url !== undefined ||
+      updates.about_photo_url !== undefined ||
+      updates.og_image_url !== undefined ||
+      updates.status === 'published'
+    );
+
+  if (shouldRegenerateHTML) {
+    try {
+      console.log('[UPDATE LANDING PAGE] Regenerando HTML estático para landing page publicada:', id);
+      const { error: htmlError } = await supabase.functions.invoke('generate-static-html', {
+        body: { landingPageId: id }
+      });
+
+      if (htmlError) {
+        console.error('[UPDATE LANDING PAGE] Erro ao regenerar HTML estático:', htmlError);
+        // Não falhar a atualização se a geração de HTML falhar
+      } else {
+        console.log('[UPDATE LANDING PAGE] HTML estático regenerado com sucesso');
+      }
+    } catch (htmlGenError: any) {
+      console.error('[UPDATE LANDING PAGE] Erro ao chamar função de geração de HTML:', htmlGenError);
+      // Não falhar a atualização se a geração de HTML falhar
+    }
+  }
+
   return data;
 }
 

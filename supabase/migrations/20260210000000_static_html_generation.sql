@@ -1,0 +1,56 @@
+-- ============================================
+-- Migration: Suporte para HTML estático por landing page
+-- ============================================
+-- Esta migration documenta a estrutura para geração de HTML estático
+-- A lógica principal está implementada nas Edge Functions e serviços
+--
+-- NOTA: Para usar triggers automáticos, seria necessário:
+-- 1. Habilitar extensão pg_net ou configurar webhooks
+-- 2. Criar função que chama Edge Function via HTTP
+-- 3. Criar trigger que chama a função quando dados mudam
+--
+-- Por enquanto, a geração de HTML estático é feita via:
+-- - admin-update-status: quando status muda para 'published'
+-- - updateLandingPage: quando dados importantes são atualizados
+-- - generate-static-html Edge Function: chamada manualmente ou via código
+
+-- Verificar se bucket landing-pages permite arquivos HTML
+-- (Já configurado na migration 20260114134754_53369dac-b7b5-4800-ac5c-8ef6d6d70050.sql)
+-- O bucket 'landing-pages' já existe e permite upload de arquivos
+
+-- Estrutura de armazenamento:
+-- landing-pages/html/{subdomain}.html
+
+-- Políticas RLS já existentes permitem:
+-- - Leitura pública (para servir HTML estático)
+-- - Upload por usuários autenticados (via Edge Functions com service role)
+
+-- Exemplo de trigger (opcional, requer pg_net):
+-- CREATE OR REPLACE FUNCTION trigger_generate_static_html()
+-- RETURNS TRIGGER AS $$
+-- BEGIN
+--   -- Chamar Edge Function via pg_net
+--   -- Isso requer configuração adicional
+--   RETURN NEW;
+-- END;
+-- $$ LANGUAGE plpgsql;
+--
+-- CREATE TRIGGER landing_page_updated_trigger
+-- AFTER UPDATE ON landing_pages
+-- FOR EACH ROW
+-- WHEN (
+--   NEW.status = 'published' AND
+--   (
+--     OLD.briefing_data IS DISTINCT FROM NEW.briefing_data OR
+--     OLD.content_data IS DISTINCT FROM NEW.content_data OR
+--     OLD.meta_title IS DISTINCT FROM NEW.meta_title OR
+--     OLD.meta_description IS DISTINCT FROM NEW.meta_description OR
+--     OLD.status IS DISTINCT FROM NEW.status
+--   )
+-- )
+-- EXECUTE FUNCTION trigger_generate_static_html();
+
+-- Por enquanto, a geração é feita via código nas funções:
+-- - services/landing-pages.ts: updateLandingPage()
+-- - supabase/functions/admin-update-status/index.ts
+-- - supabase/functions/generate-static-html/index.ts
