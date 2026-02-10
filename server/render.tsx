@@ -66,10 +66,24 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     : `${landingPage.briefing_data.name}, ${landingPage.briefing_data.specialty}, médico ${landingPage.briefing_data.crmState}, CRM ${landingPage.briefing_data.crm}, consulta médica, agendar consulta, ${landingPage.briefing_data.mainServices?.split(',').slice(0, 3).join(', ') || ''}`;
   
   // Prioridade para imagem OG: og_image_url > about_photo_url > photo_url > fallback
-  // Ignorar og_image_url se for genérico (og-default.png)
-  const ogImage = (landingPage.og_image_url && !landingPage.og_image_url.includes('og-default.png'))
-    ? landingPage.og_image_url
-    : (landingPage.about_photo_url || landingPage.photo_url || `${baseUrl}/og-default.png`);
+  // SEMPRE ignorar qualquer URL que seja base64 (data:image) - usar apenas URLs reais
+  const isOgImageGeneric = landingPage.og_image_url ? landingPage.og_image_url.includes('og-default.png') : true;
+  const isOgImageBase64 = landingPage.og_image_url ? landingPage.og_image_url.startsWith('data:image') : false;
+  const isAboutPhotoBase64 = landingPage.about_photo_url ? landingPage.about_photo_url.startsWith('data:image') : false;
+  const isPhotoBase64 = landingPage.photo_url ? landingPage.photo_url.startsWith('data:image') : false;
+  
+  // Se og_image_url for válido (não genérico e não base64), usar ele
+  // Caso contrário, usar about_photo_url ou photo_url (que são URLs do storage), mas apenas se não forem base64
+  let ogImage: string;
+  if (!isOgImageGeneric && !isOgImageBase64 && landingPage.og_image_url) {
+    ogImage = landingPage.og_image_url;
+  } else if (landingPage.about_photo_url && !isAboutPhotoBase64) {
+    ogImage = landingPage.about_photo_url;
+  } else if (landingPage.photo_url && !isPhotoBase64) {
+    ogImage = landingPage.photo_url;
+  } else {
+    ogImage = `${baseUrl}/og-default.png`;
+  }
   const ogImageSecure = ogImage.replace('http://', 'https://');
   
   // Detectar tipo de imagem OG
@@ -83,8 +97,17 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
   const ogImageType = getImageType(ogImageSecure);
   
   // Favicon: usar foto do médico se disponível, senão usar padrão
-  const faviconImage = landingPage.photo_url || landingPage.about_photo_url || `${baseUrl}/favicon.svg`;
-  const appleTouchIcon = landingPage.photo_url || landingPage.about_photo_url || `${baseUrl}/apple-touch-icon.png`;
+  // SEMPRE ignorar base64 - usar apenas URLs reais
+  const faviconImage = (landingPage.photo_url && !isPhotoBase64) 
+    ? landingPage.photo_url 
+    : (landingPage.about_photo_url && !isAboutPhotoBase64)
+    ? landingPage.about_photo_url
+    : `${baseUrl}/favicon.svg`;
+  const appleTouchIcon = (landingPage.photo_url && !isPhotoBase64)
+    ? landingPage.photo_url
+    : (landingPage.about_photo_url && !isAboutPhotoBase64)
+    ? landingPage.about_photo_url
+    : `${baseUrl}/apple-touch-icon.png`;
 
   // Generate SEO-optimized site name for og:site_name
   // Uses doctor name and specialty for better SEO and branding
@@ -100,8 +123,8 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     "description": description,
     "image": [
       ogImage,
-      ...(landingPage.photo_url ? [landingPage.photo_url] : []),
-      ...(landingPage.about_photo_url ? [landingPage.about_photo_url] : [])
+      ...(landingPage.photo_url && !isPhotoBase64 ? [landingPage.photo_url] : []),
+      ...(landingPage.about_photo_url && !isAboutPhotoBase64 ? [landingPage.about_photo_url] : [])
     ].filter(Boolean),
     "url": pageUrl,
     "sameAs": [],
@@ -154,8 +177,8 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     "url": pageUrl,
     "image": [
       ogImage,
-      ...(landingPage.about_photo_url ? [landingPage.about_photo_url] : []),
-      ...(landingPage.photo_url ? [landingPage.photo_url] : [])
+      ...(landingPage.about_photo_url && !isAboutPhotoBase64 ? [landingPage.about_photo_url] : []),
+      ...(landingPage.photo_url && !isPhotoBase64 ? [landingPage.photo_url] : [])
     ].filter(Boolean),
     "telephone": landingPage.briefing_data.contactPhone || landingPage.content_data.contactPhone,
     "email": landingPage.briefing_data.contactEmail || landingPage.content_data.contactEmail,
@@ -259,8 +282,8 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="${escapeHtml(faviconImage.includes('.svg') ? faviconImage : `${baseUrl}/favicon.svg`)}" />
-    <link rel="icon" type="image/png" sizes="32x32" href="${escapeHtml(landingPage.photo_url || landingPage.about_photo_url ? faviconImage : `${baseUrl}/favicon-32x32.png`)}" />
-    <link rel="icon" type="image/png" sizes="16x16" href="${escapeHtml(landingPage.photo_url || landingPage.about_photo_url ? faviconImage : `${baseUrl}/favicon-16x16.png`)}" />
+    <link rel="icon" type="image/png" sizes="32x32" href="${escapeHtml((!isPhotoBase64 && landingPage.photo_url) || (!isAboutPhotoBase64 && landingPage.about_photo_url) ? faviconImage : `${baseUrl}/favicon-32x32.png`)}" />
+    <link rel="icon" type="image/png" sizes="16x16" href="${escapeHtml((!isPhotoBase64 && landingPage.photo_url) || (!isAboutPhotoBase64 && landingPage.about_photo_url) ? faviconImage : `${baseUrl}/favicon-16x16.png`)}" />
     <link rel="apple-touch-icon" sizes="180x180" href="${escapeHtml(appleTouchIcon)}" />
     
     <!-- Canonical URL -->

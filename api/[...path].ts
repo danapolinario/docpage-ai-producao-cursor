@@ -155,30 +155,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch (renderError: any) {
         console.error('Erro ao renderizar SSR:', renderError);
         console.error('Stack trace:', renderError?.stack);
-        // Em caso de erro na renderização, servir index.html como fallback
-        try {
-          const indexPath = join(process.cwd(), 'dist', 'index.html');
-          const indexHtml = readFileSync(indexPath, 'utf-8');
-          res.setHeader('Content-Type', 'text/html');
-          return res.send(indexHtml);
-        } catch (fallbackError) {
-          console.error('Erro ao servir fallback:', fallbackError);
-          return res.status(500).send('Internal Server Error');
-        }
+        // IMPORTANTE: Para subdomínios, NUNCA servir index.html estático como fallback
+        // Isso evita que o HTML padrão apareça antes do conteúdo da landing page
+        // Retornar erro 500 em vez de servir index.html estático
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+        return res.status(500).send(`
+          <!DOCTYPE html>
+          <html lang="pt-BR">
+          <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>Erro ao carregar página</title>
+          </head>
+          <body>
+            <h1>Erro ao carregar página</h1>
+            <p>Por favor, tente novamente mais tarde.</p>
+          </body>
+          </html>
+        `);
       }
     } catch (error: any) {
       console.error('Erro geral ao processar subdomínio:', error);
       console.error('Stack trace:', error?.stack);
-      // Em caso de erro, servir index.html como fallback
-      try {
-        const indexPath = join(process.cwd(), 'dist', 'index.html');
-        const indexHtml = readFileSync(indexPath, 'utf-8');
-        res.setHeader('Content-Type', 'text/html');
-        return res.send(indexHtml);
-      } catch (fallbackError) {
-        console.error('Erro ao servir fallback:', fallbackError);
-        return res.status(500).send('Internal Server Error');
-      }
+      // IMPORTANTE: Para subdomínios, NUNCA servir index.html estático como fallback
+      // Isso evita que o HTML padrão apareça antes do conteúdo da landing page
+      // Retornar erro 500 em vez de servir index.html estático
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      return res.status(500).send(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>Erro ao carregar página</title>
+        </head>
+        <body>
+          <h1>Erro ao carregar página</h1>
+          <p>Por favor, tente novamente mais tarde.</p>
+        </body>
+        </html>
+      `);
     }
   }
   
