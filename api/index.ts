@@ -146,7 +146,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       return res.send(html);
     } catch (error: any) {
       console.error('[SSR] ✗ Erro ao renderizar SSR:', error?.message || error);

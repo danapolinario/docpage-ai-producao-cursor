@@ -4,13 +4,15 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "cleanUrls": false,
+  "trailingSlash": false,
   "rewrites": [
     {
       "source": "/",
       "destination": "/api"
     },
     {
-      "source": "/((?!admin|dashboard|dev|checkout|assets).*)",
+      "source": "/((?!admin|dashboard|dev|checkout|assets|favicon|robots|sitemap|.*\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)).*)",
       "destination": "/api/$1"
     },
     {
@@ -40,6 +42,10 @@
         },
         {
           "key": "Host",
+          "value": "$host"
+        },
+        {
+          "key": "X-Vercel-Original-Host",
           "value": "$host"
         }
       ]

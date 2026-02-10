@@ -127,8 +127,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
 
       try {
+        console.log('[SSR] Renderizando HTML com dados do médico...');
         const html = await renderLandingPage(landingPage, mockReq);
-        res.setHeader('Content-Type', 'text/html');
+        
+        // Verificar se o HTML gerado contém dados do médico (não genérico)
+        const hasDoctorName = html.includes(landingPage.briefing_data?.name || '');
+        const hasGenericDocPage = html.includes('DocPage AI - Crie Site Profissional');
+        
+        console.log('[SSR] Verificação do HTML gerado:', {
+          hasDoctorName,
+          hasGenericDocPage,
+          htmlLength: html.length,
+          firstChars: html.substring(0, 200)
+        });
+        
+        if (hasGenericDocPage && !hasDoctorName) {
+          console.error('[SSR] ⚠️ ATENÇÃO: HTML gerado ainda contém dados genéricos!');
+        }
+        
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         return res.send(html);
       } catch (renderError: any) {
         console.error('Erro ao renderizar SSR:', renderError);

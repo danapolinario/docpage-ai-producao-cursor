@@ -50,6 +50,16 @@ interface LandingPageData {
 
 export async function renderLandingPage(landingPage: LandingPageData, req: any): Promise<string> {
   try {
+    console.log('[RENDER] Iniciando renderização SSR para landing page:', {
+      id: landingPage.id,
+      subdomain: landingPage.subdomain,
+      hasBriefing: !!landingPage.briefing_data,
+      hasContent: !!landingPage.content_data,
+      metaTitle: landingPage.meta_title?.substring(0, 50),
+      metaDescription: landingPage.meta_description?.substring(0, 50),
+      doctorName: landingPage.briefing_data?.name
+    });
+    
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const pageUrl = landingPage.custom_domain 
       ? `https://${landingPage.custom_domain}` 
@@ -58,6 +68,14 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     // Garantir que briefing_data e content_data existem
     const briefing = landingPage.briefing_data || {} as any;
     const content = landingPage.content_data || {} as any;
+    
+    console.log('[RENDER] Dados extraídos:', {
+      doctorName: briefing.name,
+      specialty: briefing.specialty,
+      crm: briefing.crm,
+      crmState: briefing.crmState,
+      hasSubheadline: !!content.subheadline
+    });
 
     // Função para verificar se meta tag é genérica do DocPage AI
     const isGenericDocPageMeta = (value: string | null | undefined): boolean => {
@@ -74,13 +92,21 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     };
 
     // Gerar tags SEO com valores seguros
-    // Ignorar meta_title se for genérico do DocPage AI
-    const title = (landingPage.meta_title && !isGenericDocPageMeta(landingPage.meta_title))
+    // SEMPRE usar dados do médico, ignorando meta_title se for genérico do DocPage AI
+    const isTitleGeneric = landingPage.meta_title ? isGenericDocPageMeta(landingPage.meta_title) : true;
+    const title = (!isTitleGeneric && landingPage.meta_title)
       ? landingPage.meta_title
       : `${briefing.name || 'Médico'} - ${briefing.specialty || 'Especialista'} | CRM ${briefing.crm || ''}/${briefing.crmState || ''}`;
     
-    // Ignorar meta_description se for genérica do DocPage AI
-    const rawDescription = (landingPage.meta_description && !isGenericDocPageMeta(landingPage.meta_description))
+    console.log('[RENDER] Title gerado:', {
+      isTitleGeneric,
+      metaTitle: landingPage.meta_title?.substring(0, 50),
+      finalTitle: title.substring(0, 50)
+    });
+    
+    // SEMPRE usar dados do médico, ignorando meta_description se for genérica do DocPage AI
+    const isDescriptionGeneric = landingPage.meta_description ? isGenericDocPageMeta(landingPage.meta_description) : true;
+    const rawDescription = (!isDescriptionGeneric && landingPage.meta_description)
       ? landingPage.meta_description
       : (content.subheadline || 
         `Dr(a). ${briefing.name || 'Médico'}, ${briefing.specialty || 'Especialista'} - CRM ${briefing.crm || ''}/${briefing.crmState || ''}. ${briefing.crmState || ''}. Agende sua consulta online.`);
@@ -88,24 +114,39 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
       ? rawDescription.substring(0, 157) + '...' 
       : rawDescription;
     
-    // Ignorar meta_keywords se forem genéricas do DocPage AI
+    console.log('[RENDER] Description gerada:', {
+      isDescriptionGeneric,
+      metaDescription: landingPage.meta_description?.substring(0, 50),
+      finalDescription: description.substring(0, 50)
+    });
+    
+    // SEMPRE usar dados do médico, ignorando meta_keywords se forem genéricas do DocPage AI
     const hasGenericKeywords = landingPage.meta_keywords && landingPage.meta_keywords.length > 0
       ? landingPage.meta_keywords.some(kw => isGenericDocPageMeta(kw))
-      : false;
-    const keywords = (landingPage.meta_keywords && !hasGenericKeywords)
+      : true; // Se não houver keywords, considerar genérico
+    const keywords = (!hasGenericKeywords && landingPage.meta_keywords)
       ? landingPage.meta_keywords.join(', ')
       : `${briefing.name || 'Médico'}, ${briefing.specialty || 'Especialista'}, médico ${briefing.crmState || ''}, CRM ${briefing.crm || ''}, consulta médica, agendar consulta, ${briefing.mainServices?.split(',').slice(0, 3).join(', ') || ''}`;
     
     // Prioridade para imagem OG: og_image_url > about_photo_url > photo_url > fallback
-    // Ignorar og_image_url se for genérico (og-default.png)
-    const ogImage = (landingPage.og_image_url && !landingPage.og_image_url.includes('og-default.png'))
+    // SEMPRE ignorar og_image_url se for genérico (og-default.png)
+    const isOgImageGeneric = landingPage.og_image_url ? landingPage.og_image_url.includes('og-default.png') : true;
+    const ogImage = (!isOgImageGeneric && landingPage.og_image_url)
       ? landingPage.og_image_url
       : (landingPage.about_photo_url || landingPage.photo_url || `${baseUrl}/og-default.png`);
     const ogImageSecure = ogImage.replace('http://', 'https://');
+    
+    console.log('[RENDER] OG Image gerada:', {
+      isOgImageGeneric,
+      ogImageUrl: landingPage.og_image_url,
+      finalOgImage: ogImage.substring(0, 100)
+    });
 
     // Generate SEO-optimized site name for og:site_name
     // Uses doctor name and specialty for better SEO and branding
     const siteName = `Dr(a). ${briefing.name || 'Médico'} - ${briefing.specialty || 'Especialista'} | CRM ${briefing.crm || ''}/${briefing.crmState || ''}`;
+    
+    console.log('[RENDER] Site name gerado:', siteName.substring(0, 50));
 
   // Schema.org JSON-LD
   const schemaMarkup = {
@@ -334,10 +375,18 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
   </body>
 </html>`;
 
-  return html;
+    console.log('[RENDER] HTML gerado com sucesso:', {
+      htmlLength: html.length,
+      hasDoctorName: html.includes(briefing.name || ''),
+      hasGenericDocPage: html.includes('DocPage AI - Crie Site Profissional'),
+      titleInHtml: html.includes(title),
+      descriptionInHtml: html.includes(description.substring(0, 50))
+    });
+    
+    return html;
   } catch (error: any) {
-    console.error('Erro ao renderizar landing page:', error);
-    console.error('Stack trace:', error?.stack);
+    console.error('[RENDER] Erro ao renderizar landing page:', error);
+    console.error('[RENDER] Stack trace:', error?.stack);
     throw error; // Re-throw para ser tratado pelo handler
   }
 }
