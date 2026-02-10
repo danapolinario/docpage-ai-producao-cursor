@@ -13,7 +13,7 @@ interface VercelResponse {
   setHeader: (name: string, value: string) => void;
 }
 
-import { renderLandingPage } from './render';
+import { renderLandingPage } from './render.js';
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
