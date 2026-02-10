@@ -287,8 +287,8 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="${escapeHtml(briefing.name || 'Médico')}" />
-    ${landingPage.photo_url ? `<link rel="apple-touch-icon" href="${escapeHtml(landingPage.photo_url)}" sizes="180x180" />` : ''}
-    <link rel="icon" href="${escapeHtml(landingPage.photo_url || `${baseUrl}/favicon.ico`)}" type="image/x-icon" />
+    ${landingPage.photo_url && !landingPage.photo_url.startsWith('data:image') ? `<link rel="apple-touch-icon" href="${escapeHtml(landingPage.photo_url)}" sizes="180x180" />` : ''}
+    <link rel="icon" href="${escapeHtml((landingPage.photo_url && !landingPage.photo_url.startsWith('data:image')) ? landingPage.photo_url : `${baseUrl}/favicon.ico`)}" type="image/x-icon" />
     
     <!-- Canonical URL -->
     <link rel="canonical" href="${escapeHtml(pageUrl)}" />

@@ -45,6 +45,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // IMPORTANTE: Verificar subdomínio PRIMEIRO, antes de qualquer outra coisa
   // Isso garante que subdomínios sempre passem pelo SSR, mesmo que o Vercel tente servir arquivos estáticos
   
+  console.log('[API/INDEX] Handler chamado para:', req.url);
+  
   // Garantir que host seja string - verificar múltiplos headers do Vercel
   // IMPORTANTE: Vercel pode passar o host em diferentes headers dependendo da configuração
   const hostHeader = req.headers.host;

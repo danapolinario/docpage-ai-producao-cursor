@@ -42,6 +42,8 @@ function extractSubdomain(host: string): string | null {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  console.log('[API/[...PATH]] Handler chamado para:', req.url);
+  
   // Garantir que host seja string - verificar múltiplos headers do Vercel
   // IMPORTANTE: Vercel pode passar o host em diferentes headers dependendo da configuração
   const hostHeader = req.headers.host;
