@@ -67,20 +67,25 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
   
   // Prioridade para imagem OG: og_image_url > about_photo_url > photo_url > fallback
   // SEMPRE ignorar qualquer URL que seja base64 (data:image) - usar apenas URLs reais
-  const isOgImageGeneric = landingPage.og_image_url ? landingPage.og_image_url.includes('og-default.png') : true;
+  const isOgImageGeneric = landingPage.og_image_url ? landingPage.og_image_url.includes('og-default.png') : false;
   const isOgImageBase64 = landingPage.og_image_url ? landingPage.og_image_url.startsWith('data:image') : false;
   const isAboutPhotoBase64 = landingPage.about_photo_url ? landingPage.about_photo_url.startsWith('data:image') : false;
   const isPhotoBase64 = landingPage.photo_url ? landingPage.photo_url.startsWith('data:image') : false;
   
+  // Verificar se as URLs são válidas (não vazias, não base64, não genéricas)
+  const hasValidOgImage = landingPage.og_image_url && !isOgImageGeneric && !isOgImageBase64;
+  const hasValidAboutPhoto = landingPage.about_photo_url && !isAboutPhotoBase64 && landingPage.about_photo_url.trim().length > 0;
+  const hasValidPhoto = landingPage.photo_url && !isPhotoBase64 && landingPage.photo_url.trim().length > 0;
+  
   // Se og_image_url for válido (não genérico e não base64), usar ele
   // Caso contrário, usar about_photo_url ou photo_url (que são URLs do storage), mas apenas se não forem base64
   let ogImage: string;
-  if (!isOgImageGeneric && !isOgImageBase64 && landingPage.og_image_url) {
-    ogImage = landingPage.og_image_url;
-  } else if (landingPage.about_photo_url && !isAboutPhotoBase64) {
-    ogImage = landingPage.about_photo_url;
-  } else if (landingPage.photo_url && !isPhotoBase64) {
-    ogImage = landingPage.photo_url;
+  if (hasValidOgImage) {
+    ogImage = landingPage.og_image_url!;
+  } else if (hasValidAboutPhoto) {
+    ogImage = landingPage.about_photo_url!;
+  } else if (hasValidPhoto) {
+    ogImage = landingPage.photo_url!;
   } else {
     ogImage = `${baseUrl}/og-default.png`;
   }

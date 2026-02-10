@@ -59,17 +59,24 @@ async function renderLandingPageHTML(landingPage: any): Promise<string> {
     : `${briefing.name || 'Médico'}, ${briefing.specialty || 'Especialista'}, médico ${briefing.crmState || ''}, CRM ${briefing.crm || ''}, consulta médica, agendar consulta, ${briefing.mainServices?.split(',').slice(0, 3).join(', ') || ''}`;
   
   // Imagem OG
-  const isOgImageGeneric = landingPage.og_image_url ? landingPage.og_image_url.includes('og-default.png') : true;
+  // Prioridade: og_image_url > about_photo_url > photo_url > fallback
+  // SEMPRE ignorar qualquer URL que seja base64 (data:image) - usar apenas URLs reais
+  const isOgImageGeneric = landingPage.og_image_url ? landingPage.og_image_url.includes('og-default.png') : false;
   const isOgImageBase64 = landingPage.og_image_url ? landingPage.og_image_url.startsWith('data:image') : false;
   const isAboutPhotoBase64 = landingPage.about_photo_url ? landingPage.about_photo_url.startsWith('data:image') : false;
   const isPhotoBase64 = landingPage.photo_url ? landingPage.photo_url.startsWith('data:image') : false;
   
+  // Verificar se as URLs são válidas (não vazias, não base64, não genéricas)
+  const hasValidOgImage = landingPage.og_image_url && !isOgImageGeneric && !isOgImageBase64;
+  const hasValidAboutPhoto = landingPage.about_photo_url && !isAboutPhotoBase64 && landingPage.about_photo_url.trim().length > 0;
+  const hasValidPhoto = landingPage.photo_url && !isPhotoBase64 && landingPage.photo_url.trim().length > 0;
+  
   let ogImage: string;
-  if (!isOgImageGeneric && !isOgImageBase64 && landingPage.og_image_url) {
+  if (hasValidOgImage) {
     ogImage = landingPage.og_image_url;
-  } else if (landingPage.about_photo_url && !isAboutPhotoBase64) {
+  } else if (hasValidAboutPhoto) {
     ogImage = landingPage.about_photo_url;
-  } else if (landingPage.photo_url && !isPhotoBase64) {
+  } else if (hasValidPhoto) {
     ogImage = landingPage.photo_url;
   } else {
     ogImage = `${baseUrl}/og-default.png`;
