@@ -105,26 +105,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const HTML_FOLDER = 'html';
       const filePath = `${HTML_FOLDER}/${subdomain}.html`;
       
-      // Tentar buscar HTML estático do Storage
-      const { data: staticHtmlData, error: staticHtmlError } = await supabase.storage
+      // Obter URL pública do arquivo
+      const { data: { publicUrl } } = supabase.storage
         .from('landing-pages')
-        .download(filePath);
-
-      if (!staticHtmlError && staticHtmlData) {
-        console.log('[SSR] ✓ HTML estático encontrado, servindo diretamente');
-        const htmlText = await staticHtmlData.text();
+        .getPublicUrl(filePath);
+      
+      console.log('[SSR] Verificando HTML estático em:', publicUrl);
+      
+      // Tentar fazer fetch da URL pública (mais confiável que download)
+      const fetchResponse = await fetch(publicUrl, {
+        method: 'HEAD', // Usar HEAD primeiro para verificar se existe sem baixar
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (fetchResponse.ok) {
+        // Arquivo existe, fazer fetch completo
+        console.log('[SSR] ✓ HTML estático encontrado, fazendo fetch completo');
+        const fullResponse = await fetch(publicUrl, {
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
         
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600'); // Cache de 1 hora
-        res.setHeader('Vary', 'Host');
-        res.setHeader('X-Content-Type-Options', 'nosniff');
-        res.setHeader('X-Served-From', 'static-html');
-        return res.send(htmlText);
+        if (fullResponse.ok) {
+          const htmlText = await fullResponse.text();
+          
+          console.log('[SSR] ✓ HTML estático servido com sucesso, tamanho:', htmlText.length);
+          
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600'); // Cache de 1 hora
+          res.setHeader('Vary', 'Host');
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          res.setHeader('X-Served-From', 'static-html');
+          return res.send(htmlText);
+        }
       } else {
-        console.log('[SSR] HTML estático não encontrado, fazendo SSR dinâmico:', staticHtmlError?.message);
+        console.log('[SSR] HTML estático não encontrado (status:', fetchResponse.status, ')');
       }
     } catch (staticError: any) {
       console.log('[SSR] Erro ao verificar HTML estático, fazendo SSR dinâmico:', staticError?.message);
+      console.error('[SSR] Stack:', staticError?.stack);
     }
 
     // Fallback: SSR dinâmico
@@ -150,6 +172,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).send('Not found');
       }
 
+      // Se landing page está publicada mas HTML estático não existe, tentar gerar
+      if (landingPage.status === 'published') {
+        try {
+          console.log('[SSR] Landing page publicada mas HTML estático não encontrado, tentando gerar...');
+          const FUNCTIONS_BASE_URL = process.env.VITE_SUPABASE_URL?.replace('/rest/v1', '/functions/v1') || '';
+          const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+          
+          if (FUNCTIONS_BASE_URL && SERVICE_ROLE_KEY) {
+            const generateResponse = await fetch(`${FUNCTIONS_BASE_URL}/generate-static-html`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+              },
+              body: JSON.stringify({ landingPageId: landingPage.id }),
+            });
+            
+            if (generateResponse.ok) {
+              console.log('[SSR] HTML estático gerado com sucesso, tentando servir novamente...');
+              // Tentar servir o HTML estático recém-gerado
+              const HTML_FOLDER = 'html';
+              const filePath = `${HTML_FOLDER}/${subdomain}.html`;
+              const { data: { publicUrl } } = supabase.storage
+                .from('landing-pages')
+                .getPublicUrl(filePath);
+              
+              const retryResponse = await fetch(publicUrl, {
+                headers: { 'Cache-Control': 'no-cache' }
+              });
+              
+              if (retryResponse.ok) {
+                const htmlText = await retryResponse.text();
+                res.setHeader('Content-Type', 'text/html; charset=utf-8');
+                res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+                res.setHeader('Vary', 'Host');
+                res.setHeader('X-Content-Type-Options', 'nosniff');
+                res.setHeader('X-Served-From', 'static-html-generated');
+                return res.send(htmlText);
+              }
+            } else {
+              console.log('[SSR] Erro ao gerar HTML estático:', await generateResponse.text());
+            }
+          }
+        } catch (genError: any) {
+          console.log('[SSR] Erro ao tentar gerar HTML estático:', genError?.message);
+          // Continuar com SSR dinâmico
+        }
+      }
+
       // Permitir acesso mesmo se não publicado (para preview via subdomain)
       // Removido: if (landingPage.status !== 'published')
 
@@ -163,7 +234,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         headers: req.headers,
       };
 
-      console.log('[SSR] Renderizando HTML com dados do médico...');
+      console.log('[SSR] Renderizando HTML com dados do médico (SSR dinâmico)...');
       const html = await renderLandingPage(landingPage, mockReq);
       
       // Verificar se o HTML gerado contém dados do médico (não genérico)

@@ -101,25 +101,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const HTML_FOLDER = 'html';
       const filePath = `${HTML_FOLDER}/${subdomain}.html`;
       
-      // Tentar buscar HTML estático do Storage
-      const { data: staticHtmlData, error: staticHtmlError } = await supabase.storage
+      // Obter URL pública do arquivo
+      const { data: { publicUrl } } = supabase.storage
         .from('landing-pages')
-        .download(filePath);
-
-      if (!staticHtmlError && staticHtmlData) {
-        console.log('[SSR] ✓ HTML estático encontrado, servindo diretamente');
-        const htmlText = await staticHtmlData.text();
+        .getPublicUrl(filePath);
+      
+      console.log('[SSR] Verificando HTML estático em:', publicUrl);
+      
+      // Tentar fazer fetch da URL pública (mais confiável que download)
+      const fetchResponse = await fetch(publicUrl, {
+        method: 'HEAD', // Usar HEAD primeiro para verificar se existe sem baixar
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (fetchResponse.ok) {
+        // Arquivo existe, fazer fetch completo
+        console.log('[SSR] ✓ HTML estático encontrado, fazendo fetch completo');
+        const fullResponse = await fetch(publicUrl, {
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
         
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600'); // Cache de 1 hora
-        res.setHeader('Vary', 'Host');
-        res.setHeader('X-Served-From', 'static-html');
-        return res.send(htmlText);
+        if (fullResponse.ok) {
+          const htmlText = await fullResponse.text();
+          
+          console.log('[SSR] ✓ HTML estático servido com sucesso, tamanho:', htmlText.length);
+          
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600'); // Cache de 1 hora
+          res.setHeader('Vary', 'Host');
+          res.setHeader('X-Served-From', 'static-html');
+          return res.send(htmlText);
+        }
       } else {
-        console.log('[SSR] HTML estático não encontrado, fazendo SSR dinâmico:', staticHtmlError?.message);
+        console.log('[SSR] HTML estático não encontrado (status:', fetchResponse.status, ')');
       }
     } catch (staticError: any) {
       console.log('[SSR] Erro ao verificar HTML estático, fazendo SSR dinâmico:', staticError?.message);
+      console.error('[SSR] Stack:', staticError?.stack);
     }
 
     // Fallback: SSR dinâmico
