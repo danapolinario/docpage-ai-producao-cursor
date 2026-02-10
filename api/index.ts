@@ -145,12 +145,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                  !htmlText.includes('id="root"') && // O HTML estático deve ter id="root"
                                  htmlText.length < 5000; // HTML estático deve ser maior que o index padrão
           
+          // Verificar se o HTML estático contém referência a /index.tsx (antigo, precisa regenerar)
+          const hasOldIndexTsx = htmlText.includes('src="/index.tsx"') || htmlText.includes("src='/index.tsx'");
+          const hasCompiledAssets = htmlText.includes('/assets/') && (htmlText.includes('.js"') || htmlText.includes('.js\''));
+          
           if (isDefaultIndex) {
             console.error('[SSR] ⚠️ ATENÇÃO: HTML estático parece ser o index.html padrão!');
             console.error('[SSR] Continuando com SSR dinâmico...');
             // Não retornar, continuar com SSR dinâmico
+          } else if (hasOldIndexTsx && !hasCompiledAssets) {
+            console.warn('[SSR] ⚠️ ATENÇÃO: HTML estático contém referência antiga a /index.tsx!');
+            console.warn('[SSR] HTML estático precisa ser regenerado. Usando SSR dinâmico...');
+            // Não retornar, continuar com SSR dinâmico para gerar HTML correto
           } else {
             console.log('[SSR] ✓ HTML estático validado, servindo...');
+            if (hasCompiledAssets) {
+              console.log('[SSR] ✓ HTML estático contém assets compilados corretos');
+            }
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600'); // Cache de 1 hora
             res.setHeader('Vary', 'Host');

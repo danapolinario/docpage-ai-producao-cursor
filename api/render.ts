@@ -65,27 +65,67 @@ function getCompiledAssets(): { js: string; css?: string } {
     join(__dirname, '..', 'dist', 'index.html'),
   ];
   
+  console.log('[ASSETS] Procurando assets compilados nos caminhos:', possiblePaths);
+  
   for (const htmlPath of possiblePaths) {
     if (existsSync(htmlPath)) {
       try {
+        console.log('[ASSETS] Arquivo encontrado:', htmlPath);
         const htmlContent = readFileSync(htmlPath, 'utf-8');
-        // Extrair nomes dos assets compilados usando regex
-        const jsMatch = htmlContent.match(/<script[^>]*type=["']module["'][^>]*src=["']([^"']*index[^"']*\.js[^"']*)["']/);
-        const cssMatch = htmlContent.match(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']*index[^"']*\.css[^"']*)["']/);
+        console.log('[ASSETS] Tamanho do HTML:', htmlContent.length);
         
-        if (jsMatch) {
+        // Extrair nomes dos assets compilados usando regex mais flexível
+        // Procurar por scripts module que referenciam arquivos .js
+        const jsMatches = htmlContent.matchAll(/<script[^>]*type=["']module["'][^>]*src=["']([^"']*\.js[^"']*)["']/g);
+        const cssMatches = htmlContent.matchAll(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']*\.css[^"']*)["']/g);
+        
+        // Pegar o primeiro match de JS que não seja do Vite client
+        let jsAsset: string | null = null;
+        for (const match of jsMatches) {
+          const src = match[1];
+          if (!src.includes('@vite') && !src.includes('vite')) {
+            jsAsset = src;
+            console.log('[ASSETS] Asset JS encontrado:', jsAsset);
+            break;
+          }
+        }
+        
+        // Pegar o primeiro match de CSS
+        let cssAsset: string | undefined = undefined;
+        for (const match of cssMatches) {
+          const href = match[1];
+          if (!href.includes('fonts.googleapis.com')) {
+            cssAsset = href;
+            console.log('[ASSETS] Asset CSS encontrado:', cssAsset);
+            break;
+          }
+        }
+        
+        if (jsAsset) {
           return {
-            js: jsMatch[1],
-            css: cssMatch ? cssMatch[1] : undefined
+            js: jsAsset,
+            css: cssAsset
           };
+        } else {
+          console.log('[ASSETS] Nenhum asset JS encontrado no HTML, procurando por index.tsx...');
+          // Fallback: procurar por index.tsx
+          const indexMatch = htmlContent.match(/<script[^>]*type=["']module["'][^>]*src=["']([^"']*index\.tsx[^"']*)["']/);
+          if (indexMatch) {
+            console.log('[ASSETS] Usando index.tsx como fallback:', indexMatch[1]);
+            return { js: indexMatch[1] };
+          }
         }
       } catch (error: any) {
         console.error('[ASSETS] Erro ao ler spa.html:', error?.message);
+        console.error('[ASSETS] Stack:', error?.stack);
       }
+    } else {
+      console.log('[ASSETS] Arquivo não encontrado:', htmlPath);
     }
   }
   
-  // Fallback: usar /index.tsx (o Vercel pode resolver isso em produção via rewrites)
+  // Fallback final: usar /index.tsx (o Vercel pode resolver isso em produção via rewrites)
+  console.warn('[ASSETS] ⚠️ Nenhum asset compilado encontrado, usando /index.tsx como fallback');
   return { js: '/index.tsx' };
 }
 
