@@ -186,6 +186,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const pathArray = req.query.path;
   const path = Array.isArray(pathArray) ? pathArray.join('/') : (pathArray || '');
   
+  // IMPORTANTE: Se a rota for `/` (vazia) e o host for um subdomínio .docpage.com.br,
+  // mas não foi detectado acima, pode ser um problema de header. Tentar novamente.
+  if (!path || path === '' || path === '/') {
+    const hostname = host.split(':')[0].toLowerCase();
+    if (hostname.includes('.docpage.com.br') && !hostname.startsWith('www.') && !hostname.startsWith('docpage.')) {
+      const parts = hostname.split('.');
+      if (parts.length >= 4) {
+        const potentialSubdomain = parts[0];
+        console.log('[SUBDOMAIN DEBUG] Tentando detectar subdomínio novamente para rota /:', {
+          hostname,
+          potentialSubdomain,
+          parts
+        });
+        // Tentar buscar a landing page novamente
+        try {
+          const { data: landingPage, error } = await supabase
+            .from('landing_pages')
+            .select('*')
+            .eq('subdomain', potentialSubdomain)
+            .single();
+          
+          if (!error && landingPage) {
+            console.log('[SUBDOMAIN DEBUG] Subdomínio encontrado na segunda tentativa:', potentialSubdomain);
+            const mockReq = {
+              protocol: 'https',
+              get: (header: string) => {
+                if (header === 'host') return host;
+                return req.headers[header.toLowerCase()] || '';
+              },
+              headers: req.headers,
+            };
+            const html = await renderLandingPage(landingPage, mockReq);
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            return res.send(html);
+          }
+        } catch (retryError) {
+          console.error('[SUBDOMAIN DEBUG] Erro ao tentar detectar subdomínio novamente:', retryError);
+        }
+      }
+    }
+  }
+  
   console.log('[SUBDOMAIN DEBUG] Not a subdomain, serving SPA:', {
     host,
     subdomain: null,

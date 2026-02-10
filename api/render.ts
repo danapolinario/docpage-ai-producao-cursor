@@ -175,8 +175,8 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     "description": description,
     "image": [
       ogImage,
-      ...(landingPage.photo_url ? [landingPage.photo_url] : []),
-      ...(landingPage.about_photo_url ? [landingPage.about_photo_url] : [])
+      ...(landingPage.photo_url && !landingPage.photo_url.startsWith('data:image') ? [landingPage.photo_url] : []),
+      ...(landingPage.about_photo_url && !landingPage.about_photo_url.startsWith('data:image') ? [landingPage.about_photo_url] : [])
     ].filter(Boolean),
     "url": pageUrl,
     "sameAs": [],
