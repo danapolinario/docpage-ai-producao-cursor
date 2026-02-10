@@ -48,6 +48,47 @@ interface LandingPageData {
   og_image_url?: string | null;
 }
 
+import { readFileSync, existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// Para ES modules, precisamos definir __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Função para descobrir os assets compilados do build do Vite
+function getCompiledAssets(): { js: string; css?: string } {
+  const possiblePaths = [
+    join(process.cwd(), 'dist', 'spa.html'),
+    join(process.cwd(), 'dist', 'index.html'),
+    join(__dirname, '..', 'dist', 'spa.html'),
+    join(__dirname, '..', 'dist', 'index.html'),
+  ];
+  
+  for (const htmlPath of possiblePaths) {
+    if (existsSync(htmlPath)) {
+      try {
+        const htmlContent = readFileSync(htmlPath, 'utf-8');
+        // Extrair nomes dos assets compilados usando regex
+        const jsMatch = htmlContent.match(/<script[^>]*type=["']module["'][^>]*src=["']([^"']*index[^"']*\.js[^"']*)["']/);
+        const cssMatch = htmlContent.match(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']*index[^"']*\.css[^"']*)["']/);
+        
+        if (jsMatch) {
+          return {
+            js: jsMatch[1],
+            css: cssMatch ? cssMatch[1] : undefined
+          };
+        }
+      } catch (error: any) {
+        console.error('[ASSETS] Erro ao ler spa.html:', error?.message);
+      }
+    }
+  }
+  
+  // Fallback: usar /index.tsx (o Vercel pode resolver isso em produção via rewrites)
+  return { js: '/index.tsx' };
+}
+
 export async function renderLandingPage(landingPage: LandingPageData, req: any): Promise<string> {
   try {
     console.log('[RENDER] Iniciando renderização SSR para landing page:', {
@@ -64,6 +105,10 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     const pageUrl = landingPage.custom_domain 
       ? `https://${landingPage.custom_domain}` 
       : `https://${landingPage.subdomain}.docpage.com.br`;
+    
+    // Descobrir assets compilados
+    const assets = getCompiledAssets();
+    console.log('[RENDER] Assets compilados descobertos:', assets);
 
     // Garantir que briefing_data e content_data existem
     const briefing = landingPage.briefing_data || {} as any;
@@ -388,7 +433,8 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
       // Injetar dados da landing page no window para hidratação
       window.__LANDING_PAGE_DATA__ = ${JSON.stringify(landingPage)};
     </script>
-    <script type="module" src="/index.tsx"></script>
+    ${assets.css ? `<link rel="stylesheet" href="${assets.css}" />` : ''}
+    <script type="module" src="${assets.js}"></script>
   </body>
 </html>`;
 
