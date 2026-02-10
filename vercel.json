@@ -6,6 +6,14 @@
   "framework": "vite",
   "cleanUrls": false,
   "trailingSlash": false,
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "api/render.ts"
+    },
+    "api/[...path].ts": {
+      "includeFiles": "api/render.ts"
+    }
+  },
   "rewrites": [
     {
       "source": "/admin",
@@ -47,6 +55,10 @@
         {
           "key": "X-Vercel-Original-Host",
           "value": "$host"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate, max-age=0"
         }
       ]
     }

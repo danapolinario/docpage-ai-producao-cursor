@@ -42,6 +42,9 @@ function extractSubdomain(host: string): string | null {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // IMPORTANTE: Verificar subdomínio PRIMEIRO, antes de qualquer outra coisa
+  // Isso garante que subdomínios sempre passem pelo SSR, mesmo que o Vercel tente servir arquivos estáticos
+  
   // Garantir que host seja string - verificar múltiplos headers do Vercel
   // IMPORTANTE: Vercel pode passar o host em diferentes headers dependendo da configuração
   const hostHeader = req.headers.host;
@@ -65,6 +68,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     host = Array.isArray(xHost) ? xHost[0] : xHost;
   }
   
+  // Verificar se é subdomínio ANTES de qualquer processamento
+  const subdomain = extractSubdomain(host);
+  
   // Log detalhado para debug
   console.log('[SSR DEBUG] ============================================');
   console.log('[SSR DEBUG] Request URL:', req.url);
@@ -78,8 +84,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     finalHost: host
   });
   
-  const subdomain = extractSubdomain(host);
-  
   console.log('[SSR DEBUG] Subdomain extraction:', {
     host,
     subdomain,
@@ -89,7 +93,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   });
   console.log('[SSR DEBUG] ============================================');
   
-  // Se for subdomínio, renderizar SSR
+  // Se for subdomínio, renderizar SSR IMEDIATAMENTE
+  // Isso garante que subdomínios sempre passem pelo SSR, mesmo que o Vercel tente servir arquivos estáticos
   if (subdomain) {
     console.log('[SSR] ✓ Subdomínio detectado, renderizando SSR:', subdomain);
     try {
@@ -146,9 +151,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0, private');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+      res.setHeader('Vary', 'Host');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
       return res.send(html);
     } catch (error: any) {
       console.error('[SSR] ✗ Erro ao renderizar SSR:', error?.message || error);

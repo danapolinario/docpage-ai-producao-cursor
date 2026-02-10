@@ -129,9 +129,13 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
       : `${briefing.name || 'Médico'}, ${briefing.specialty || 'Especialista'}, médico ${briefing.crmState || ''}, CRM ${briefing.crm || ''}, consulta médica, agendar consulta, ${briefing.mainServices?.split(',').slice(0, 3).join(', ') || ''}`;
     
     // Prioridade para imagem OG: og_image_url > about_photo_url > photo_url > fallback
-    // SEMPRE ignorar og_image_url se for genérico (og-default.png)
+    // SEMPRE ignorar og_image_url se for genérico (og-default.png) ou base64 (data:image)
     const isOgImageGeneric = landingPage.og_image_url ? landingPage.og_image_url.includes('og-default.png') : true;
-    const ogImage = (!isOgImageGeneric && landingPage.og_image_url)
+    const isOgImageBase64 = landingPage.og_image_url ? landingPage.og_image_url.startsWith('data:image') : false;
+    
+    // Se og_image_url for válido (não genérico e não base64), usar ele
+    // Caso contrário, usar about_photo_url ou photo_url (que são URLs do storage)
+    const ogImage = (!isOgImageGeneric && !isOgImageBase64 && landingPage.og_image_url)
       ? landingPage.og_image_url
       : (landingPage.about_photo_url || landingPage.photo_url || `${baseUrl}/og-default.png`);
     const ogImageSecure = ogImage.replace('http://', 'https://');
