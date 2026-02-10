@@ -14,7 +14,9 @@
     "preview": "vite preview",
     "build:dev": "vite build --mode development",
     "generate:static-html": "tsx scripts/generate-all-static-html.ts",
-    "generate:static-html:single": "tsx scripts/generate-single-static-html.ts"
+    "generate:static-html:single": "tsx scripts/generate-single-static-html.ts",
+    "check:images": "tsx scripts/check-landing-page-images.ts",
+    "migrate:photos": "tsx scripts/migrate-base64-photos.ts"
   },
   "dependencies": {
     "@google/genai": "^1.30.0",

@@ -221,9 +221,42 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     const isPhotoBase64 = landingPage.photo_url ? landingPage.photo_url.startsWith('data:image') : false;
     
     // Verificar se as URLs são válidas (não vazias, não base64, não genéricas)
-    const hasValidOgImage = landingPage.og_image_url && !isOgImageGeneric && !isOgImageBase64;
-    const hasValidAboutPhoto = landingPage.about_photo_url && !isAboutPhotoBase64 && landingPage.about_photo_url.trim().length > 0;
-    const hasValidPhoto = landingPage.photo_url && !isPhotoBase64 && landingPage.photo_url.trim().length > 0;
+    // Verificar também se não são strings vazias ou apenas espaços
+    const hasValidOgImage = landingPage.og_image_url && 
+                            typeof landingPage.og_image_url === 'string' &&
+                            landingPage.og_image_url.trim().length > 0 &&
+                            !isOgImageGeneric && 
+                            !isOgImageBase64;
+    
+    const hasValidAboutPhoto = landingPage.about_photo_url && 
+                               typeof landingPage.about_photo_url === 'string' &&
+                               landingPage.about_photo_url.trim().length > 0 &&
+                               !isAboutPhotoBase64;
+    
+    const hasValidPhoto = landingPage.photo_url && 
+                          typeof landingPage.photo_url === 'string' &&
+                          landingPage.photo_url.trim().length > 0 &&
+                          !isPhotoBase64;
+    
+    // Log detalhado para debug
+    console.log('[RENDER] Verificação de imagens OG:', {
+      og_image_url: landingPage.og_image_url ? (landingPage.og_image_url.length > 100 ? landingPage.og_image_url.substring(0, 100) + '...' : landingPage.og_image_url) : 'null/undefined',
+      og_image_url_type: typeof landingPage.og_image_url,
+      og_image_url_length: landingPage.og_image_url?.length || 0,
+      isOgImageGeneric,
+      isOgImageBase64,
+      hasValidOgImage,
+      about_photo_url: landingPage.about_photo_url ? (landingPage.about_photo_url.length > 100 ? landingPage.about_photo_url.substring(0, 100) + '...' : landingPage.about_photo_url) : 'null/undefined',
+      about_photo_url_type: typeof landingPage.about_photo_url,
+      about_photo_url_length: landingPage.about_photo_url?.length || 0,
+      isAboutPhotoBase64,
+      hasValidAboutPhoto,
+      photo_url: landingPage.photo_url ? (landingPage.photo_url.length > 100 ? landingPage.photo_url.substring(0, 100) + '...' : landingPage.photo_url) : 'null/undefined',
+      photo_url_type: typeof landingPage.photo_url,
+      photo_url_length: landingPage.photo_url?.length || 0,
+      isPhotoBase64,
+      hasValidPhoto,
+    });
     
     // Se og_image_url for válido (não genérico e não base64), usar ele
     // Caso contrário, usar about_photo_url ou photo_url (que são URLs do storage), mas apenas se não forem base64

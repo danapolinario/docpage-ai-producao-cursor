@@ -199,7 +199,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         status: landingPage?.status,
         landingPageId: landingPage?.id,
         hasMetaTitle: !!landingPage?.meta_title,
-        metaTitle: landingPage?.meta_title?.substring(0, 50)
+        metaTitle: landingPage?.meta_title?.substring(0, 50),
+        photo_url: landingPage?.photo_url ? (landingPage.photo_url.length > 100 ? landingPage.photo_url.substring(0, 100) + '...' : landingPage.photo_url) : 'null/undefined',
+        about_photo_url: landingPage?.about_photo_url ? (landingPage.about_photo_url.length > 100 ? landingPage.about_photo_url.substring(0, 100) + '...' : landingPage.about_photo_url) : 'null/undefined',
+        og_image_url: landingPage?.og_image_url ? (landingPage.og_image_url.length > 100 ? landingPage.og_image_url.substring(0, 100) + '...' : landingPage.og_image_url) : 'null/undefined',
       });
 
       if (error || !landingPage) {

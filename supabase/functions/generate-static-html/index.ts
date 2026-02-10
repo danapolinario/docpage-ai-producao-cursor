@@ -66,20 +66,45 @@ async function renderLandingPageHTML(landingPage: any): Promise<string> {
   const isAboutPhotoBase64 = landingPage.about_photo_url ? landingPage.about_photo_url.startsWith('data:image') : false;
   const isPhotoBase64 = landingPage.photo_url ? landingPage.photo_url.startsWith('data:image') : false;
   
-  // Verificar se as URLs são válidas (não vazias, não base64, não genéricas)
-  const hasValidOgImage = landingPage.og_image_url && !isOgImageGeneric && !isOgImageBase64;
-  const hasValidAboutPhoto = landingPage.about_photo_url && !isAboutPhotoBase64 && landingPage.about_photo_url.trim().length > 0;
-  const hasValidPhoto = landingPage.photo_url && !isPhotoBase64 && landingPage.photo_url.trim().length > 0;
+    // Verificar se as URLs são válidas (não vazias, não base64, não genéricas)
+  const hasValidOgImage = landingPage.og_image_url && 
+                          typeof landingPage.og_image_url === 'string' &&
+                          landingPage.og_image_url.trim().length > 0 &&
+                          !isOgImageGeneric && 
+                          !isOgImageBase64;
+  
+  const hasValidAboutPhoto = landingPage.about_photo_url && 
+                             typeof landingPage.about_photo_url === 'string' &&
+                             landingPage.about_photo_url.trim().length > 0 &&
+                             !isAboutPhotoBase64;
+  
+  const hasValidPhoto = landingPage.photo_url && 
+                        typeof landingPage.photo_url === 'string' &&
+                        landingPage.photo_url.trim().length > 0 &&
+                        !isPhotoBase64;
+  
+  console.log('[GENERATE STATIC HTML] Verificação de imagens OG:', {
+    og_image_url: landingPage.og_image_url ? (landingPage.og_image_url.length > 100 ? landingPage.og_image_url.substring(0, 100) + '...' : landingPage.og_image_url) : 'null/undefined',
+    hasValidOgImage,
+    about_photo_url: landingPage.about_photo_url ? (landingPage.about_photo_url.length > 100 ? landingPage.about_photo_url.substring(0, 100) + '...' : landingPage.about_photo_url) : 'null/undefined',
+    hasValidAboutPhoto,
+    photo_url: landingPage.photo_url ? (landingPage.photo_url.length > 100 ? landingPage.photo_url.substring(0, 100) + '...' : landingPage.photo_url) : 'null/undefined',
+    hasValidPhoto,
+  });
   
   let ogImage: string;
   if (hasValidOgImage) {
     ogImage = landingPage.og_image_url;
+    console.log('[GENERATE STATIC HTML] Usando og_image_url:', ogImage.substring(0, 100));
   } else if (hasValidAboutPhoto) {
     ogImage = landingPage.about_photo_url;
+    console.log('[GENERATE STATIC HTML] Usando about_photo_url:', ogImage.substring(0, 100));
   } else if (hasValidPhoto) {
     ogImage = landingPage.photo_url;
+    console.log('[GENERATE STATIC HTML] Usando photo_url:', ogImage.substring(0, 100));
   } else {
     ogImage = `${baseUrl}/og-default.png`;
+    console.warn('[GENERATE STATIC HTML] ⚠️ Nenhuma imagem válida encontrada, usando og-default.png');
   }
   const ogImageSecure = ogImage.replace('http://', 'https://');
   
