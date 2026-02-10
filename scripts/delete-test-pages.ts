@@ -109,9 +109,10 @@ function parseArgs() {
 async function findTestLandingPages(options: any) {
   let query = supabase
     .from('landing_pages')
-    .select('id, subdomain, user_id, status, created_at, photo_url, about_photo_url, og_image_url');
+    .select('id, subdomain, user_id, status, created_at, photo_url, about_photo_url, og_image_url')
+    .limit(1000); // Limite para evitar timeout
 
-  // Filtrar por subdomains
+  // Filtrar por subdomains (mais eficiente - usar primeiro se disponível)
   if (options.subdomains && options.subdomains.length > 0) {
     query = query.in('subdomain', options.subdomains);
   }
@@ -128,31 +129,51 @@ async function findTestLandingPages(options: any) {
     query = query.lt('created_at', cutoffDate.toISOString());
   }
 
+  // Se buscar por email, precisamos buscar todos os usuários primeiro
+  // e depois filtrar as landing pages
+  if (options.emailContains) {
+    console.log('   🔍 Buscando usuários por email...');
+    
+    // Buscar todos os usuários (com limite)
+    const { data: users, error: usersError } = await supabase.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000
+    });
+
+    if (usersError) {
+      throw new Error(`Erro ao buscar usuários: ${usersError.message}`);
+    }
+
+    // Filtrar usuários por email
+    const matchingUserIds = (users?.users || [])
+      .filter(user => user.email?.toLowerCase().includes(options.emailContains.toLowerCase()))
+      .map(user => user.id);
+
+    if (matchingUserIds.length === 0) {
+      console.log('   ℹ️  Nenhum usuário encontrado com o email especificado');
+      return [];
+    }
+
+    console.log(`   ✅ Encontrados ${matchingUserIds.length} usuário(s) com email contendo "${options.emailContains}"`);
+    
+    // Filtrar landing pages por user_id
+    query = query.in('user_id', matchingUserIds);
+  }
+
+  console.log('   🔍 Executando query no banco de dados...');
   const { data: landingPages, error } = await query;
 
   if (error) {
     throw new Error(`Erro ao buscar landing pages: ${error.message}`);
   }
 
-  // Filtrar por email do usuário se especificado
-  if (options.emailContains && landingPages) {
-    const filtered: any[] = [];
-    
-    for (const lp of landingPages) {
-      try {
-        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(lp.user_id);
-        if (!userError && userData?.user?.email?.toLowerCase().includes(options.emailContains.toLowerCase())) {
-          filtered.push(lp);
-        }
-      } catch (err: any) {
-        console.warn(`   ⚠️  Erro ao buscar usuário ${lp.user_id}: ${err.message}`);
-      }
-    }
-    
-    return filtered;
+  if (!landingPages || landingPages.length === 0) {
+    return [];
   }
 
-  return landingPages || [];
+  console.log(`   ✅ Encontradas ${landingPages.length} landing page(s)`);
+
+  return landingPages;
 }
 
 /**
