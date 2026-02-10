@@ -129,21 +129,34 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
       : `${briefing.name || 'Médico'}, ${briefing.specialty || 'Especialista'}, médico ${briefing.crmState || ''}, CRM ${briefing.crm || ''}, consulta médica, agendar consulta, ${briefing.mainServices?.split(',').slice(0, 3).join(', ') || ''}`;
     
     // Prioridade para imagem OG: og_image_url > about_photo_url > photo_url > fallback
-    // SEMPRE ignorar og_image_url se for genérico (og-default.png) ou base64 (data:image)
+    // SEMPRE ignorar qualquer URL que seja base64 (data:image) - usar apenas URLs reais
     const isOgImageGeneric = landingPage.og_image_url ? landingPage.og_image_url.includes('og-default.png') : true;
     const isOgImageBase64 = landingPage.og_image_url ? landingPage.og_image_url.startsWith('data:image') : false;
+    const isAboutPhotoBase64 = landingPage.about_photo_url ? landingPage.about_photo_url.startsWith('data:image') : false;
+    const isPhotoBase64 = landingPage.photo_url ? landingPage.photo_url.startsWith('data:image') : false;
     
     // Se og_image_url for válido (não genérico e não base64), usar ele
-    // Caso contrário, usar about_photo_url ou photo_url (que são URLs do storage)
-    const ogImage = (!isOgImageGeneric && !isOgImageBase64 && landingPage.og_image_url)
-      ? landingPage.og_image_url
-      : (landingPage.about_photo_url || landingPage.photo_url || `${baseUrl}/og-default.png`);
+    // Caso contrário, usar about_photo_url ou photo_url (que são URLs do storage), mas apenas se não forem base64
+    let ogImage: string;
+    if (!isOgImageGeneric && !isOgImageBase64 && landingPage.og_image_url) {
+      ogImage = landingPage.og_image_url;
+    } else if (landingPage.about_photo_url && !isAboutPhotoBase64) {
+      ogImage = landingPage.about_photo_url;
+    } else if (landingPage.photo_url && !isPhotoBase64) {
+      ogImage = landingPage.photo_url;
+    } else {
+      ogImage = `${baseUrl}/og-default.png`;
+    }
     const ogImageSecure = ogImage.replace('http://', 'https://');
     
     console.log('[RENDER] OG Image gerada:', {
       isOgImageGeneric,
-      ogImageUrl: landingPage.og_image_url,
-      finalOgImage: ogImage.substring(0, 100)
+      isOgImageBase64,
+      ogImageUrl: landingPage.og_image_url ? (landingPage.og_image_url.startsWith('data:image') ? 'BASE64 (truncado)' : landingPage.og_image_url.substring(0, 100)) : null,
+      aboutPhotoUrl: landingPage.about_photo_url?.substring(0, 100),
+      photoUrl: landingPage.photo_url?.substring(0, 100),
+      finalOgImage: ogImage.substring(0, 100),
+      finalOgImageIsBase64: ogImage.startsWith('data:image')
     });
 
     // Generate SEO-optimized site name for og:site_name
