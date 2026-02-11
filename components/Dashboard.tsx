@@ -1240,13 +1240,21 @@ export const Dashboard: React.FC<Props> = ({
                            Você criou sua landing page, mas ainda não possui uma assinatura ativa. Complete seu cadastro e escolha um plano para ativar seu site.
                          </p>
                          <button
-                           onClick={() => navigate('/checkout')}
+                           onClick={() => {
+                             if (landingPageId) {
+                               // Salvar landingPageId no localStorage para o checkout usar
+                               localStorage.setItem('checkout_landing_page_id', landingPageId);
+                               navigate('/checkout?from=dashboard');
+                             } else {
+                               navigate('/checkout');
+                             }
+                           }}
                            className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
                          >
                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15l1-4m4 4l1-4m2 4h3M3 19h18a2 2 0 002-2V7a2 2 0 00-2-2H3a2 2 0 00-2 2v10a2 2 0 002 2z" />
                            </svg>
-                           Ir para Checkout
+                           Ir para Pagamento
                          </button>
                        </div>
                      </div>

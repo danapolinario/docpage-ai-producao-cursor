@@ -210,15 +210,22 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     const path = window.location.pathname;
     const searchParams = new URLSearchParams(window.location.search);
     const canceled = searchParams.get('canceled') === 'true';
+    const fromDashboard = searchParams.get('from') === 'dashboard';
+    const hasLandingPageId = localStorage.getItem('checkout_landing_page_id');
     
     if (path === '/checkout') {
       // Se está na rota /checkout sem dados, redirecionar para home
-      // MAS: se canceled=true ou está restaurando estado, não redirecionar ainda
+      // MAS: se canceled=true, está restaurando estado, ou veio do dashboard, não redirecionar ainda
       if (!state.generatedContent || !state.briefing.name) {
-        if (canceled || isRestoringState) {
-          // Se foi cancelado ou está restaurando, dar mais tempo para o estado ser restaurado
-          // Não redirecionar - aguardar que o estado seja restaurado
-          // O useEffect de restauração vai atualizar o estado
+        if (canceled || isRestoringState || fromDashboard || hasLandingPageId) {
+          // Se veio do dashboard ou tem landingPageId, permitir acesso ao checkout
+          // O PricingPage vai lidar com a lógica de carregar dados da landing page existente
+          if (state.step !== 5) {
+            setState(prev => ({ ...prev, step: 5 }));
+          }
+          if (pricingViewMode !== 'checkout') {
+            setPricingViewMode('checkout');
+          }
           return;
         } else {
           window.location.href = '/';
@@ -1251,23 +1258,40 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
           </div>
         )}
         
-        {state.step === 5 && state.generatedContent && (
+        {state.step === 5 && (state.generatedContent || localStorage.getItem('checkout_landing_page_id')) && (
           <div className="w-full h-full overflow-y-auto">
             <PricingPage 
               onRestart={handleRestart} 
               onEditSite={handleEditSite}
-              doctorName={state.briefing.name}
-              content={state.generatedContent}
-              design={state.designSettings}
-              visibility={state.sectionVisibility}
+              doctorName={state.briefing.name || 'Médico'}
+              content={state.generatedContent || DUMMY_CONTENT}
+              design={state.designSettings || {}}
+              visibility={state.sectionVisibility || {
+                hero: true,
+                about: true,
+                services: true,
+                testimonials: true,
+                footer: true,
+              }}
               photoUrl={state.photoUrl}
               aboutPhotoUrl={state.aboutPhotoUrl}
-              briefing={state.briefing}
-              layoutVariant={state.layoutVariant}
+              briefing={state.briefing.name ? state.briefing : {
+                name: 'Médico',
+                specialty: '',
+                crm: '',
+                city: '',
+                state: '',
+                contactEmail: '',
+                contactPhone: '',
+                contactAddresses: [],
+              }}
+              layoutVariant={state.layoutVariant || 1}
               selectedDomain=""
               initialViewMode={pricingViewMode}
-              landingPageId={currentLandingPageId || undefined}
+              landingPageId={currentLandingPageId || localStorage.getItem('checkout_landing_page_id') || undefined}
               onCheckoutSuccess={(data) => {
+                // Limpar landingPageId do localStorage após sucesso
+                localStorage.removeItem('checkout_landing_page_id');
                 // Atualizar estado de autenticação após checkout bem-sucedido
                 setIsAuthenticatedUser(true);
                 setCurrentLandingPageId(data.landingPageId);

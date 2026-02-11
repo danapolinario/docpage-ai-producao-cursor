@@ -37,15 +37,16 @@ export async function getUserSubscription(userId: string): Promise<Subscription 
     .eq('status', 'active')
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle(); // Usar maybeSingle ao invés de single para evitar erro quando não há resultado
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      // Nenhuma assinatura encontrada
+    // Se for erro de "nenhum resultado", retornar null silenciosamente
+    if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
       return null;
     }
     console.error('Error fetching user subscription:', error);
-    throw error;
+    // Não lançar erro, apenas retornar null para não quebrar o dashboard
+    return null;
   }
 
   return data;

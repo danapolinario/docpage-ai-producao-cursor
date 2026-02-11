@@ -48,14 +48,23 @@ export const PricingPage: React.FC<Props> = ({
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('annual');
 
   // Se landingPageId for fornecido externamente (ex: após login), usar ele
+  // Também verificar localStorage quando vem do dashboard
   useEffect(() => {
-    if (landingPageId && initialViewMode === 'dashboard') {
+    // Verificar se há landingPageId no localStorage (quando vem do dashboard)
+    const storedLandingPageId = localStorage.getItem('checkout_landing_page_id');
+    const effectiveLandingPageId = landingPageId || storedLandingPageId;
+    
+    if (effectiveLandingPageId && (initialViewMode === 'dashboard' || initialViewMode === 'checkout')) {
       setCheckoutData({
-        landingPageId,
+        landingPageId: effectiveLandingPageId,
         landingPageUrl: `https://${selectedDomain || 'seu-dominio.com.br'}`,
         domain: selectedDomain || 'seu-dominio.com.br'
       });
-      setViewMode('dashboard');
+      if (initialViewMode === 'dashboard') {
+        setViewMode('dashboard');
+      } else if (initialViewMode === 'checkout') {
+        setViewMode('checkout');
+      }
     }
   }, [landingPageId, initialViewMode, selectedDomain]);
 
