@@ -121,11 +121,48 @@ interface AppProps {
 }
 
 const App: React.FC<AppProps> = ({ isDevMode = false }) => {
-  const [showSaaSIntro, setShowSaaSIntro] = useState(true);
-  const [state, setState] = useState<AppState>(INITIAL_STATE);
+  // Verificar se está na rota /checkout ao inicializar
+  const [showSaaSIntro, setShowSaaSIntro] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      const searchParams = new URLSearchParams(window.location.search);
+      const fromDashboard = searchParams.get('from') === 'dashboard';
+      const hasLandingPageId = localStorage.getItem('checkout_landing_page_id');
+      // Se está em /checkout vindo do dashboard, não mostrar a home
+      if (path === '/checkout' && (fromDashboard || hasLandingPageId)) {
+        return false;
+      }
+    }
+    return true;
+  });
+  const [state, setState] = useState<AppState>(() => {
+    // Se está vindo do dashboard, inicializar com step 5
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      const searchParams = new URLSearchParams(window.location.search);
+      const fromDashboard = searchParams.get('from') === 'dashboard';
+      const hasLandingPageId = localStorage.getItem('checkout_landing_page_id');
+      if (path === '/checkout' && (fromDashboard || hasLandingPageId)) {
+        return { ...INITIAL_STATE, step: 5 };
+      }
+    }
+    return INITIAL_STATE;
+  });
   const [viewMode, setViewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [pricingViewMode, setPricingViewMode] = useState<'plans' | 'checkout' | 'success' | 'dashboard'>('plans');
+  const [pricingViewMode, setPricingViewMode] = useState<'plans' | 'checkout' | 'success' | 'dashboard'>(() => {
+    // Se está vindo do dashboard, inicializar com checkout
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      const searchParams = new URLSearchParams(window.location.search);
+      const fromDashboard = searchParams.get('from') === 'dashboard';
+      const hasLandingPageId = localStorage.getItem('checkout_landing_page_id');
+      if (path === '/checkout' && (fromDashboard || hasLandingPageId)) {
+        return 'checkout';
+      }
+    }
+    return 'plans';
+  });
   const [showConfetti, setShowConfetti] = useState(false);
   const [isAuthenticatedUser, setIsAuthenticatedUser] = useState<boolean | null>(null);
   const [currentLandingPageId, setCurrentLandingPageId] = useState<string | null>(null);
@@ -214,6 +251,11 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     const hasLandingPageId = localStorage.getItem('checkout_landing_page_id');
     
     if (path === '/checkout') {
+      // Se veio do dashboard, garantir que a home não seja mostrada
+      if (fromDashboard || hasLandingPageId) {
+        setShowSaaSIntro(false);
+      }
+      
       // Se está na rota /checkout sem dados, redirecionar para home
       // MAS: se canceled=true, está restaurando estado, ou veio do dashboard, não redirecionar ainda
       if (!state.generatedContent || !state.briefing.name) {
@@ -243,6 +285,40 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
       }
     }
   }, [state.generatedContent, state.briefing.name, state.step, pricingViewMode, isRestoringState]);
+
+  // Executar imediatamente ao montar para detectar rota /checkout antes de renderizar
+  // Este useEffect deve executar ANTES de qualquer render
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const path = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+    const fromDashboard = searchParams.get('from') === 'dashboard';
+    const hasLandingPageId = localStorage.getItem('checkout_landing_page_id');
+    
+    // Se está em /checkout vindo do dashboard, configurar estado imediatamente
+    if (path === '/checkout' && (fromDashboard || hasLandingPageId)) {
+      console.log('[CHECKOUT] Detectado acesso do dashboard, configurando estado...', { fromDashboard, hasLandingPageId });
+      setShowSaaSIntro(false);
+      setState(prev => {
+        if (prev.step !== 5) {
+          console.log('[CHECKOUT] Configurando step para 5');
+          return { ...prev, step: 5 };
+        }
+        return prev;
+      });
+      setPricingViewMode(prev => {
+        if (prev !== 'checkout') {
+          console.log('[CHECKOUT] Configurando pricingViewMode para checkout');
+          return 'checkout';
+        }
+        return prev;
+      });
+    }
+    
+    // Executar checkCheckoutRoute também
+    checkCheckoutRoute();
+  }, []); // Executar apenas uma vez ao montar
 
   // Executar quando as dependências mudarem
   useEffect(() => {
