@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BriefingData, LandingPageContent, DesignSettings, SectionVisibility, LayoutVariant, Plan, ThemeType } from '../types';
 import { Preview } from './Preview';
 import { EditorPanel } from './EditorPanel';
@@ -96,6 +97,7 @@ export const Dashboard: React.FC<Props> = ({
   onEditSite,
   landingPageId
 }) => {
+  const navigate = useNavigate();
   const [activeView, setActiveView] = useState<ViewState>('overview');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -111,6 +113,9 @@ export const Dashboard: React.FC<Props> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [localVisibility, setLocalVisibility] = useState<SectionVisibility>(visibility);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Verificar se o usuário tem landing page mas não tem assinatura
+  const hasLandingPageButNoSubscription = landingPageId && !subscription;
 
   // Carregar dados do backend se landingPageId for fornecido
   useEffect(() => {
@@ -1216,104 +1221,135 @@ export const Dashboard: React.FC<Props> = ({
                    </div>
                  )}
 
-                 {/* Plan Features & Subscription Status (Merged) */}
-                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 md:p-6 shadow-sm">
-                   <div className="flex items-start gap-3 md:gap-4">
-                     <div className="flex-shrink-0 mt-1">
-                       <svg className="w-5 h-5 md:w-6 md:h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                       </svg>
-                     </div>
-                     <div className="flex-1">
-                       <div className="flex items-center gap-2 mb-3">
-                         <h3 className="text-sm md:text-base font-bold text-blue-900">Status da Assinatura e Funcionalidades</h3>
-                         {subscription ? (
-                           <>
-                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                               subscription.status === 'active' 
-                                 ? 'bg-green-100 text-green-700' 
-                                 : subscription.status === 'canceled'
-                                 ? 'bg-red-100 text-red-700'
-                                 : subscription.status === 'past_due'
-                                 ? 'bg-yellow-100 text-yellow-700'
-                                 : 'bg-gray-100 text-gray-700'
-                             }`}>
-                               {subscription.status === 'active' ? 'Ativa' : 
-                                subscription.status === 'canceled' ? 'Cancelada' :
-                                subscription.status === 'past_due' ? 'Atrasada' :
-                                subscription.status === 'unpaid' ? 'Não Paga' :
-                                subscription.status === 'trialing' ? 'Período de Teste' : subscription.status}
-                             </span>
-                             <span className="px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded uppercase">
-                               {subscription.plan_id === 'pro' ? 'Profissional' : 'Starter'} - {subscription.billing_period === 'monthly' ? 'Mensal' : 'Anual'}
-                             </span>
-                           </>
-                         ) : (
-                           <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded uppercase">{plan.name}</span>
-                         )}
+                 {/* Banner de Assinatura Pendente ou Plan Features & Subscription Status */}
+                 {hasLandingPageButNoSubscription ? (
+                   <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl p-6 md:p-8 shadow-lg">
+                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
+                       <div className="flex-shrink-0">
+                         <div className="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center">
+                           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                           </svg>
+                         </div>
                        </div>
-                       
-                       {subscription && (
-                         <div className="mb-3 pb-3 border-b border-blue-200">
-                           <p className="text-xs text-blue-700">
-                             {subscription.cancel_at_period_end 
-                               ? `Cancelará em ${new Date(subscription.current_period_end).toLocaleDateString('pt-BR')}`
-                               : `Próxima renovação: ${new Date(subscription.current_period_end).toLocaleDateString('pt-BR')}`
-                             }
-                           </p>
-                         </div>
-                       )}
-                       
-                       <p className="text-xs md:text-sm text-blue-800 mb-3 leading-relaxed">
-                         {planFeatures.description}
-                       </p>
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
-                         <div className="flex items-center gap-2 text-xs md:text-sm">
-                           <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canEdit ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canEdit ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
+                       <div className="flex-1">
+                         <h3 className="text-lg md:text-xl font-bold text-amber-900 mb-2">
+                           Assinatura Pendente
+                         </h3>
+                         <p className="text-sm md:text-base text-amber-800 mb-4">
+                           Você criou sua landing page, mas ainda não possui uma assinatura ativa. Complete seu cadastro e escolha um plano para ativar seu site.
+                         </p>
+                         <button
+                           onClick={() => navigate('/checkout')}
+                           className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
+                         >
+                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15l1-4m4 4l1-4m2 4h3M3 19h18a2 2 0 002-2V7a2 2 0 00-2-2H3a2 2 0 00-2 2v10a2 2 0 002 2z" />
                            </svg>
-                           <span className={planFeatures.canEdit ? 'text-blue-900' : 'text-gray-500'}>Edição completa do site</span>
-                         </div>
-                         <div className="flex items-center gap-2 text-xs md:text-sm">
-                           <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canViewAdvancedStats ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canViewAdvancedStats ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
-                           </svg>
-                           <span className={planFeatures.canViewAdvancedStats ? 'text-blue-900' : 'text-gray-500'}>Estatísticas avançadas</span>
-                         </div>
-                         <div className="flex items-center gap-2 text-xs md:text-sm">
-                           <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canAccessSocialMedia ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canAccessSocialMedia ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
-                           </svg>
-                           <span className={planFeatures.canAccessSocialMedia ? 'text-blue-900' : 'text-gray-500'}>Posts para redes sociais</span>
-                         </div>
-                         {planFeatures.canGetConsulting && (
-                           <div className="flex items-center gap-2 text-xs md:text-sm">
-                             <svg className="w-4 h-4 flex-shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                             </svg>
-                             <span className="text-blue-900">Consultoria mensal</span>
-                           </div>
-                         )}
-                         {planFeatures.canGetCustomDesign && (
-                           <div className="flex items-center gap-2 text-xs md:text-sm">
-                             <svg className="w-4 h-4 flex-shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                             </svg>
-                             <span className="text-blue-900">Customização humana</span>
-                           </div>
-                         )}
-                         {planFeatures.canGetAdsManagement && (
-                           <div className="flex items-center gap-2 text-xs md:text-sm">
-                             <svg className="w-4 h-4 flex-shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                             </svg>
-                             <span className="text-blue-900">Gestão de tráfego (Ads)</span>
-                           </div>
-                         )}
+                           Ir para Checkout
+                         </button>
                        </div>
                      </div>
                    </div>
-                 </div>
+                 ) : (
+                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 md:p-6 shadow-sm">
+                     <div className="flex items-start gap-3 md:gap-4">
+                       <div className="flex-shrink-0 mt-1">
+                         <svg className="w-5 h-5 md:w-6 md:h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                         </svg>
+                       </div>
+                       <div className="flex-1">
+                         <div className="flex items-center gap-2 mb-3">
+                           <h3 className="text-sm md:text-base font-bold text-blue-900">Status da Assinatura e Funcionalidades</h3>
+                           {subscription ? (
+                             <>
+                               <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                 subscription.status === 'active' 
+                                   ? 'bg-green-100 text-green-700' 
+                                   : subscription.status === 'canceled'
+                                   ? 'bg-red-100 text-red-700'
+                                   : subscription.status === 'past_due'
+                                   ? 'bg-yellow-100 text-yellow-700'
+                                   : 'bg-gray-100 text-gray-700'
+                               }`}>
+                                 {subscription.status === 'active' ? 'Ativa' : 
+                                  subscription.status === 'canceled' ? 'Cancelada' :
+                                  subscription.status === 'past_due' ? 'Atrasada' :
+                                  subscription.status === 'unpaid' ? 'Não Paga' :
+                                  subscription.status === 'trialing' ? 'Período de Teste' : subscription.status}
+                               </span>
+                               <span className="px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded uppercase">
+                                 {subscription.plan_id === 'pro' ? 'Profissional' : 'Starter'} - {subscription.billing_period === 'monthly' ? 'Mensal' : 'Anual'}
+                               </span>
+                             </>
+                           ) : (
+                             <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded uppercase">{plan.name}</span>
+                           )}
+                         </div>
+                         
+                         {subscription && (
+                           <div className="mb-3 pb-3 border-b border-blue-200">
+                             <p className="text-xs text-blue-700">
+                               {subscription.cancel_at_period_end 
+                                 ? `Cancelará em ${new Date(subscription.current_period_end).toLocaleDateString('pt-BR')}`
+                                 : `Próxima renovação: ${new Date(subscription.current_period_end).toLocaleDateString('pt-BR')}`
+                               }
+                             </p>
+                           </div>
+                         )}
+                         
+                         <p className="text-xs md:text-sm text-blue-800 mb-3 leading-relaxed">
+                           {planFeatures.description}
+                         </p>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
+                           <div className="flex items-center gap-2 text-xs md:text-sm">
+                             <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canEdit ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canEdit ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
+                             </svg>
+                             <span className={planFeatures.canEdit ? 'text-blue-900' : 'text-gray-500'}>Edição completa do site</span>
+                           </div>
+                           <div className="flex items-center gap-2 text-xs md:text-sm">
+                             <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canViewAdvancedStats ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canViewAdvancedStats ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
+                             </svg>
+                             <span className={planFeatures.canViewAdvancedStats ? 'text-blue-900' : 'text-gray-500'}>Estatísticas avançadas</span>
+                           </div>
+                           <div className="flex items-center gap-2 text-xs md:text-sm">
+                             <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canAccessSocialMedia ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canAccessSocialMedia ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
+                             </svg>
+                             <span className={planFeatures.canAccessSocialMedia ? 'text-blue-900' : 'text-gray-500'}>Posts para redes sociais</span>
+                           </div>
+                           {planFeatures.canGetConsulting && (
+                             <div className="flex items-center gap-2 text-xs md:text-sm">
+                               <svg className="w-4 h-4 flex-shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                               </svg>
+                               <span className="text-blue-900">Consultoria mensal</span>
+                             </div>
+                           )}
+                           {planFeatures.canGetCustomDesign && (
+                             <div className="flex items-center gap-2 text-xs md:text-sm">
+                               <svg className="w-4 h-4 flex-shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                               </svg>
+                               <span className="text-blue-900">Customização humana</span>
+                             </div>
+                           )}
+                           {planFeatures.canGetAdsManagement && (
+                             <div className="flex items-center gap-2 text-xs md:text-sm">
+                               <svg className="w-4 h-4 flex-shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                               </svg>
+                               <span className="text-blue-900">Gestão de tráfego (Ads)</span>
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                 )}
 
                  {/* Mobile Menu Orientation */}
                  <div className="md:hidden bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
