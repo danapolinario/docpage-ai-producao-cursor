@@ -14,9 +14,9 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
-// Carregar variáveis de ambiente do arquivo .env se existir
+// Carregar variáveis de ambiente do arquivo .env.local se existir
 try {
-  const envPath = join(process.cwd(), '.env');
+  const envPath = join(process.cwd(), '.env.local');
   if (existsSync(envPath)) {
     const envFile = readFileSync(envPath, 'utf-8');
     const envLines = envFile.split('\n');
@@ -35,7 +35,7 @@ try {
     }
   }
 } catch (error: any) {
-  // Ignorar se .env não existir
+  // Ignorar se .env.local não existir
 }
 
 const supabaseUrl = 
@@ -51,7 +51,7 @@ const supabaseServiceKey =
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('❌ Erro: Variáveis de ambiente não configuradas\n');
-  console.error('Configure VITE_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no .env');
+  console.error('Configure VITE_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no .env.local');
   console.error('Ou exporte as variáveis no terminal antes de executar\n');
   process.exit(1);
 }

@@ -930,7 +930,7 @@ export const Dashboard: React.FC<Props> = ({
         canGetConsulting: false,
         canGetCustomDesign: false,
         canGetAdsManagement: false,
-        description: 'Seu plano Starter inclui: edição básica do site, estatísticas de acesso e gerenciamento de domínio. Para acessar funcionalidades avançadas como estatísticas detalhadas, email profissional e posts para redes sociais, considere fazer upgrade para o plano Profissional.'
+        description: 'Seu plano Starter inclui: edição do site, estatísticas de acesso e gerenciamento de domínio. Para acessar funcionalidades avançadas como estatísticas detalhadas, email profissional e posts para redes sociais, considere fazer upgrade para o plano Profissional.'
       };
     }
   };

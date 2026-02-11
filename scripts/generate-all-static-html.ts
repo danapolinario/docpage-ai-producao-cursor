@@ -17,9 +17,9 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
-// Carregar variáveis de ambiente do arquivo .env se existir
+// Carregar variáveis de ambiente do arquivo .env.local se existir
 try {
-  const envPath = join(process.cwd(), '.env');
+  const envPath = join(process.cwd(), '.env.local');
   if (existsSync(envPath)) {
     const envFile = readFileSync(envPath, 'utf-8');
     const envLines = envFile.split('\n');
@@ -36,12 +36,12 @@ try {
         }
       }
     }
-    console.log('✓ Arquivo .env carregado\n');
+    console.log('✓ Arquivo .env.local carregado\n');
   }
 } catch (error: any) {
-  // Arquivo .env não existe ou não pode ser lido - usar variáveis do sistema
+  // Arquivo .env.local não existe ou não pode ser lido - usar variáveis do sistema
   if (error.code !== 'ENOENT') {
-    console.log('⚠️  Aviso: Não foi possível carregar .env, usando variáveis do sistema\n');
+    console.log('⚠️  Aviso: Não foi possível carregar .env.local, usando variáveis do sistema\n');
   }
 }
 
@@ -62,10 +62,9 @@ if (!supabaseUrl || !supabaseServiceKey) {
   console.error('📝 Configure as variáveis de ambiente de uma das seguintes formas:\n');
   
   console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.error('Opção 1: Criar arquivo .env na raiz do projeto (RECOMENDADO)\n');
-  console.error('   1. Copie o arquivo .env.example para .env:');
-  console.error('      cp .env.example .env\n');
-  console.error('   2. Edite o arquivo .env e preencha os valores:\n');
+  console.error('Opção 1: Criar arquivo .env.local na raiz do projeto (RECOMENDADO)\n');
+  console.error('   1. Crie o arquivo .env.local na raiz do projeto:\n');
+  console.error('   2. Edite o arquivo .env.local e preencha os valores:\n');
   console.error('      VITE_SUPABASE_URL=https://seu-projeto.supabase.co');
   console.error('      SUPABASE_SERVICE_ROLE_KEY=sua-service-role-key\n');
   
