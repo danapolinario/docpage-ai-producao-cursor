@@ -89,8 +89,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const subdomain = extractSubdomain(host);
   
   // Verificar se há parâmetro preview na URL
-  const url = new URL(req.url || '/', `https://${host}`);
-  const hasPreview = url.searchParams.has('preview');
+  let hasPreview = false;
+  try {
+    const requestUrl = req.url || '/';
+    // Se req.url já tem protocolo, usar diretamente, senão construir URL completa
+    const fullUrl = requestUrl.startsWith('http') ? requestUrl : `https://${host}${requestUrl}`;
+    const url = new URL(fullUrl);
+    hasPreview = url.searchParams.has('preview');
+  } catch (error) {
+    // Fallback: verificar manualmente se tem ?preview na string
+    const requestUrl = req.url || '';
+    hasPreview = requestUrl.includes('?preview') || requestUrl.includes('&preview');
+    console.log('[SSR] Erro ao parsear URL, usando fallback:', error);
+  }
   
   console.log('[SSR DEBUG] Subdomain extraction:', {
     host,
