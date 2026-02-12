@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { BriefingForm } from './components/BriefingForm';
 import { ContentConfig } from './components/ContentConfig';
 import { PhotoUploader } from './components/PhotoUploader';
@@ -121,6 +122,8 @@ interface AppProps {
 }
 
 const App: React.FC<AppProps> = ({ isDevMode = false }) => {
+  const location = useLocation();
+  
   // Verificar se está na rota /checkout ao inicializar
   const [showSaaSIntro, setShowSaaSIntro] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -137,6 +140,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   });
   const [state, setState] = useState<AppState>(() => {
     // Se está vindo do dashboard, inicializar com step 5
+    // Nota: location ainda não está disponível na inicialização, então usamos window.location
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
       const searchParams = new URLSearchParams(window.location.search);
@@ -152,6 +156,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [pricingViewMode, setPricingViewMode] = useState<'plans' | 'checkout' | 'success' | 'dashboard'>(() => {
     // Se está vindo do dashboard, inicializar com checkout
+    // Nota: location ainda não está disponível na inicialização, então usamos window.location
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
       const searchParams = new URLSearchParams(window.location.search);
@@ -244,8 +249,8 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   const checkCheckoutRoute = React.useCallback(() => {
     if (typeof window === 'undefined') return;
     
-    const path = window.location.pathname;
-    const searchParams = new URLSearchParams(window.location.search);
+    const path = location.pathname;
+    const searchParams = new URLSearchParams(location.search);
     const canceled = searchParams.get('canceled') === 'true';
     const fromDashboard = searchParams.get('from') === 'dashboard';
     const hasLandingPageId = localStorage.getItem('checkout_landing_page_id');
@@ -284,21 +289,23 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
         setPricingViewMode('checkout');
       }
     }
-  }, [state.generatedContent, state.briefing.name, state.step, pricingViewMode, isRestoringState]);
+  }, [location.pathname, location.search, state.generatedContent, state.briefing.name, state.step, pricingViewMode, isRestoringState]);
 
-  // Executar imediatamente ao montar para detectar rota /checkout antes de renderizar
-  // Este useEffect deve executar ANTES de qualquer render
+  // Executar quando a rota mudar (detecta navegação do React Router)
+  // Este é o useEffect principal que detecta mudanças de rota
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const path = window.location.pathname;
-    const searchParams = new URLSearchParams(window.location.search);
+    const path = location.pathname;
+    const searchParams = new URLSearchParams(location.search);
     const fromDashboard = searchParams.get('from') === 'dashboard';
     const hasLandingPageId = localStorage.getItem('checkout_landing_page_id');
     
+    console.log('[ROUTE CHANGE] Rota mudou:', { path, search: location.search, fromDashboard, hasLandingPageId });
+    
     // Se está em /checkout vindo do dashboard, configurar estado imediatamente
     if (path === '/checkout' && (fromDashboard || hasLandingPageId)) {
-      console.log('[CHECKOUT] Detectado acesso do dashboard, configurando estado...', { fromDashboard, hasLandingPageId });
+      console.log('[CHECKOUT] Detectado acesso do dashboard, configurando estado imediatamente...', { fromDashboard, hasLandingPageId, path });
+      
+      // Atualizar estados de forma síncrona
       setShowSaaSIntro(false);
       setState(prev => {
         if (prev.step !== 5) {
@@ -316,9 +323,12 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
       });
     }
     
-    // Executar checkCheckoutRoute também
-    checkCheckoutRoute();
-  }, []); // Executar apenas uma vez ao montar
+    // Executar checkCheckoutRoute também para garantir consistência
+    // Usar setTimeout para garantir que os estados sejam atualizados primeiro
+    setTimeout(() => {
+      checkCheckoutRoute();
+    }, 0);
+  }, [location.pathname, location.search]); // Executar quando a rota mudar - removido checkCheckoutRoute das dependências para evitar loops
 
   // Executar quando as dependências mudarem
   useEffect(() => {

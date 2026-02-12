@@ -46,6 +46,10 @@ export const PricingPage: React.FC<Props> = ({
   const [confirmedDomain, setConfirmedDomain] = useState('');
   const [checkoutData, setCheckoutData] = useState<{ landingPageId: string; landingPageUrl: string; domain: string } | null>(null);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('annual');
+  // Dados pré-preenchidos quando vem do dashboard
+  const [prefilledDomain, setPrefilledDomain] = useState<string | null>(null);
+  const [prefilledCpf, setPrefilledCpf] = useState<string | null>(null);
+  const [prefilledHasCustomDomain, setPrefilledHasCustomDomain] = useState(false);
 
   // Se landingPageId for fornecido externamente (ex: após login), usar ele
   // Também verificar localStorage quando vem do dashboard
@@ -67,6 +71,141 @@ export const PricingPage: React.FC<Props> = ({
       }
     }
   }, [landingPageId, initialViewMode, selectedDomain]);
+
+  // Buscar dados da landing page quando vem do dashboard (domínio, CPF, plano)
+  useEffect(() => {
+    const fetchLandingPageData = async () => {
+      // Só buscar se estiver em modo checkout e tiver landingPageId
+      if (initialViewMode !== 'checkout' && viewMode !== 'checkout') {
+        return;
+      }
+
+      const storedLandingPageId = localStorage.getItem('checkout_landing_page_id');
+      const effectiveLandingPageId = landingPageId || storedLandingPageId;
+      
+      if (!effectiveLandingPageId) {
+        return;
+      }
+
+      try {
+        console.log('[PRICING PAGE] Buscando dados da landing page para checkout:', effectiveLandingPageId);
+        
+        // Buscar landing page
+        const { data: landingPage, error: lpError } = await supabase
+          .from('landing_pages')
+          .select('id, chosen_domain, custom_domain, cpf, subdomain')
+          .eq('id', effectiveLandingPageId)
+          .single();
+
+        if (lpError) {
+          console.error('[PRICING PAGE] Erro ao buscar landing page:', lpError);
+          return;
+        }
+
+        // Buscar domínio de pending_checkouts se não tiver chosen_domain
+        let domainToUse = landingPage.chosen_domain || landingPage.custom_domain;
+        let cpfToUse = landingPage.cpf;
+        let hasCustomDomain = !!landingPage.custom_domain;
+
+        if (!domainToUse) {
+          const { data: pendingCheckout } = await supabase
+            .from('pending_checkouts')
+            .select('domain, has_custom_domain, custom_domain, cpf')
+            .eq('landing_page_id', effectiveLandingPageId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (pendingCheckout) {
+            domainToUse = pendingCheckout.has_custom_domain && pendingCheckout.custom_domain
+              ? pendingCheckout.custom_domain
+              : pendingCheckout.domain;
+            cpfToUse = cpfToUse || pendingCheckout.cpf;
+            hasCustomDomain = pendingCheckout.has_custom_domain || false;
+          }
+        }
+
+        // Buscar plano da subscription se houver
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: subscription } = await supabase
+            .from('subscriptions')
+            .select('plan_id, billing_period')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (subscription) {
+            // Mapear plan_id para Plan object
+            const planMap: Record<string, Plan> = {
+              starter: {
+                id: 'starter',
+                name: 'Starter',
+                price: subscription.billing_period === 'annual' ? 'R$ 97' : 'R$ 147',
+                oldPrice: subscription.billing_period === 'annual' ? 'R$ 147' : undefined,
+                rawPrice: subscription.billing_period === 'annual' ? 97 : 147,
+                period: '/mês',
+                description: 'Para quem está começando e quer presença digital rápida.',
+                features: [
+                  'Hospedagem inclusa',
+                  'Domínio .com.br grátis (1 ano)',
+                  'Botão WhatsApp',
+                  'Estatísticas de acesso'
+                ],
+                cta: 'Começar Agora',
+                popular: false,
+                color: 'border-slate-200'
+              },
+              pro: {
+                id: 'pro',
+                name: 'Profissional',
+                price: subscription.billing_period === 'annual' ? 'R$ 197' : 'R$ 297',
+                oldPrice: subscription.billing_period === 'annual' ? 'R$ 297' : undefined,
+                rawPrice: subscription.billing_period === 'annual' ? 197 : 297,
+                period: '/mês',
+                description: 'Para especialistas que buscam autoridade e agendamentos.',
+                features: [
+                  'Tudo do Starter',
+                  'Estatísticas de acesso avançadas',
+                  'Sugestões periódicas da nossa equipe para melhoria de desempenho',
+                  'Plano estratégico para otimizar resultados',
+                  'Pacote de posts para Redes Sociais'
+                ],
+                cta: 'Assinar Profissional',
+                popular: true,
+                color: 'border-blue-500 ring-2 ring-blue-500'
+              }
+            };
+
+            const plan = planMap[subscription.plan_id];
+            if (plan) {
+              setSelectedPlan(plan);
+              setBillingPeriod(subscription.billing_period as 'monthly' | 'annual');
+            }
+          }
+        }
+
+        // Preencher dados do domínio e CPF
+        if (domainToUse) {
+          setPrefilledDomain(domainToUse);
+          setConfirmedDomain(domainToUse);
+          setPrefilledHasCustomDomain(hasCustomDomain);
+          console.log('[PRICING PAGE] Domínio pré-preenchido:', domainToUse, 'Custom:', hasCustomDomain);
+        }
+
+        if (cpfToUse) {
+          setPrefilledCpf(cpfToUse);
+          console.log('[PRICING PAGE] CPF pré-preenchido encontrado');
+        }
+      } catch (error: any) {
+        console.error('[PRICING PAGE] Erro ao buscar dados da landing page:', error);
+      }
+    };
+
+    fetchLandingPageData();
+  }, [landingPageId, initialViewMode, viewMode]);
 
   // Auto-select a dummy plan if jumping straight to checkout/dashboard in dev mode
   // Também seleciona um plano padrão quando voltar do Stripe com canceled=true
@@ -345,6 +484,9 @@ export const PricingPage: React.FC<Props> = ({
           onBack={() => setViewMode('plans')}
           onSuccess={handleCheckoutSuccess}
           onError={handleCheckoutError}
+          prefilledDomain={prefilledDomain}
+          prefilledCpf={prefilledCpf}
+          prefilledHasCustomDomain={prefilledHasCustomDomain}
         />
       </div>
     );

@@ -21,6 +21,10 @@ interface Props {
   onBack: () => void;
   onSuccess: (data: { landingPageId: string; landingPageUrl: string; domain: string }) => void;
   onError?: (error: string) => void;
+  // Dados pré-preenchidos quando vem do dashboard
+  prefilledDomain?: string | null;
+  prefilledCpf?: string | null;
+  prefilledHasCustomDomain?: boolean;
 }
 
 type CheckoutStep = 1 | 2 | 3;
@@ -37,7 +41,10 @@ export const CheckoutFlow: React.FC<Props> = ({
   aboutPhotoUrl,
   onBack, 
   onSuccess,
-  onError
+  onError,
+  prefilledDomain,
+  prefilledCpf,
+  prefilledHasCustomDomain = false
 }) => {
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -108,7 +115,37 @@ export const CheckoutFlow: React.FC<Props> = ({
     }
   }, [resendCountdown, isCodeSent]);
 
-  // Verificar se já está autenticado
+  // Preencher dados pré-preenchidos quando disponíveis
+  useEffect(() => {
+    if (prefilledDomain) {
+      // Se tem domínio pré-preenchido, verificar se é custom domain
+      if (prefilledHasCustomDomain) {
+        setHasCustomDomain(true);
+        setCustomDomainValue(prefilledDomain);
+      } else {
+        // Extrair nome do domínio e extensão
+        const domainMatch = prefilledDomain.match(/^(.+?)(\.(com\.br|med\.br|com|br|net|org))$/);
+        if (domainMatch) {
+          setDomain(domainMatch[1]); // Nome do domínio sem extensão
+          setDomainExtension(domainMatch[2]); // Extensão
+          setSelectedDomain(domainMatch[1]);
+          setIsDomainAvailable(true);
+        } else {
+          // Se não tem extensão, assumir .com.br
+          setDomain(prefilledDomain);
+          setDomainExtension('.com.br');
+          setSelectedDomain(prefilledDomain);
+          setIsDomainAvailable(true);
+        }
+      }
+    }
+
+    if (prefilledCpf) {
+      setCpf(prefilledCpf);
+    }
+  }, [prefilledDomain, prefilledCpf, prefilledHasCustomDomain]);
+
+  // Verificar se já está autenticado e pular steps se dados estiverem pré-preenchidos
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -129,8 +166,15 @@ export const CheckoutFlow: React.FC<Props> = ({
           if (!email && user.email) {
             setEmail(user.email);
           }
-          // Se já está autenticado, avançar automaticamente para o Step 2 (domínio)
-          setCurrentStep(2);
+          
+          // Se tem dados pré-preenchidos (domínio e CPF), pular direto para Step 3
+          if (prefilledDomain && (prefilledCpf || prefilledHasCustomDomain)) {
+            console.log('[CHECKOUT FLOW] Dados pré-preenchidos detectados, pulando para Step 3');
+            setCurrentStep(3);
+          } else {
+            // Se já está autenticado mas não tem dados pré-preenchidos, avançar para Step 2
+            setCurrentStep(2);
+          }
         } else {
           setIsAuthenticated(false);
           // Garantir que está no Step 1 se não estiver autenticado
@@ -145,7 +189,7 @@ export const CheckoutFlow: React.FC<Props> = ({
       }
     };
     checkAuth();
-  }, []);
+  }, [prefilledDomain, prefilledCpf, prefilledHasCustomDomain, email]);
 
   // Step 1: Enviar código OTP
   const handleSendCode = async () => {
