@@ -302,18 +302,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                           console.log('[VERIFY] Erro ao obter sessão/usuário:', sessionError?.message || userError?.message);
                           
                           // Tentar obter sessão do localStorage diretamente
-                          const sessionKey = Object.keys(localStorage).find(key => 
-                            key.includes('supabase.auth.token') || 
-                            key.includes('sb-') && key.includes('-auth-token')
+                          // Procurar por todas as chaves possíveis do Supabase
+                          const possibleKeys = Object.keys(localStorage).filter(key => 
+                            key.includes('supabase') || 
+                            (key.includes('sb-') && key.includes('auth'))
                           );
                           
-                          if (sessionKey) {
+                          console.log('[VERIFY] Chaves do localStorage encontradas:', possibleKeys);
+                          
+                          for (const sessionKey of possibleKeys) {
                             try {
                               const storedData = localStorage.getItem(sessionKey);
                               if (storedData) {
-                                const sessionData = JSON.parse(storedData);
-                                if (sessionData.access_token || sessionData.accessToken) {
-                                  const accessToken = sessionData.access_token || sessionData.accessToken;
+                                let sessionData;
+                                try {
+                                  sessionData = JSON.parse(storedData);
+                                } catch {
+                                  // Se não for JSON, pode ser apenas o token
+                                  if (storedData.length > 50) {
+                                    // Parece ser um token JWT
+                                    const { data: { user: userFromToken }, error: tokenError } = await supabase.auth.getUser(storedData);
+                                    if (!tokenError && userFromToken) {
+                                      user = userFromToken;
+                                      console.log('[VERIFY] Usuário obtido do token direto do localStorage');
+                                      break;
+                                    }
+                                  }
+                                  continue;
+                                }
+                                
+                                // Tentar diferentes formatos de dados
+                                let accessToken = null;
+                                
+                                if (sessionData.access_token) {
+                                  accessToken = sessionData.access_token;
+                                } else if (sessionData.accessToken) {
+                                  accessToken = sessionData.accessToken;
+                                } else if (sessionData.session && sessionData.session.access_token) {
+                                  accessToken = sessionData.session.access_token;
+                                } else if (typeof sessionData === 'string' && sessionData.length > 50) {
+                                  // Pode ser o token direto como string
+                                  accessToken = sessionData;
+                                }
+                                
+                                if (accessToken) {
                                   console.log('[VERIFY] Token encontrado no localStorage, tentando obter usuário...');
                                   
                                   // Tentar usar o token para obter usuário
@@ -321,6 +353,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                   if (!tokenError && userFromToken) {
                                     user = userFromToken;
                                     console.log('[VERIFY] Usuário obtido do token do localStorage');
+                                    break;
                                   } else {
                                     console.log('[VERIFY] Erro ao obter usuário do token:', tokenError?.message);
                                   }
@@ -328,6 +361,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                               }
                             } catch (e) {
                               console.error('[VERIFY] Erro ao ler sessão do localStorage:', e);
+                              continue;
                             }
                           }
                         }
@@ -391,11 +425,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   }
                   
                   function showAccessDenied() {
+                    console.log('[VERIFY] Mostrando mensagem de acesso negado');
+                    // Limpar qualquer conteúdo existente e mostrar mensagem
+                    document.body.innerHTML = '';
+                    document.body.style.display = 'block';
+                    document.body.style.margin = '0';
+                    document.body.style.padding = '0';
+                    document.body.style.fontFamily = 'Arial, sans-serif';
+                    document.body.style.background = '#f3f4f6';
                     document.body.innerHTML = \`
-                      <div style="font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f3f4f6;">
-                        <div style="text-align: center; padding: 2rem;">
-                          <h1 style="color: #374151; margin-bottom: 1rem;">Esta landing page ainda não foi publicada</h1>
-                          <p style="color: #6b7280;">Apenas o proprietário ou um administrador pode visualizar esta página antes da publicação.</p>
+                      <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f3f4f6;">
+                        <div style="text-align: center; padding: 2rem; max-width: 600px;">
+                          <div style="width: 64px; height: 64px; margin: 0 auto 1.5rem; background: #fbbf24; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <svg style="width: 32px; height: 32px; color: white;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                          </div>
+                          <h1 style="color: #374151; margin-bottom: 1rem; font-size: 1.5rem; font-weight: bold;">Esta landing page ainda não foi publicada</h1>
+                          <p style="color: #6b7280; font-size: 1rem; line-height: 1.5;">Apenas o proprietário ou um administrador pode visualizar esta página antes da publicação.</p>
                         </div>
                       </div>
                     \`;
