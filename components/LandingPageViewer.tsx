@@ -70,7 +70,7 @@ export const LandingPageViewer: React.FC = () => {
       }
 
       try {
-        // Primeiro tentar buscar a landing page (independente do status para verificar se existe)
+        // Buscar landing page (independente do status para verificar se existe)
         const { data, error: fetchError } = await supabase
           .from('landing_pages')
           .select('*')
@@ -80,11 +80,37 @@ export const LandingPageViewer: React.FC = () => {
         if (fetchError) {
           console.error('Error fetching landing page:', fetchError);
           setError('Landing page não encontrada');
-        } else {
-          // Permitir visualização mesmo se não publicado (para preview via subdomain)
-          // A verificação de status pode ser feita no servidor se necessário
-          setLandingPage(data);
+          setLoading(false);
+          return;
         }
+
+        // Verificar autenticação e permissões
+        const { data: { user } } = await supabase.auth.getUser();
+        const isOwner = user && user.id === data.user_id;
+        
+        // Verificar se é admin
+        let isAdmin = false;
+        if (user) {
+          try {
+            const { checkIsAdmin } = await import('../services/admin');
+            isAdmin = await checkIsAdmin();
+          } catch (adminError) {
+            console.error('Error checking admin status:', adminError);
+            // Continuar sem permissão de admin se houver erro
+          }
+        }
+
+        // Permitir acesso se publicado OU se usuário é dono OU se usuário é admin
+        const canAccess = data.status === 'published' || isOwner || isAdmin;
+
+        if (!canAccess) {
+          setError('Esta landing page ainda não foi publicada');
+          setLoading(false);
+          return;
+        }
+
+        // Permitir visualização
+        setLandingPage(data);
       } catch (err) {
         console.error('Error:', err);
         setError('Erro ao carregar landing page');

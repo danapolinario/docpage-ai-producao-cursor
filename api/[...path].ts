@@ -18,6 +18,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { verifyAuthFromRequest } from './auth-utils.js';
 
 // Para ES modules, precisamos definir __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -179,8 +180,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).send('Not found');
       }
 
-      // Permitir acesso mesmo se não publicado (para preview via subdomain)
-      // Removido: if (landingPage.status !== 'published')
+      // Verificar autenticação e permissões
+      const cookies = req.headers.cookie || '';
+      const authHeader = req.headers.authorization || '';
+      const authResult = await verifyAuthFromRequest(cookies, authHeader);
+      
+      const isOwner = authResult.isAuthenticated && authResult.userId === landingPage.user_id;
+      const isAdmin = authResult.isAdmin;
+      const isPublished = landingPage.status === 'published';
+      
+      // Permitir acesso se publicado OU se usuário é dono OU se usuário é admin
+      const canAccess = isPublished || isOwner || isAdmin;
+      
+      if (!canAccess) {
+        console.log('[SUBDOMAIN DEBUG] Access denied - landing page not published and user has no permission', {
+          status: landingPage.status,
+          isOwner,
+          isAdmin,
+          isAuthenticated: authResult.isAuthenticated,
+          userId: authResult.userId,
+          landingPageUserId: landingPage.user_id
+        });
+        return res.status(403).send(`
+          <!DOCTYPE html>
+          <html lang="pt-BR">
+          <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>Acesso Negado</title>
+          </head>
+          <body style="font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f3f4f6;">
+            <div style="text-align: center; padding: 2rem;">
+              <h1 style="color: #374151; margin-bottom: 1rem;">Esta landing page ainda não foi publicada</h1>
+              <p style="color: #6b7280;">Apenas o proprietário ou um administrador pode visualizar esta página antes da publicação.</p>
+            </div>
+          </body>
+          </html>
+        `);
+      }
+
+      console.log('[SUBDOMAIN DEBUG] Access granted', {
+        status: landingPage.status,
+        isOwner,
+        isAdmin,
+        isPublished
+      });
 
       // Criar objeto req compatível para renderLandingPage
       const mockReq = {
