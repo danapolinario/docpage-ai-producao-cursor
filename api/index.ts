@@ -28,6 +28,10 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Cliente com service role para bypass RLS quando necessário
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseAdmin = serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
+
 function extractSubdomain(host: string): string | null {
   const hostname = host.split(':')[0].toLowerCase();
   if (hostname.endsWith('.docpage.com.br')) {
@@ -187,7 +191,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Fallback: SSR dinâmico
     try {
-      const { data: landingPage, error } = await supabase
+      // IMPORTANTE: Usar service role key para fazer a query (bypass RLS)
+      // Isso permite buscar landing pages não publicadas para verificação de permissões
+      if (!supabaseAdmin) {
+        console.error('[SSR] ⚠️ Service role key não configurada! Não será possível buscar landing pages não publicadas.');
+      }
+      
+      const queryClient = supabaseAdmin || supabase;
+      const { data: landingPage, error } = await queryClient
         .from('landing_pages')
         .select('*')
         .eq('subdomain', subdomain)
@@ -197,8 +208,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         subdomain,
         found: !!landingPage,
         error: error?.message,
+        errorCode: error?.code,
         status: landingPage?.status,
         landingPageId: landingPage?.id,
+        userId: landingPage?.user_id,
+        usingServiceRole: !!supabaseAdmin,
         hasMetaTitle: !!landingPage?.meta_title,
         metaTitle: landingPage?.meta_title?.substring(0, 50),
         photo_url: landingPage?.photo_url ? (landingPage.photo_url.length > 100 ? landingPage.photo_url.substring(0, 100) + '...' : landingPage.photo_url) : 'null/undefined',
@@ -207,55 +221,85 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
 
       if (error || !landingPage) {
-        console.log('[SSR] ✗ Landing page não encontrada, retornando 404');
+        console.log('[SSR] ✗ Landing page não encontrada, retornando 404', {
+          error: error?.message,
+          errorCode: error?.code,
+          errorDetails: error?.details,
+          errorHint: error?.hint,
+          subdomain
+        });
         return res.status(404).send('Not found');
       }
 
       // Verificar autenticação e permissões
-      const cookies = req.headers.cookie || '';
-      const authHeader = req.headers.authorization || '';
-      const authResult = await verifyAuthFromRequest(cookies, authHeader);
-      
-      const isOwner = authResult.isAuthenticated && authResult.userId === landingPage.user_id;
-      const isAdmin = authResult.isAdmin;
+      // IMPORTANTE: Se landing page está publicada, permitir acesso público
       const isPublished = landingPage.status === 'published';
       
-      // Permitir acesso se publicado OU se usuário é dono OU se usuário é admin
-      const canAccess = isPublished || isOwner || isAdmin;
-      
-      if (!canAccess) {
-        console.log('[SSR] ✗ Acesso negado - landing page não publicada e usuário não tem permissão', {
-          status: landingPage.status,
-          isOwner,
-          isAdmin,
+      if (isPublished) {
+        console.log('[SSR] ✓ Landing page publicada, acesso público permitido');
+      } else {
+        // Se não está publicada, verificar autenticação e permissões
+        console.log('[SSR] Landing page não publicada, verificando autenticação...');
+        const cookies = req.headers.cookie || '';
+        const authHeader = req.headers.authorization || '';
+        
+        console.log('[SSR] Headers de autenticação:', {
+          hasCookies: !!cookies,
+          cookiesLength: cookies.length,
+          hasAuthHeader: !!authHeader,
+          cookiePreview: cookies.substring(0, 200)
+        });
+        
+        const authResult = await verifyAuthFromRequest(cookies, authHeader);
+        
+        const isOwner = authResult.isAuthenticated && authResult.userId === landingPage.user_id;
+        const isAdmin = authResult.isAdmin;
+        
+        console.log('[SSR] Resultado da verificação de autenticação:', {
           isAuthenticated: authResult.isAuthenticated,
           userId: authResult.userId,
-          landingPageUserId: landingPage.user_id
+          isAdmin,
+          isOwner,
+          landingPageUserId: landingPage.user_id,
+          status: landingPage.status
         });
-        return res.status(403).send(`
-          <!DOCTYPE html>
-          <html lang="pt-BR">
-          <head>
-            <meta charset="UTF-8" />
-            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-            <title>Acesso Negado</title>
-          </head>
-          <body style="font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f3f4f6;">
-            <div style="text-align: center; padding: 2rem;">
-              <h1 style="color: #374151; margin-bottom: 1rem;">Esta landing page ainda não foi publicada</h1>
-              <p style="color: #6b7280;">Apenas o proprietário ou um administrador pode visualizar esta página antes da publicação.</p>
-            </div>
-          </body>
-          </html>
-        `);
-      }
+        
+        // Permitir acesso se usuário é dono OU se usuário é admin
+        const canAccess = isOwner || isAdmin;
+        
+        if (!canAccess) {
+          console.log('[SSR] ✗ Acesso negado - landing page não publicada e usuário não tem permissão', {
+            status: landingPage.status,
+            isOwner,
+            isAdmin,
+            isAuthenticated: authResult.isAuthenticated,
+            userId: authResult.userId,
+            landingPageUserId: landingPage.user_id
+          });
+          return res.status(403).send(`
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>Acesso Negado</title>
+            </head>
+            <body style="font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f3f4f6;">
+              <div style="text-align: center; padding: 2rem;">
+                <h1 style="color: #374151; margin-bottom: 1rem;">Esta landing page ainda não foi publicada</h1>
+                <p style="color: #6b7280;">Apenas o proprietário ou um administrador pode visualizar esta página antes da publicação.</p>
+              </div>
+            </body>
+            </html>
+          `);
+        }
 
-      console.log('[SSR] ✓ Acesso permitido', {
-        status: landingPage.status,
-        isOwner,
-        isAdmin,
-        isPublished
-      });
+        console.log('[SSR] ✓ Acesso permitido para usuário autenticado', {
+          status: landingPage.status,
+          isOwner,
+          isAdmin
+        });
+      }
 
       // Se landing page está publicada mas HTML estático não existe, tentar gerar
       if (landingPage.status === 'published') {
