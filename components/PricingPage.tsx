@@ -207,17 +207,88 @@ export const PricingPage: React.FC<Props> = ({
     fetchLandingPageData();
   }, [landingPageId, initialViewMode, viewMode]);
 
-  // Auto-select a dummy plan if jumping straight to checkout/dashboard in dev mode
-  // Também seleciona um plano padrão quando voltar do Stripe com canceled=true
-  // IMPORTANTE: Este useEffect deve executar ANTES de sincronizar o viewMode
+  // Auto-select plan when coming from dashboard or checkout
+  // Prioridade: 1) URL query param, 2) localStorage (checkout_selected_plan), 3) localStorage (checkout_state), 4) padrão
   useEffect(() => {
     // Só executar se initialViewMode for 'checkout' ou 'dashboard'
     if (initialViewMode !== 'checkout' && initialViewMode !== 'dashboard') {
       return;
     }
     
-    // Primeiro, tentar restaurar o plano do localStorage (se voltou do Stripe)
-    // Fazer isso mesmo se já tem plano selecionado, para garantir que está correto
+    // 1. Verificar se há plano na URL (quando vem do dashboard)
+    const urlParams = new URLSearchParams(window.location.search);
+    const planFromUrl = urlParams.get('plan');
+    
+    if (planFromUrl === 'starter' || planFromUrl === 'pro') {
+      const planMap: Record<string, Plan> = {
+        starter: {
+          id: 'starter',
+          name: 'Starter',
+          price: 'R$ 97',
+          oldPrice: 'R$ 147',
+          rawPrice: 97,
+          period: '/mês',
+          description: 'Para quem está começando e quer presença digital rápida.',
+          features: [
+            'Hospedagem inclusa',
+            'Domínio .com.br grátis (1 ano)',
+            'Botão WhatsApp',
+            'Estatísticas de acesso'
+          ],
+          cta: 'Começar Agora',
+          popular: false,
+          color: 'border-slate-200'
+        },
+        pro: {
+          id: 'pro',
+          name: 'Profissional',
+          price: 'R$ 197',
+          oldPrice: 'R$ 297',
+          rawPrice: 197,
+          period: '/mês',
+          description: 'Para especialistas que buscam autoridade e agendamentos.',
+          features: [
+            'Tudo do Starter',
+            'Estatísticas de acesso avançadas',
+            'Sugestões periódicas da nossa equipe para melhoria de desempenho',
+            'Plano estratégico para otimizar resultados',
+            'Pacote de posts para Redes Sociais'
+          ],
+          cta: 'Assinar Profissional',
+          popular: true,
+          color: 'border-blue-500 ring-2 ring-blue-500'
+        }
+      };
+      
+      const plan = planMap[planFromUrl];
+      if (plan) {
+        setSelectedPlan(plan);
+        // Verificar billing period do localStorage
+        const billingPeriodFromStorage = localStorage.getItem('checkout_billing_period');
+        if (billingPeriodFromStorage === 'monthly' || billingPeriodFromStorage === 'annual') {
+          setBillingPeriod(billingPeriodFromStorage);
+        }
+        return; // Não continuar para outras verificações
+      }
+    }
+    
+    // 2. Tentar restaurar o plano do localStorage (checkout_selected_plan - quando vem do dashboard)
+    try {
+      const savedPlan = localStorage.getItem('checkout_selected_plan');
+      if (savedPlan) {
+        const parsedPlan = JSON.parse(savedPlan);
+        setSelectedPlan(parsedPlan);
+        const billingPeriodFromStorage = localStorage.getItem('checkout_billing_period');
+        if (billingPeriodFromStorage === 'monthly' || billingPeriodFromStorage === 'annual') {
+          setBillingPeriod(billingPeriodFromStorage);
+        }
+        return; // Não continuar para outras verificações
+      }
+    } catch (error) {
+      console.warn('Erro ao restaurar plano do localStorage (checkout_selected_plan):', error);
+    }
+    
+    // 3. Tentar restaurar o plano do localStorage (checkout_state - quando voltou do Stripe)
     try {
       const savedState = localStorage.getItem('checkout_state');
       if (savedState) {
@@ -231,15 +302,15 @@ export const PricingPage: React.FC<Props> = ({
         }
       }
     } catch (error) {
-      console.warn('Erro ao restaurar plano do localStorage:', error);
+      console.warn('Erro ao restaurar plano do localStorage (checkout_state):', error);
     }
     
-    // Se já tem plano selecionado e não encontrou no localStorage, não fazer nada
+    // Se já tem plano selecionado e não encontrou em nenhum lugar, não fazer nada
     if (selectedPlan) {
       return;
     }
     
-    // Se não encontrou no localStorage e não tem plano, selecionar plano padrão
+    // 4. Se não encontrou em nenhum lugar e não tem plano, selecionar plano padrão (pro)
     setSelectedPlan({
       id: 'pro',
       name: 'Profissional',

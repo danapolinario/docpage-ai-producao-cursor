@@ -1224,38 +1224,180 @@ export const Dashboard: React.FC<Props> = ({
                  {/* Banner de Assinatura Pendente ou Plan Features & Subscription Status */}
                  {hasLandingPageButNoSubscription ? (
                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl p-6 md:p-8 shadow-lg">
-                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
-                       <div className="flex-shrink-0">
-                         <div className="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center">
+                     <div className="mb-6">
+                       <div className="flex items-center gap-3 mb-3">
+                         <div className="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center flex-shrink-0">
                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                            </svg>
                          </div>
+                         <div>
+                           <h3 className="text-lg md:text-xl font-bold text-amber-900">
+                             Assinatura Pendente
+                           </h3>
+                           <p className="text-sm md:text-base text-amber-800">
+                             Escolha um plano para ativar sua landing page
+                           </p>
+                         </div>
                        </div>
-                       <div className="flex-1">
-                         <h3 className="text-lg md:text-xl font-bold text-amber-900 mb-2">
-                           Assinatura Pendente
-                         </h3>
-                         <p className="text-sm md:text-base text-amber-800 mb-4">
-                           Você criou sua landing page, mas ainda não possui uma assinatura ativa. Complete seu cadastro e escolha um plano para ativar seu site.
-                         </p>
-                         <button
-                           onClick={() => {
-                             if (landingPageId) {
-                               // Salvar landingPageId no localStorage para o checkout usar
-                               localStorage.setItem('checkout_landing_page_id', landingPageId);
-                               navigate('/checkout?from=dashboard');
-                             } else {
-                               navigate('/checkout');
-                             }
-                           }}
-                           className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
-                         >
-                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15l1-4m4 4l1-4m2 4h3M3 19h18a2 2 0 002-2V7a2 2 0 00-2-2H3a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                           </svg>
-                           Ir para Pagamento
-                         </button>
+                     </div>
+                     
+                     {/* Planos */}
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       {/* Plano Starter */}
+                       <div className="bg-white rounded-lg border-2 border-slate-200 p-6 hover:border-amber-400 transition-colors">
+                         <div className="mb-4">
+                           <h4 className="text-xl font-bold text-slate-900 mb-1">Starter</h4>
+                           <div className="flex items-baseline gap-2 mb-2">
+                             <span className="text-3xl font-bold text-slate-900">R$ 97</span>
+                             <span className="text-slate-600">/mês</span>
+                             <span className="text-sm text-slate-500 line-through ml-2">R$ 147</span>
+                           </div>
+                           <p className="text-sm text-slate-600 mb-4">
+                             Para quem está começando e quer presença digital rápida.
+                           </p>
+                           <ul className="space-y-2 mb-6">
+                             <li className="flex items-center gap-2 text-sm text-slate-700">
+                               <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                               </svg>
+                               Hospedagem inclusa
+                             </li>
+                             <li className="flex items-center gap-2 text-sm text-slate-700">
+                               <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                               </svg>
+                               Domínio .com.br grátis (1 ano)
+                             </li>
+                             <li className="flex items-center gap-2 text-sm text-slate-700">
+                               <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                               </svg>
+                               Botão WhatsApp
+                             </li>
+                             <li className="flex items-center gap-2 text-sm text-slate-700">
+                               <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                               </svg>
+                               Estatísticas de acesso
+                             </li>
+                           </ul>
+                           <button
+                             onClick={() => {
+                               if (landingPageId) {
+                                 localStorage.setItem('checkout_landing_page_id', landingPageId);
+                                 localStorage.setItem('checkout_selected_plan', JSON.stringify({
+                                   id: 'starter',
+                                   name: 'Starter',
+                                   price: 'R$ 97',
+                                   oldPrice: 'R$ 147',
+                                   rawPrice: 97,
+                                   period: '/mês',
+                                   description: 'Para quem está começando e quer presença digital rápida.',
+                                   features: [
+                                     'Hospedagem inclusa',
+                                     'Domínio .com.br grátis (1 ano)',
+                                     'Botão WhatsApp',
+                                     'Estatísticas de acesso'
+                                   ],
+                                   cta: 'Começar Agora',
+                                   popular: false,
+                                   color: 'border-slate-200'
+                                 }));
+                                 localStorage.setItem('checkout_billing_period', 'annual');
+                                 navigate('/checkout?from=dashboard&plan=starter');
+                               } else {
+                                 navigate('/checkout');
+                               }
+                             }}
+                             className="w-full px-6 py-3 bg-slate-700 hover:bg-slate-800 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
+                           >
+                             Escolher Plano
+                           </button>
+                         </div>
+                       </div>
+
+                       {/* Plano Profissional */}
+                       <div className="bg-white rounded-lg border-2 border-blue-500 ring-2 ring-blue-500 p-6 relative">
+                         <div className="absolute top-4 right-4 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                           POPULAR
+                         </div>
+                         <div className="mb-4">
+                           <h4 className="text-xl font-bold text-slate-900 mb-1">Profissional</h4>
+                           <div className="flex items-baseline gap-2 mb-2">
+                             <span className="text-3xl font-bold text-slate-900">R$ 197</span>
+                             <span className="text-slate-600">/mês</span>
+                             <span className="text-sm text-slate-500 line-through ml-2">R$ 297</span>
+                           </div>
+                           <p className="text-sm text-slate-600 mb-4">
+                             Para especialistas que buscam autoridade e agendamentos.
+                           </p>
+                           <ul className="space-y-2 mb-6">
+                             <li className="flex items-center gap-2 text-sm text-slate-700">
+                               <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                               </svg>
+                               Tudo do Starter
+                             </li>
+                             <li className="flex items-center gap-2 text-sm text-slate-700">
+                               <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                               </svg>
+                               Estatísticas avançadas
+                             </li>
+                             <li className="flex items-center gap-2 text-sm text-slate-700">
+                               <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                               </svg>
+                               Sugestões periódicas
+                             </li>
+                             <li className="flex items-center gap-2 text-sm text-slate-700">
+                               <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                               </svg>
+                               Plano estratégico
+                             </li>
+                             <li className="flex items-center gap-2 text-sm text-slate-700">
+                               <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                               </svg>
+                               Posts para Redes Sociais
+                             </li>
+                           </ul>
+                           <button
+                             onClick={() => {
+                               if (landingPageId) {
+                                 localStorage.setItem('checkout_landing_page_id', landingPageId);
+                                 localStorage.setItem('checkout_selected_plan', JSON.stringify({
+                                   id: 'pro',
+                                   name: 'Profissional',
+                                   price: 'R$ 197',
+                                   oldPrice: 'R$ 297',
+                                   rawPrice: 197,
+                                   period: '/mês',
+                                   description: 'Para especialistas que buscam autoridade e agendamentos.',
+                                   features: [
+                                     'Tudo do Starter',
+                                     'Estatísticas de acesso avançadas',
+                                     'Sugestões periódicas da nossa equipe para melhoria de desempenho',
+                                     'Plano estratégico para otimizar resultados',
+                                     'Pacote de posts para Redes Sociais'
+                                   ],
+                                   cta: 'Assinar Profissional',
+                                   popular: true,
+                                   color: 'border-blue-500 ring-2 ring-blue-500'
+                                 }));
+                                 localStorage.setItem('checkout_billing_period', 'annual');
+                                 navigate('/checkout?from=dashboard&plan=pro');
+                               } else {
+                                 navigate('/checkout');
+                               }
+                             }}
+                             className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
+                           >
+                             Escolher Plano
+                           </button>
+                         </div>
                        </div>
                      </div>
                    </div>

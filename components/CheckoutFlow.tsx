@@ -161,15 +161,21 @@ export const CheckoutFlow: React.FC<Props> = ({
         
         if (user && user.id) {
           setIsAuthenticated(true);
-          // Usar email do usuário autenticado apenas se o campo email estiver vazio
-          // Caso contrário, manter o email que o usuário digitou
-          if (!email && user.email) {
+          // SEMPRE preencher email do usuário autenticado quando vem do dashboard
+          // Isso garante que o email esteja preenchido antes de pular para Step 3
+          if (user.email) {
             setEmail(user.email);
+            setConfirmEmail(user.email); // Preencher também o campo de confirmação
           }
           
           // Se tem dados pré-preenchidos (domínio e CPF), pular direto para Step 3
           if (prefilledDomain && (prefilledCpf || prefilledHasCustomDomain)) {
-            console.log('[CHECKOUT FLOW] Dados pré-preenchidos detectados, pulando para Step 3');
+            console.log('[CHECKOUT FLOW] Dados pré-preenchidos detectados, pulando para Step 3', {
+              prefilledDomain,
+              prefilledCpf: !!prefilledCpf,
+              prefilledHasCustomDomain,
+              userEmail: user.email
+            });
             setCurrentStep(3);
           } else {
             // Se já está autenticado mas não tem dados pré-preenchidos, avançar para Step 2
@@ -189,7 +195,7 @@ export const CheckoutFlow: React.FC<Props> = ({
       }
     };
     checkAuth();
-  }, [prefilledDomain, prefilledCpf, prefilledHasCustomDomain, email]);
+  }, [prefilledDomain, prefilledCpf, prefilledHasCustomDomain]);
 
   // Step 1: Enviar código OTP
   const handleSendCode = async () => {
