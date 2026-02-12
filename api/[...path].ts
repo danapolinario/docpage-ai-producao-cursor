@@ -262,37 +262,83 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     try {
                       let supabase;
                       
-                      // Tentar usar cliente Supabase existente da página (se disponível)
-                      if (window.__SUPABASE_CLIENT__) {
-                        supabase = window.__SUPABASE_CLIENT__;
-                        console.log('[VERIFY] Usando cliente Supabase existente da página');
-                      } else if (window.supabase && window.supabase.createClient) {
-                        // Criar novo cliente com localStorage para compartilhar sessão
+                      // IMPORTANTE: Sempre criar um novo cliente com localStorage explícito
+                      // para garantir que a sessão seja carregada corretamente do localStorage
+                      if (window.supabase && window.supabase.createClient) {
+                        // Criar novo cliente com localStorage explícito para compartilhar sessão
                         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
                           auth: {
                             storage: window.localStorage,
                             persistSession: true,
-                            autoRefreshToken: true
+                            autoRefreshToken: true,
+                            detectSessionInUrl: false
                           }
                         });
-                        console.log('[VERIFY] Criado novo cliente Supabase com localStorage');
+                        console.log('[VERIFY] Criado novo cliente Supabase com localStorage explícito');
+                      } else if (window.__SUPABASE_CLIENT__) {
+                        // Se não conseguir criar novo cliente, tentar usar o existente
+                        supabase = window.__SUPABASE_CLIENT__;
+                        console.log('[VERIFY] Usando cliente Supabase existente da página');
                       } else {
                         console.error('[VERIFY] Supabase não está disponível');
                         showAccessDenied();
                         return;
                       }
                       
+                      // Aguardar um pouco para garantir que o cliente carregou a sessão do localStorage
+                      await new Promise(resolve => setTimeout(resolve, 200));
+                      
                       // Tentar obter sessão primeiro (pode funcionar melhor que getUser quando a sessão está no localStorage)
                       let user = null;
                       let session = null;
                       
-                      // Primeiro tentar obter sessão
-                      const { data: { session: sessionData }, error: sessionError } = await supabase.auth.getSession();
-                      if (!sessionError && sessionData) {
-                        session = sessionData;
-                        user = sessionData.user;
-                        console.log('[VERIFY] Sessão obtida via getSession()');
-                      } else {
+                      // IMPORTANTE: Tentar restaurar sessão do localStorage manualmente antes de verificar
+                      // O Supabase armazena a sessão em uma chave específica: sb-{project-ref}-auth-token
+                      const supabaseUrlParts = SUPABASE_URL.split('//')[1]?.split('.')[0];
+                      const allKeys = Object.keys(localStorage);
+                      const sessionKeys = allKeys.filter(key => 
+                        key.includes('sb-') && key.includes('auth-token')
+                      );
+                      
+                      console.log('[VERIFY] Todas as chaves do localStorage:', allKeys);
+                      console.log('[VERIFY] Chaves de sessão encontradas:', sessionKeys);
+                      
+                      // Tentar restaurar sessão manualmente se encontrou chave
+                      for (const sessionKey of sessionKeys) {
+                        try {
+                          const storedData = localStorage.getItem(sessionKey);
+                          if (storedData) {
+                            const sessionData = JSON.parse(storedData);
+                            if (sessionData.access_token && sessionData.refresh_token) {
+                              console.log('[VERIFY] Tentando restaurar sessão manualmente...');
+                              const { data: { session: restoredSession }, error: restoreError } = await supabase.auth.setSession({
+                                access_token: sessionData.access_token,
+                                refresh_token: sessionData.refresh_token
+                              });
+                              if (!restoreError && restoredSession && restoredSession.user) {
+                                user = restoredSession.user;
+                                session = restoredSession;
+                                console.log('[VERIFY] Sessão restaurada manualmente com sucesso');
+                                break;
+                              } else {
+                                console.log('[VERIFY] Erro ao restaurar sessão:', restoreError?.message);
+                              }
+                            }
+                          }
+                        } catch (e) {
+                          console.error('[VERIFY] Erro ao restaurar sessão manualmente:', e);
+                        }
+                      }
+                      
+                      // Se ainda não tem usuário, tentar métodos normais
+                      if (!user) {
+                        // Primeiro tentar obter sessão
+                        const { data: { session: sessionData }, error: sessionError } = await supabase.auth.getSession();
+                        if (!sessionError && sessionData && sessionData.user) {
+                          session = sessionData;
+                          user = sessionData.user;
+                          console.log('[VERIFY] Sessão obtida via getSession()');
+                        } else {
                         // Se não conseguir sessão, tentar getUser
                         const { data: { user: userData }, error: userError } = await supabase.auth.getUser();
                         if (!userError && userData) {
@@ -302,25 +348,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                           console.log('[VERIFY] Erro ao obter sessão/usuário:', sessionError?.message || userError?.message);
                           
                           // Tentar obter sessão do localStorage diretamente
-                          // Procurar por todas as chaves possíveis do Supabase
+                          // O Supabase armazena a sessão em uma chave específica: sb-{project-ref}-auth-token
+                          // Precisamos encontrar essa chave
+                          const supabaseUrlParts = SUPABASE_URL.split('//')[1]?.split('.')[0];
                           const possibleKeys = Object.keys(localStorage).filter(key => 
                             key.includes('supabase') || 
-                            (key.includes('sb-') && key.includes('auth'))
+                            (key.includes('sb-') && key.includes('auth')) ||
+                            (supabaseUrlParts && key.includes(supabaseUrlParts))
                           );
                           
                           console.log('[VERIFY] Chaves do localStorage encontradas:', possibleKeys);
+                          console.log('[VERIFY] SUPABASE_URL:', SUPABASE_URL);
                           
+                          // Tentar todas as chaves possíveis
                           for (const sessionKey of possibleKeys) {
                             try {
                               const storedData = localStorage.getItem(sessionKey);
                               if (storedData) {
+                                console.log(\`[VERIFY] Tentando chave: \${sessionKey}, tamanho: \${storedData.length}\`);
+                                
                                 let sessionData;
                                 try {
                                   sessionData = JSON.parse(storedData);
                                 } catch {
                                   // Se não for JSON, pode ser apenas o token
-                                  if (storedData.length > 50) {
+                                  if (storedData.length > 50 && storedData.match(/^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/)) {
                                     // Parece ser um token JWT
+                                    console.log('[VERIFY] Token JWT encontrado diretamente');
                                     const { data: { user: userFromToken }, error: tokenError } = await supabase.auth.getUser(storedData);
                                     if (!tokenError && userFromToken) {
                                       user = userFromToken;
@@ -340,9 +394,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                   accessToken = sessionData.accessToken;
                                 } else if (sessionData.session && sessionData.session.access_token) {
                                   accessToken = sessionData.session.access_token;
-                                } else if (typeof sessionData === 'string' && sessionData.length > 50) {
-                                  // Pode ser o token direto como string
-                                  accessToken = sessionData;
+                                } else if (sessionData.user && sessionData.user.id) {
+                                  // Pode ser que já tenha o user no objeto
+                                  user = sessionData.user;
+                                  console.log('[VERIFY] Usuário encontrado diretamente no objeto de sessão');
+                                  break;
                                 }
                                 
                                 if (accessToken) {
@@ -358,6 +414,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                     console.log('[VERIFY] Erro ao obter usuário do token:', tokenError?.message);
                                   }
                                 }
+                                
+                                // Tentar usar setSession se tiver os dados completos
+                                if (sessionData.access_token && sessionData.refresh_token) {
+                                  try {
+                                    const { data: { session: newSession }, error: setSessionError } = await supabase.auth.setSession({
+                                      access_token: sessionData.access_token,
+                                      refresh_token: sessionData.refresh_token
+                                    });
+                                    if (!setSessionError && newSession && newSession.user) {
+                                      user = newSession.user;
+                                      console.log('[VERIFY] Sessão restaurada via setSession()');
+                                      break;
+                                    }
+                                  } catch (e) {
+                                    console.error('[VERIFY] Erro ao restaurar sessão:', e);
+                                  }
+                                }
                               }
                             } catch (e) {
                               console.error('[VERIFY] Erro ao ler sessão do localStorage:', e);
@@ -368,7 +441,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                       }
                       
                       if (!user) {
-                        console.log('[VERIFY] Usuário não autenticado');
+                        console.log('[VERIFY] Usuário não autenticado após todas as tentativas');
                         showAccessDenied();
                         return;
                       }
