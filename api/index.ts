@@ -78,6 +78,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Verificar se é subdomínio ANTES de qualquer processamento
   const subdomain = extractSubdomain(host);
   
+  // Verificar se há parâmetro preview na URL
+  const url = new URL(req.url || '/', `https://${host}`);
+  const hasPreview = url.searchParams.has('preview');
+  
   // Log detalhado para debug
   console.log('[SSR DEBUG] ============================================');
   console.log('[SSR DEBUG] Request URL:', req.url);
@@ -238,424 +242,113 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (isPublished) {
         console.log('[SSR] ✓ Landing page publicada, acesso público permitido');
       } else {
-        // Se não está publicada, verificar autenticação e permissões
-        console.log('[SSR] Landing page não publicada, verificando autenticação...');
-        const cookies = req.headers.cookie || '';
-        const authHeader = req.headers.authorization || '';
-        
-        console.log('[SSR] Headers de autenticação:', {
-          hasCookies: !!cookies,
-          cookiesLength: cookies.length,
-          hasAuthHeader: !!authHeader,
-          cookiePreview: cookies.substring(0, 200)
-        });
-        
-        const authResult = await verifyAuthFromRequest(cookies, authHeader);
-        
-        const isOwner = authResult.isAuthenticated && authResult.userId === landingPage.user_id;
-        const isAdmin = authResult.isAdmin;
-        
-        console.log('[SSR] Resultado da verificação de autenticação:', {
-          isAuthenticated: authResult.isAuthenticated,
-          userId: authResult.userId,
-          isAdmin,
-          isOwner,
-          landingPageUserId: landingPage.user_id,
-          status: landingPage.status
-        });
-        
-        // Permitir acesso se usuário é dono OU se usuário é admin
-        const canAccess = isOwner || isAdmin;
-        
-        if (!canAccess) {
-          console.log('[SSR] ✗ Acesso negado - landing page não publicada e usuário não tem permissão', {
-            status: landingPage.status,
-            isOwner,
-            isAdmin,
-            isAuthenticated: authResult.isAuthenticated,
-            userId: authResult.userId,
-            landingPageUserId: landingPage.user_id
-          });
+        // Se não está publicada, verificar se tem parâmetro preview na URL
+        if (hasPreview) {
+          console.log('[SSR] ✓ Landing page draft com preview, acesso permitido');
+        } else {
+          // Se não tem preview, verificar autenticação e permissões (apenas admin ou dono)
+          console.log('[SSR] Landing page não publicada sem preview, verificando autenticação...');
+          const cookies = req.headers.cookie || '';
+          const authHeader = req.headers.authorization || '';
           
-          // Se não conseguimos verificar autenticação no servidor (porque Supabase usa localStorage),
-          // servir HTML completo mas com script que verifica acesso no cliente ANTES de mostrar conteúdo
-          if (!authResult.isAuthenticated) {
-            // Renderizar HTML completo mas com verificação no cliente
-            const mockReq = {
-              protocol: 'https',
-              get: (header: string) => {
-                if (header === 'host') return host;
-                return req.headers[header.toLowerCase()] || '';
-              },
-              headers: req.headers,
-            };
+          const authResult = await verifyAuthFromRequest(cookies, authHeader);
+          
+          const isOwner = authResult.isAuthenticated && authResult.userId === landingPage.user_id;
+          const isAdmin = authResult.isAdmin;
+          
+          // Permitir acesso apenas se usuário é dono OU se usuário é admin
+          const canAccess = isOwner || isAdmin;
+          
+          if (!canAccess) {
+            console.log('[SSR] ✗ Acesso negado - landing page não publicada sem preview e usuário não tem permissão');
             
-            const htmlContent = await renderLandingPage(landingPage, mockReq);
-            
-            // Injetar script de verificação ANTES do fechamento do </body>
-            const verificationScript = `
-              <script>
-                (function() {
-                  // Ocultar conteúdo até verificar acesso
-                  document.body.style.display = 'none';
-                  
-                  const SUPABASE_URL = '${supabaseUrl}';
-                  const SUPABASE_KEY = '${supabaseKey}';
-                  
-                  async function checkAccess() {
-                    try {
-                      let supabase;
-                      
-                      // IMPORTANTE: Sempre criar um novo cliente com localStorage explícito
-                      // para garantir que a sessão seja carregada corretamente do localStorage
-                      if (window.supabase && window.supabase.createClient) {
-                        // Criar novo cliente com localStorage explícito para compartilhar sessão
-                        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                          auth: {
-                            storage: window.localStorage,
-                            persistSession: true,
-                            autoRefreshToken: true,
-                            detectSessionInUrl: false
-                          }
-                        });
-                        console.log('[VERIFY] Criado novo cliente Supabase com localStorage explícito');
-                      } else if (window.__SUPABASE_CLIENT__) {
-                        // Se não conseguir criar novo cliente, tentar usar o existente
-                        supabase = window.__SUPABASE_CLIENT__;
-                        console.log('[VERIFY] Usando cliente Supabase existente da página');
-                      } else {
-                        console.error('[VERIFY] Supabase não está disponível');
-                        showAccessDenied();
-                        return;
-                      }
-                      
-                      // Aguardar um pouco para garantir que o cliente carregou a sessão do localStorage
-                      await new Promise(resolve => setTimeout(resolve, 200));
-                      
-                      // Tentar obter sessão primeiro (pode funcionar melhor que getUser quando a sessão está no localStorage)
-                      let user = null;
-                      let session = null;
-                      
-                      // IMPORTANTE: Tentar restaurar sessão do localStorage manualmente antes de verificar
-                      // O Supabase armazena a sessão em uma chave específica: sb-{project-ref}-auth-token
-                      const supabaseUrlParts = SUPABASE_URL.split('//')[1]?.split('.')[0];
-                      const allKeys = Object.keys(localStorage);
-                      const sessionKeys = allKeys.filter(key => 
-                        key.includes('sb-') && key.includes('auth-token')
-                      );
-                      
-                      console.log('[VERIFY] Todas as chaves do localStorage:', allKeys);
-                      console.log('[VERIFY] Chaves de sessão encontradas:', sessionKeys);
-                      
-                      // Tentar restaurar sessão manualmente se encontrou chave
-                      for (const sessionKey of sessionKeys) {
-                        try {
-                          const storedData = localStorage.getItem(sessionKey);
-                          if (storedData) {
-                            const sessionData = JSON.parse(storedData);
-                            if (sessionData.access_token && sessionData.refresh_token) {
-                              console.log('[VERIFY] Tentando restaurar sessão manualmente...');
-                              const { data: { session: restoredSession }, error: restoreError } = await supabase.auth.setSession({
-                                access_token: sessionData.access_token,
-                                refresh_token: sessionData.refresh_token
-                              });
-                              if (!restoreError && restoredSession && restoredSession.user) {
-                                user = restoredSession.user;
-                                session = restoredSession;
-                                console.log('[VERIFY] Sessão restaurada manualmente com sucesso');
-                                break;
-                              } else {
-                                console.log('[VERIFY] Erro ao restaurar sessão:', restoreError?.message);
-                              }
-                            }
-                          }
-                        } catch (e) {
-                          console.error('[VERIFY] Erro ao restaurar sessão manualmente:', e);
-                        }
-                      }
-                      
-                      // Se ainda não tem usuário, tentar métodos normais
-                      if (!user) {
-                        // Primeiro tentar obter sessão
-                        const { data: { session: sessionData }, error: sessionError } = await supabase.auth.getSession();
-                        if (!sessionError && sessionData && sessionData.user) {
-                          session = sessionData;
-                          user = sessionData.user;
-                          console.log('[VERIFY] Sessão obtida via getSession()');
-                        } else {
-                          // Se não conseguir sessão, tentar getUser
-                          const { data: { user: userData }, error: userError } = await supabase.auth.getUser();
-                          if (!userError && userData) {
-                            user = userData;
-                            console.log('[VERIFY] Usuário obtido via getUser()');
-                          } else {
-                            console.log('[VERIFY] Erro ao obter sessão/usuário:', sessionError?.message || userError?.message);
-                            
-                            // Tentar obter sessão do localStorage diretamente
-                            // O Supabase armazena a sessão em uma chave específica: sb-{project-ref}-auth-token
-                            // Precisamos encontrar essa chave
-                            const supabaseUrlParts = SUPABASE_URL.split('//')[1]?.split('.')[0];
-                            const possibleKeys = Object.keys(localStorage).filter(key => 
-                              key.includes('supabase') || 
-                              (key.includes('sb-') && key.includes('auth')) ||
-                              (supabaseUrlParts && key.includes(supabaseUrlParts))
-                            );
-                            
-                            console.log('[VERIFY] Chaves do localStorage encontradas:', possibleKeys);
-                            console.log('[VERIFY] SUPABASE_URL:', SUPABASE_URL);
-                            
-                            // Tentar todas as chaves possíveis
-                            for (const sessionKey of possibleKeys) {
-                              try {
-                                const storedData = localStorage.getItem(sessionKey);
-                                if (storedData) {
-                                  console.log(\`[VERIFY] Tentando chave: \${sessionKey}, tamanho: \${storedData.length}\`);
-                                  
-                                  let sessionData;
-                                  try {
-                                    sessionData = JSON.parse(storedData);
-                                  } catch {
-                                    // Se não for JSON, pode ser apenas o token
-                                    if (storedData.length > 50 && storedData.match(/^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/)) {
-                                      // Parece ser um token JWT
-                                      console.log('[VERIFY] Token JWT encontrado diretamente');
-                                      const { data: { user: userFromToken }, error: tokenError } = await supabase.auth.getUser(storedData);
-                                      if (!tokenError && userFromToken) {
-                                        user = userFromToken;
-                                        console.log('[VERIFY] Usuário obtido do token direto do localStorage');
-                                        break;
-                                      }
-                                    }
-                                    continue;
-                                  }
-                                  
-                                  // Tentar diferentes formatos de dados
-                                  let accessToken = null;
-                                  
-                                  if (sessionData.access_token) {
-                                    accessToken = sessionData.access_token;
-                                  } else if (sessionData.accessToken) {
-                                    accessToken = sessionData.accessToken;
-                                  } else if (sessionData.session && sessionData.session.access_token) {
-                                    accessToken = sessionData.session.access_token;
-                                  } else if (sessionData.user && sessionData.user.id) {
-                                    // Pode ser que já tenha o user no objeto
-                                    user = sessionData.user;
-                                    console.log('[VERIFY] Usuário encontrado diretamente no objeto de sessão');
-                                    break;
-                                  }
-                                  
-                                  if (accessToken) {
-                                    console.log('[VERIFY] Token encontrado no localStorage, tentando obter usuário...');
-                                    
-                                    // Tentar usar o token para obter usuário
-                                    const { data: { user: userFromToken }, error: tokenError } = await supabase.auth.getUser(accessToken);
-                                    if (!tokenError && userFromToken) {
-                                      user = userFromToken;
-                                      console.log('[VERIFY] Usuário obtido do token do localStorage');
-                                      break;
-                                    } else {
-                                      console.log('[VERIFY] Erro ao obter usuário do token:', tokenError?.message);
-                                    }
-                                  }
-                                  
-                                  // Tentar usar setSession se tiver os dados completos
-                                  if (sessionData.access_token && sessionData.refresh_token) {
-                                    try {
-                                      const { data: { session: newSession }, error: setSessionError } = await supabase.auth.setSession({
-                                        access_token: sessionData.access_token,
-                                        refresh_token: sessionData.refresh_token
-                                      });
-                                      if (!setSessionError && newSession && newSession.user) {
-                                        user = newSession.user;
-                                        console.log('[VERIFY] Sessão restaurada via setSession()');
-                                        break;
-                                      }
-                                    } catch (e) {
-                                      console.error('[VERIFY] Erro ao restaurar sessão:', e);
-                                    }
-                                  }
-                                }
-                              } catch (e) {
-                                console.error('[VERIFY] Erro ao ler sessão do localStorage:', e);
-                                continue;
-                              }
-                            }
-                          }
-                        }
-                      }
-                      
-                      if (!user) {
-                        console.log('[VERIFY] Usuário não autenticado após todas as tentativas');
-                        showAccessDenied();
-                        return;
-                      }
-                      
-                      console.log('[VERIFY] Usuário autenticado:', user.id);
-                      
-                      // Verificar se é admin
-                      let isAdmin = false;
-                      try {
-                        const { data: adminData, error: adminError } = await supabase
-                          .from('user_roles')
-                          .select('role')
-                          .eq('user_id', user.id)
-                          .eq('role', 'admin')
-                          .maybeSingle();
-                        isAdmin = !!adminData && !adminError;
-                        console.log('[VERIFY] Verificação de admin:', { isAdmin, adminError: adminError?.message });
-                      } catch (e) {
-                        console.error('[VERIFY] Erro ao verificar admin:', e);
-                      }
-                      
-                      // Buscar landing page para verificar se é dono
-                      const { data: lpData, error: lpError } = await supabase
-                        .from('landing_pages')
-                        .select('user_id')
-                        .eq('subdomain', '${subdomain}')
-                        .maybeSingle();
-                      
-                      if (lpError) {
-                        console.error('[VERIFY] Erro ao buscar landing page:', lpError);
-                        showAccessDenied();
-                        return;
-                      }
-                      
-                      const isOwner = lpData && user.id === lpData.user_id;
-                      console.log('[VERIFY] Verificação de acesso:', { isOwner, isAdmin, userId: user.id, lpUserId: lpData?.user_id });
-                      
-                      if (isOwner || isAdmin) {
-                        // Tem acesso, mostrar conteúdo
-                        document.body.style.display = '';
-                      } else {
-                        showAccessDenied();
-                      }
-                    } catch (error) {
-                      console.error('[VERIFY] Erro ao verificar acesso:', error);
-                      showAccessDenied();
-                    }
+            // Retornar página de acesso negado
+            return res.status(403).send(`
+              <!DOCTYPE html>
+              <html lang="pt-BR">
+              <head>
+                <meta charset="UTF-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                <title>Acesso Negado</title>
+                <style>
+                  body {
+                    font-family: Arial, sans-serif;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 100vh;
+                    margin: 0;
+                    background: #f3f4f6;
                   }
-                  
-                  function showAccessDenied() {
-                    console.log('[VERIFY] Mostrando mensagem de acesso negado');
-                    // Limpar qualquer conteúdo existente e mostrar mensagem
-                    document.body.innerHTML = '';
-                    document.body.style.display = 'block';
-                    document.body.style.margin = '0';
-                    document.body.style.padding = '0';
-                    document.body.style.fontFamily = 'Arial, sans-serif';
-                    document.body.style.background = '#f3f4f6';
-                    document.body.innerHTML = \`
-                      <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f3f4f6;">
-                        <div style="text-align: center; padding: 2rem; max-width: 600px;">
-                          <div style="width: 64px; height: 64px; margin: 0 auto 1.5rem; background: #fbbf24; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                            <svg style="width: 32px; height: 32px; color: white;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                          </div>
-                          <h1 style="color: #374151; margin-bottom: 1rem; font-size: 1.5rem; font-weight: bold;">Esta landing page ainda não foi publicada</h1>
-                          <p style="color: #6b7280; font-size: 1rem; line-height: 1.5;">Apenas o proprietário ou um administrador pode visualizar esta página antes da publicação.</p>
-                        </div>
-                      </div>
-                    \`;
+                  .container {
+                    text-align: center;
+                    padding: 2rem;
+                    max-width: 600px;
                   }
-                  
-                  // Wrapper para garantir que erros sejam tratados
-                  async function safeCheckAccess() {
-                    try {
-                      await checkAccess();
-                    } catch (error) {
-                      console.error('[VERIFY] Erro fatal ao verificar acesso:', error);
-                      showAccessDenied();
-                    }
+                  .icon {
+                    width: 64px;
+                    height: 64px;
+                    margin: 0 auto 1.5rem;
+                    background: #fbbf24;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
                   }
-                  
-                  // Função para aguardar e tentar novamente se necessário
-                  async function checkAccessWithRetry(retries = 3) {
-                    for (let i = 0; i < retries; i++) {
-                      try {
-                        await safeCheckAccess();
-                        // Se chegou aqui sem erro, verificar se o body foi mostrado ou negado
-                        if (document.body.style.display !== 'none' || document.body.innerHTML.includes('Esta landing page ainda não foi publicada')) {
-                          return; // Já foi processado
-                        }
-                        // Se ainda está oculto e não foi negado, aguardar e tentar novamente
-                        if (i < retries - 1) {
-                          console.log(\`[VERIFY] Tentativa \${i + 1} falhou, aguardando e tentando novamente...\`);
-                          await new Promise(resolve => setTimeout(resolve, 500));
-                        } else {
-                          // Última tentativa falhou, mostrar acesso negado
-                          showAccessDenied();
-                        }
-                      } catch (error) {
-                        console.error(\`[VERIFY] Erro na tentativa \${i + 1}:\`, error);
-                        if (i === retries - 1) {
-                          showAccessDenied();
-                        } else {
-                          await new Promise(resolve => setTimeout(resolve, 500));
-                        }
-                      }
-                    }
+                  h1 {
+                    color: #374151;
+                    margin-bottom: 1rem;
+                    font-size: 1.5rem;
+                    font-weight: bold;
                   }
-                  
-                  // Aguardar um pouco para garantir que o DOM está pronto e o Supabase carregou a sessão
-                  if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', function() {
-                      setTimeout(() => checkAccessWithRetry(), 300);
-                    });
-                  } else {
-                    setTimeout(() => checkAccessWithRetry(), 300);
+                  p {
+                    color: #6b7280;
+                    font-size: 1rem;
+                    line-height: 1.5;
                   }
-                  
-                  // Carregar Supabase JS se necessário
-                  if (!window.supabase || !window.supabase.createClient) {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-                    script.onload = function() {
-                      setTimeout(() => checkAccessWithRetry(), 300);
-                    };
-                    script.onerror = function() {
-                      console.error('[VERIFY] Erro ao carregar biblioteca Supabase');
-                      showAccessDenied();
-                    };
-                    document.head.appendChild(script);
-                  }
-                })();
-              </script>
-            `;
-            
-            const htmlWithVerification = htmlContent.replace('</body>', verificationScript + '</body>');
-            
-            res.setHeader('Content-Type', 'text/html; charset=utf-8');
-            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0, private');
-            return res.status(200).send(htmlWithVerification);
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <div class="icon">
+                    <svg style="width: 32px; height: 32px; color: white;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h1>Esta landing page ainda não foi publicada</h1>
+                  <p>Apenas o proprietário ou um administrador pode visualizar esta página antes da publicação.</p>
+                </div>
+              </body>
+              </html>
+            `);
           }
-          
-          // Se verificamos mas não tem acesso, bloquear
-          return res.status(403).send(`
-            <!DOCTYPE html>
-            <html lang="pt-BR">
-            <head>
-              <meta charset="UTF-8" />
-              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <title>Acesso Negado</title>
-            </head>
-            <body style="font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f3f4f6;">
-              <div style="text-align: center; padding: 2rem;">
-                <h1 style="color: #374151; margin-bottom: 1rem;">Esta landing page ainda não foi publicada</h1>
-                <p style="color: #6b7280;">Apenas o proprietário ou um administrador pode visualizar esta página antes da publicação.</p>
-              </div>
-            </body>
-            </html>
-          `);
         }
-
-        console.log('[SSR] ✓ Acesso permitido para usuário autenticado', {
-          status: landingPage.status,
-          isOwner,
-          isAdmin
-        });
       }
+      
+      // Se chegou aqui, tem permissão (publicada, preview, ou admin/dono)
+      // Renderizar HTML normalmente
+      const mockReq = {
+        protocol: 'https',
+        get: (header: string) => {
+          if (header === 'host') return host;
+          return req.headers[header.toLowerCase()] || '';
+        },
+        headers: req.headers,
+      };
+      
+      const htmlContent = await renderLandingPage(landingPage, mockReq);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, max-age=3600, s-maxage=3600');
+      res.setHeader('Vary', 'Host');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Served-From', hasPreview ? 'dynamic-ssr-preview' : 'dynamic-ssr');
+      return res.status(200).send(htmlContent);
+    } catch (error: any) {
+      console.error('[SSR] ✗ Erro ao renderizar SSR:', error?.message || error);
+      console.error('[SSR] Stack:', error?.stack);
+      return res.status(500).send('Internal Server Error');
+    }
+  }
 
       // Se landing page está publicada mas HTML estático não existe, tentar gerar
       if (landingPage.status === 'published') {

@@ -1085,7 +1085,7 @@ export const Dashboard: React.FC<Props> = ({
              <div className="flex items-center gap-4">
                 {displayDomain && (
                   <a 
-                    href={`https://${displayDomain}`}
+                    href={`https://${displayDomain}${dashboardData?.landingPage?.status !== 'published' ? '/?preview' : ''}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm font-medium text-blue-600 border border-blue-200 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
@@ -1609,7 +1609,7 @@ export const Dashboard: React.FC<Props> = ({
                         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-fit">
                            <h3 className="font-bold text-gray-800 mb-4">Seu Site</h3>
                            
-                           <a href={displayDomain ? `https://${displayDomain}` : '#'}
+                           <a href={displayDomain ? `https://${displayDomain}${dashboardData?.landingPage?.status !== 'published' ? '/?preview' : ''}` : '#'}
                              target="_blank"
                              rel="noopener noreferrer"
                              className="block w-full bg-gray-100 rounded-lg border border-gray-200 relative mb-4 overflow-hidden group cursor-pointer"
