@@ -260,21 +260,104 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   
                   async function checkAccess() {
                     try {
-                      // Verificar se Supabase está disponível
-                      if (!window.supabase || !window.supabase.createClient) {
-                        console.error('Supabase não está disponível');
+                      let supabase;
+                      
+                      // Tentar usar cliente Supabase existente da página (se disponível)
+                      if (window.__SUPABASE_CLIENT__) {
+                        supabase = window.__SUPABASE_CLIENT__;
+                        console.log('[VERIFY] Usando cliente Supabase existente da página');
+                      } else if (window.supabase && window.supabase.createClient) {
+                        // Criar novo cliente com localStorage para compartilhar sessão
+                        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                          auth: {
+                            storage: window.localStorage,
+                            persistSession: true,
+                            autoRefreshToken: true
+                          }
+                        });
+                        console.log('[VERIFY] Criado novo cliente Supabase com localStorage');
+                      } else {
+                        console.error('[VERIFY] Supabase não está disponível');
                         showAccessDenied();
                         return;
                       }
                       
-                      const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                      
+                      // Obter usuário autenticado
                       const { data: { user }, error: userError } = await supabase.auth.getUser();
-                      if (userError || !user) {
-                        console.log('Usuário não autenticado:', userError?.message);
+                      
+                      if (userError) {
+                        console.log('[VERIFY] Erro ao obter usuário:', userError.message);
+                        // Se o erro for apenas "Auth session missing", tentar obter sessão do localStorage
+                        if (userError.message.includes('session missing') || userError.message.includes('Auth session missing')) {
+                          // Tentar obter sessão do localStorage diretamente
+                          const sessionKey = Object.keys(localStorage).find(key => key.includes('supabase.auth.token'));
+                          if (sessionKey) {
+                            try {
+                              const sessionData = JSON.parse(localStorage.getItem(sessionKey) || '{}');
+                              if (sessionData.access_token) {
+                                // Tentar usar o token para obter usuário
+                                const { data: { user: userFromToken }, error: tokenError } = await supabase.auth.getUser(sessionData.access_token);
+                                if (!tokenError && userFromToken) {
+                                  console.log('[VERIFY] Usuário obtido do token do localStorage');
+                                  // Continuar com userFromToken
+                                  const finalUser = userFromToken;
+                                  
+                                  // Verificar se é admin
+                                  let isAdmin = false;
+                                  try {
+                                    const { data: adminData, error: adminError } = await supabase
+                                      .from('user_roles')
+                                      .select('role')
+                                      .eq('user_id', finalUser.id)
+                                      .eq('role', 'admin')
+                                      .maybeSingle();
+                                    isAdmin = !!adminData && !adminError;
+                                    console.log('[VERIFY] Verificação de admin:', { isAdmin, adminError: adminError?.message });
+                                  } catch (e) {
+                                    console.error('[VERIFY] Erro ao verificar admin:', e);
+                                  }
+                                  
+                                  // Buscar landing page para verificar se é dono
+                                  const { data: lpData, error: lpError } = await supabase
+                                    .from('landing_pages')
+                                    .select('user_id')
+                                    .eq('subdomain', '${subdomain}')
+                                    .maybeSingle();
+                                  
+                                  if (lpError) {
+                                    console.error('[VERIFY] Erro ao buscar landing page:', lpError);
+                                    showAccessDenied();
+                                    return;
+                                  }
+                                  
+                                  const isOwner = lpData && finalUser.id === lpData.user_id;
+                                  console.log('[VERIFY] Verificação de acesso:', { isOwner, isAdmin, userId: finalUser.id, lpUserId: lpData?.user_id });
+                                  
+                                  if (isOwner || isAdmin) {
+                                    document.body.style.display = '';
+                                    return;
+                                  } else {
+                                    showAccessDenied();
+                                    return;
+                                  }
+                                }
+                              }
+                            } catch (e) {
+                              console.error('[VERIFY] Erro ao ler sessão do localStorage:', e);
+                            }
+                          }
+                        }
                         showAccessDenied();
                         return;
                       }
+                      
+                      if (!user) {
+                        console.log('[VERIFY] Usuário não autenticado');
+                        showAccessDenied();
+                        return;
+                      }
+                      
+                      console.log('[VERIFY] Usuário autenticado:', user.id);
                       
                       // Verificar se é admin
                       let isAdmin = false;
@@ -286,9 +369,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                           .eq('role', 'admin')
                           .maybeSingle();
                         isAdmin = !!adminData && !adminError;
-                        console.log('Verificação de admin:', { isAdmin, adminError: adminError?.message });
+                        console.log('[VERIFY] Verificação de admin:', { isAdmin, adminError: adminError?.message });
                       } catch (e) {
-                        console.error('Erro ao verificar admin:', e);
+                        console.error('[VERIFY] Erro ao verificar admin:', e);
                       }
                       
                       // Buscar landing page para verificar se é dono
@@ -299,13 +382,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         .maybeSingle();
                       
                       if (lpError) {
-                        console.error('Erro ao buscar landing page:', lpError);
+                        console.error('[VERIFY] Erro ao buscar landing page:', lpError);
                         showAccessDenied();
                         return;
                       }
                       
                       const isOwner = lpData && user.id === lpData.user_id;
-                      console.log('Verificação de acesso:', { isOwner, isAdmin, userId: user.id, lpUserId: lpData?.user_id });
+                      console.log('[VERIFY] Verificação de acesso:', { isOwner, isAdmin, userId: user.id, lpUserId: lpData?.user_id });
                       
                       if (isOwner || isAdmin) {
                         // Tem acesso, mostrar conteúdo
@@ -314,7 +397,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         showAccessDenied();
                       }
                     } catch (error) {
-                      console.error('Erro ao verificar acesso:', error);
+                      console.error('[VERIFY] Erro ao verificar acesso:', error);
                       showAccessDenied();
                     }
                   }
@@ -330,26 +413,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     \`;
                   }
                   
-                  // Carregar Supabase JS e verificar acesso
-                  if (window.supabase && window.supabase.createClient) {
-                    checkAccess();
+                  // Aguardar um pouco para garantir que o DOM está pronto e tentar usar cliente existente
+                  if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', function() {
+                      setTimeout(checkAccess, 100);
+                    });
                   } else {
+                    setTimeout(checkAccess, 100);
+                  }
+                  
+                  // Carregar Supabase JS se necessário
+                  if (!window.supabase || !window.supabase.createClient) {
                     const script = document.createElement('script');
                     script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
                     script.onload = function() {
-                      // Verificar novamente se Supabase está disponível após carregar
-                      if (window.supabase && window.supabase.createClient) {
-                        checkAccess();
-                      } else {
-                        console.error('Supabase não foi carregado corretamente');
-                        showAccessDenied();
-                      }
+                      setTimeout(checkAccess, 100);
                     };
                     script.onerror = function() {
-                      console.error('Erro ao carregar biblioteca Supabase');
+                      console.error('[VERIFY] Erro ao carregar biblioteca Supabase');
                       showAccessDenied();
                     };
                     document.head.appendChild(script);
+                  } else {
+                    // Supabase já está carregado, verificar acesso
+                    setTimeout(checkAccess, 100);
                   }
                 })();
               </script>

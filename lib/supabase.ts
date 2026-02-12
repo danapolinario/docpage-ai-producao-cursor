@@ -16,3 +16,8 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     detectSessionInUrl: true,
   },
 });
+
+// Expor cliente Supabase globalmente para scripts inline poderem usar
+if (typeof window !== 'undefined') {
+  (window as any).__SUPABASE_CLIENT__ = supabase;
+}
