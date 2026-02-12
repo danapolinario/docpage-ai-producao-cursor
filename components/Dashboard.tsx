@@ -1463,13 +1463,13 @@ export const Dashboard: React.FC<Props> = ({
                              <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canViewAdvancedStats ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canViewAdvancedStats ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
                              </svg>
-                             <span className={planFeatures.canViewAdvancedStats ? 'text-blue-900' : 'text-gray-500'}>Estatísticas avançadas</span>
+                             <span className={planFeatures.canViewAdvancedStats ? 'text-blue-900' : 'text-gray-500'}>Estatísticas básicas</span>
                            </div>
                            <div className="flex items-center gap-2 text-xs md:text-sm">
                              <svg className={`w-4 h-4 flex-shrink-0 ${planFeatures.canAccessSocialMedia ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={planFeatures.canAccessSocialMedia ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
                              </svg>
-                             <span className={planFeatures.canAccessSocialMedia ? 'text-blue-900' : 'text-gray-500'}>Posts para redes sociais</span>
+                             <span className={planFeatures.canAccessSocialMedia ? 'text-blue-900' : 'text-gray-500'}>Hospedagem, domínio (1 ano) e Botão Whatsapp</span>
                            </div>
                            {planFeatures.canGetConsulting && (
                              <div className="flex items-center gap-2 text-xs md:text-sm">
