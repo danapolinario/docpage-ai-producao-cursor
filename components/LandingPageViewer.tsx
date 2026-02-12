@@ -70,38 +70,162 @@ export const LandingPageViewer: React.FC = () => {
       }
 
       try {
-        // Buscar landing page (independente do status para verificar se existe)
-        const { data, error: fetchError } = await supabase
-          .from('landing_pages')
-          .select('*')
-          .eq('subdomain', subdomain)
-          .single();
+        // Primeiro verificar autenticação antes de fazer a query
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        console.log('[LandingPageViewer] Usuário autenticado:', {
+          isAuthenticated: !!user,
+          userId: user?.id,
+          userError: userError?.message
+        });
 
-        if (fetchError) {
-          console.error('Error fetching landing page:', fetchError);
-          setError('Landing page não encontrada');
-          setLoading(false);
-          return;
-        }
-
-        // Verificar autenticação e permissões
-        const { data: { user } } = await supabase.auth.getUser();
-        const isOwner = user && user.id === data.user_id;
-        
-        // Verificar se é admin
+        // Verificar se é admin ANTES de fazer a query
         let isAdmin = false;
         if (user) {
           try {
             const { checkIsAdmin } = await import('../services/admin');
             isAdmin = await checkIsAdmin();
+            console.log('[LandingPageViewer] Verificação de admin:', { isAdmin });
           } catch (adminError) {
-            console.error('Error checking admin status:', adminError);
+            console.error('[LandingPageViewer] Erro ao verificar admin:', adminError);
             // Continuar sem permissão de admin se houver erro
           }
         }
 
+        // Buscar landing page (independente do status para verificar se existe)
+        // IMPORTANTE: As políticas RLS devem permitir acesso se:
+        // - Landing page está publicada (anon)
+        // - Usuário é dono da landing page (authenticated)
+        // - Usuário é admin (authenticated)
+        
+        // Tentar buscar primeiro apenas campos essenciais para verificar acesso
+        let data: any = null;
+        let fetchError: any = null;
+        
+        // Primeira tentativa: buscar apenas campos mínimos para verificar permissões
+        const { data: minimalData, error: minimalError } = await supabase
+          .from('landing_pages')
+          .select('id, user_id, status, subdomain')
+          .eq('subdomain', subdomain)
+          .maybeSingle();
+        
+        if (minimalError) {
+          console.log('[LandingPageViewer] Erro ao buscar dados mínimos:', minimalError);
+          fetchError = minimalError;
+        } else if (minimalData) {
+          // Se conseguiu buscar dados mínimos, verificar acesso
+          const isOwner = user && user.id === minimalData.user_id;
+          const canAccessMinimal = minimalData.status === 'published' || isOwner || isAdmin;
+          
+          if (canAccessMinimal) {
+            console.log('[LandingPageViewer] Acesso confirmado com dados mínimos, buscando dados completos...');
+            // Se tem acesso, buscar dados completos
+            const { data: fullData, error: fullError } = await supabase
+              .from('landing_pages')
+              .select('*')
+              .eq('subdomain', subdomain)
+              .single();
+            
+            if (fullError) {
+              console.error('[LandingPageViewer] Erro ao buscar dados completos:', fullError);
+              fetchError = fullError;
+            } else {
+              data = fullData;
+            }
+          } else {
+            // Não tem acesso mesmo com dados mínimos
+            setError('Esta landing page ainda não foi publicada');
+            setLoading(false);
+            return;
+          }
+        } else {
+          // Não encontrou dados mínimos
+          setError('Landing page não encontrada');
+          setLoading(false);
+          return;
+        }
+        
+        // Se ainda não temos data, tentar query completa direta (fallback)
+        if (!data && !fetchError) {
+          const { data: directData, error: directError } = await supabase
+            .from('landing_pages')
+            .select('*')
+            .eq('subdomain', subdomain)
+            .single();
+          
+          if (directError) {
+            fetchError = directError;
+          } else {
+            data = directData;
+          }
+        }
+
+        console.log('[LandingPageViewer] Resultado da query:', {
+          found: !!data,
+          error: fetchError?.message,
+          errorCode: fetchError?.code,
+          errorDetails: fetchError?.details,
+          errorHint: fetchError?.hint,
+          status: data?.status,
+          userId: data?.user_id,
+          isOwner: user && user.id === data?.user_id,
+          isAdmin
+        });
+
+        if (fetchError) {
+          // Se o erro for de RLS (PGRST301 ou similar), pode ser que o usuário não tenha permissão
+          // Mas ainda podemos tentar verificar se é dono ou admin
+          console.error('[LandingPageViewer] Erro ao buscar landing page:', fetchError);
+          
+          // Se o erro for de permissão e o usuário está autenticado, tentar verificar se é dono ou admin
+          if (user && (fetchError.code === 'PGRST301' || fetchError.message?.includes('permission') || fetchError.message?.includes('RLS'))) {
+            console.log('[LandingPageViewer] Erro de permissão detectado, tentando verificar acesso alternativo...');
+            
+            // Tentar buscar apenas o ID e user_id para verificar se é dono
+            const { data: minimalData, error: minimalError } = await supabase
+              .from('landing_pages')
+              .select('id, user_id, status')
+              .eq('subdomain', subdomain)
+              .maybeSingle();
+            
+            if (minimalData) {
+              const isOwner = user.id === minimalData.user_id;
+              const canAccess = minimalData.status === 'published' || isOwner || isAdmin;
+              
+              if (canAccess) {
+                console.log('[LandingPageViewer] Acesso permitido via verificação alternativa');
+                // Se tem acesso, tentar buscar novamente com uma query diferente ou usar dados mínimos
+                // Por enquanto, vamos mostrar erro mas com mensagem mais específica
+                setError('Erro ao carregar dados completos da landing page. Verifique suas permissões.');
+                setLoading(false);
+                return;
+              }
+            }
+          }
+          
+          setError('Landing page não encontrada ou você não tem permissão para visualizá-la');
+          setLoading(false);
+          return;
+        }
+
+        if (!data) {
+          setError('Landing page não encontrada');
+          setLoading(false);
+          return;
+        }
+
+        // Verificar se é dono
+        const isOwner = user && user.id === data.user_id;
+        
         // Permitir acesso se publicado OU se usuário é dono OU se usuário é admin
         const canAccess = data.status === 'published' || isOwner || isAdmin;
+
+        console.log('[LandingPageViewer] Verificação de acesso:', {
+          status: data.status,
+          isPublished: data.status === 'published',
+          isOwner,
+          isAdmin,
+          canAccess
+        });
 
         if (!canAccess) {
           setError('Esta landing page ainda não foi publicada');

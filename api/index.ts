@@ -231,75 +231,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).send('Not found');
       }
 
-      // Verificar autenticação e permissões
-      // IMPORTANTE: Se landing page está publicada, permitir acesso público
-      const isPublished = landingPage.status === 'published';
-      
-      if (isPublished) {
-        console.log('[SSR] ✓ Landing page publicada, acesso público permitido');
-      } else {
-        // Se não está publicada, verificar autenticação e permissões
-        console.log('[SSR] Landing page não publicada, verificando autenticação...');
-        const cookies = req.headers.cookie || '';
-        const authHeader = req.headers.authorization || '';
-        
-        console.log('[SSR] Headers de autenticação:', {
-          hasCookies: !!cookies,
-          cookiesLength: cookies.length,
-          hasAuthHeader: !!authHeader,
-          cookiePreview: cookies.substring(0, 200)
-        });
-        
-        const authResult = await verifyAuthFromRequest(cookies, authHeader);
-        
-        const isOwner = authResult.isAuthenticated && authResult.userId === landingPage.user_id;
-        const isAdmin = authResult.isAdmin;
-        
-        console.log('[SSR] Resultado da verificação de autenticação:', {
-          isAuthenticated: authResult.isAuthenticated,
-          userId: authResult.userId,
-          isAdmin,
-          isOwner,
-          landingPageUserId: landingPage.user_id,
-          status: landingPage.status
-        });
-        
-        // Permitir acesso se usuário é dono OU se usuário é admin
-        const canAccess = isOwner || isAdmin;
-        
-        if (!canAccess) {
-          console.log('[SSR] ✗ Acesso negado - landing page não publicada e usuário não tem permissão', {
-            status: landingPage.status,
-            isOwner,
-            isAdmin,
-            isAuthenticated: authResult.isAuthenticated,
-            userId: authResult.userId,
-            landingPageUserId: landingPage.user_id
-          });
-          return res.status(403).send(`
-            <!DOCTYPE html>
-            <html lang="pt-BR">
-            <head>
-              <meta charset="UTF-8" />
-              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <title>Acesso Negado</title>
-            </head>
-            <body style="font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f3f4f6;">
-              <div style="text-align: center; padding: 2rem;">
-                <h1 style="color: #374151; margin-bottom: 1rem;">Esta landing page ainda não foi publicada</h1>
-                <p style="color: #6b7280;">Apenas o proprietário ou um administrador pode visualizar esta página antes da publicação.</p>
-              </div>
-            </body>
-            </html>
-          `);
-        }
-
-        console.log('[SSR] ✓ Acesso permitido para usuário autenticado', {
-          status: landingPage.status,
-          isOwner,
-          isAdmin
-        });
-      }
+      // IMPORTANTE: Não bloquear no servidor - deixar o cliente fazer a verificação
+      // O Supabase JS client usa localStorage, não cookies HTTP, então não podemos
+      // verificar autenticação confiavelmente no servidor para requisições de subdomínio.
+      // O LandingPageViewer.tsx já faz a verificação no cliente.
+      console.log('[SSR] ✓ Landing page encontrada, servindo HTML (verificação de acesso será feita no cliente)', {
+        status: landingPage.status,
+        landingPageId: landingPage.id
+      });
 
       // Se landing page está publicada mas HTML estático não existe, tentar gerar
       if (landingPage.status === 'published') {
