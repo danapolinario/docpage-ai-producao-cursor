@@ -383,12 +383,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                           user = sessionData.user;
                           console.log('[VERIFY] Sessão obtida via getSession()');
                         } else {
-                        // Se não conseguir sessão, tentar getUser
-                        const { data: { user: userData }, error: userError } = await supabase.auth.getUser();
-                        if (!userError && userData) {
-                          user = userData;
-                          console.log('[VERIFY] Usuário obtido via getUser()');
-                        } else {
+                          // Se não conseguir sessão, tentar getUser
+                          const { data: { user: userData }, error: userError } = await supabase.auth.getUser();
+                          if (!userError && userData) {
+                            user = userData;
+                            console.log('[VERIFY] Usuário obtido via getUser()');
+                          } else {
                           console.log('[VERIFY] Erro ao obter sessão/usuário:', sessionError?.message || userError?.message);
                           
                           // Tentar obter sessão do localStorage diretamente
@@ -563,7 +563,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   async function checkAccessWithRetry(retries = 3) {
                     for (let i = 0; i < retries; i++) {
                       try {
-                        await checkAccess();
+                        await safeCheckAccess();
                         // Se chegou aqui sem erro, verificar se o body foi mostrado ou negado
                         if (document.body.style.display !== 'none' || document.body.innerHTML.includes('Esta landing page ainda não foi publicada')) {
                           return; // Já foi processado
@@ -572,6 +572,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         if (i < retries - 1) {
                           console.log(\`[VERIFY] Tentativa \${i + 1} falhou, aguardando e tentando novamente...\`);
                           await new Promise(resolve => setTimeout(resolve, 500));
+                        } else {
+                          // Última tentativa falhou, mostrar acesso negado
+                          showAccessDenied();
                         }
                       } catch (error) {
                         console.error(\`[VERIFY] Erro na tentativa \${i + 1}:\`, error);
