@@ -187,14 +187,178 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).send('Not found');
       }
 
-      // IMPORTANTE: Não bloquear no servidor - deixar o cliente fazer a verificação
-      // O Supabase JS client usa localStorage, não cookies HTTP, então não podemos
-      // verificar autenticação confiavelmente no servidor para requisições de subdomínio.
-      // O LandingPageViewer.tsx já faz a verificação no cliente.
-      console.log('[SUBDOMAIN DEBUG] Landing page encontrada, servindo HTML (verificação de acesso será feita no cliente)', {
-        status: landingPage.status,
-        landingPageId: landingPage.id
-      });
+      // Verificar autenticação e permissões
+      // IMPORTANTE: Se landing page está publicada, permitir acesso público
+      const isPublished = landingPage.status === 'published';
+      
+      if (isPublished) {
+        console.log('[SUBDOMAIN DEBUG] Landing page publicada, acesso público permitido');
+      } else {
+        // Se não está publicada, verificar autenticação e permissões
+        console.log('[SUBDOMAIN DEBUG] Landing page não publicada, verificando autenticação...');
+        const cookies = req.headers.cookie || '';
+        const authHeader = req.headers.authorization || '';
+        
+        console.log('[SUBDOMAIN DEBUG] Headers de autenticação:', {
+          hasCookies: !!cookies,
+          cookiesLength: cookies.length,
+          hasAuthHeader: !!authHeader,
+          cookiePreview: cookies.substring(0, 200)
+        });
+        
+        const authResult = await verifyAuthFromRequest(cookies, authHeader);
+        
+        const isOwner = authResult.isAuthenticated && authResult.userId === landingPage.user_id;
+        const isAdmin = authResult.isAdmin;
+        
+        console.log('[SUBDOMAIN DEBUG] Resultado da verificação de autenticação:', {
+          isAuthenticated: authResult.isAuthenticated,
+          userId: authResult.userId,
+          isAdmin,
+          isOwner,
+          landingPageUserId: landingPage.user_id,
+          status: landingPage.status
+        });
+        
+        // Permitir acesso se usuário é dono OU se usuário é admin
+        const canAccess = isOwner || isAdmin;
+        
+        if (!canAccess) {
+          console.log('[SUBDOMAIN DEBUG] Access denied - landing page not published and user has no permission', {
+            status: landingPage.status,
+            isOwner,
+            isAdmin,
+            isAuthenticated: authResult.isAuthenticated,
+            userId: authResult.userId,
+            landingPageUserId: landingPage.user_id
+          });
+          
+          // Se não conseguimos verificar autenticação no servidor (porque Supabase usa localStorage),
+          // servir HTML completo mas com script que verifica acesso no cliente ANTES de mostrar conteúdo
+          if (!authResult.isAuthenticated) {
+            // Renderizar HTML completo mas com verificação no cliente
+            const mockReq = {
+              protocol: 'https',
+              get: (header: string) => {
+                if (header === 'host') return host;
+                return req.headers[header.toLowerCase()] || '';
+              },
+              headers: req.headers,
+            };
+            
+            const htmlContent = await renderLandingPage(landingPage, mockReq);
+            
+            // Injetar script de verificação ANTES do fechamento do </body>
+            const verificationScript = `
+              <script>
+                (function() {
+                  // Ocultar conteúdo até verificar acesso
+                  document.body.style.display = 'none';
+                  
+                  const SUPABASE_URL = '${supabaseUrl}';
+                  const SUPABASE_KEY = '${supabaseKey}';
+                  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                  
+                  async function checkAccess() {
+                    try {
+                      const { data: { user } } = await supabase.auth.getUser();
+                      if (!user) {
+                        showAccessDenied();
+                        return;
+                      }
+                      
+                      // Verificar se é admin
+                      let isAdmin = false;
+                      try {
+                        const { data: adminData } = await supabase
+                          .from('user_roles')
+                          .select('role')
+                          .eq('user_id', user.id)
+                          .eq('role', 'admin')
+                          .maybeSingle();
+                        isAdmin = !!adminData;
+                      } catch (e) {
+                        console.error('Erro ao verificar admin:', e);
+                      }
+                      
+                      // Buscar landing page para verificar se é dono
+                      const { data: lpData } = await supabase
+                        .from('landing_pages')
+                        .select('user_id')
+                        .eq('subdomain', '${subdomain}')
+                        .maybeSingle();
+                      
+                      const isOwner = lpData && user.id === lpData.user_id;
+                      
+                      if (isOwner || isAdmin) {
+                        // Tem acesso, mostrar conteúdo
+                        document.body.style.display = '';
+                      } else {
+                        showAccessDenied();
+                      }
+                    } catch (error) {
+                      console.error('Erro ao verificar acesso:', error);
+                      showAccessDenied();
+                    }
+                  }
+                  
+                  function showAccessDenied() {
+                    document.body.innerHTML = \`
+                      <div style="font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f3f4f6;">
+                        <div style="text-align: center; padding: 2rem;">
+                          <h1 style="color: #374151; margin-bottom: 1rem;">Esta landing page ainda não foi publicada</h1>
+                          <p style="color: #6b7280;">Apenas o proprietário ou um administrador pode visualizar esta página antes da publicação.</p>
+                        </div>
+                      </div>
+                    \`;
+                  }
+                  
+                  // Carregar Supabase JS e verificar acesso
+                  if (window.supabase) {
+                    checkAccess();
+                  } else {
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+                    script.onload = checkAccess;
+                    script.onerror = showAccessDenied;
+                    document.head.appendChild(script);
+                  }
+                })();
+              </script>
+            `;
+            
+            const htmlWithVerification = htmlContent.replace('</body>', verificationScript + '</body>');
+            
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0, private');
+            return res.status(200).send(htmlWithVerification);
+          }
+          
+          // Se verificamos mas não tem acesso, bloquear
+          return res.status(403).send(`
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>Acesso Negado</title>
+            </head>
+            <body style="font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f3f4f6;">
+              <div style="text-align: center; padding: 2rem;">
+                <h1 style="color: #374151; margin-bottom: 1rem;">Esta landing page ainda não foi publicada</h1>
+                <p style="color: #6b7280;">Apenas o proprietário ou um administrador pode visualizar esta página antes da publicação.</p>
+              </div>
+            </body>
+            </html>
+          `);
+        }
+
+        console.log('[SUBDOMAIN DEBUG] Access granted for authenticated user', {
+          status: landingPage.status,
+          isOwner,
+          isAdmin
+        });
+      }
 
       // Criar objeto req compatível para renderLandingPage
       const mockReq = {

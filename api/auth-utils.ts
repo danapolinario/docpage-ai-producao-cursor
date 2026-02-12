@@ -39,13 +39,20 @@ export async function verifyAuthFromRequest(
     }
 
     // 2. Tentar extrair dos cookies
+    // IMPORTANTE: O Supabase JS client usa localStorage por padrão, não cookies HTTP
+    // Quando você acessa um subdomínio diferente, os cookies podem não ser enviados
+    // Por isso, vamos tentar múltiplos formatos e também verificar se há algum cookie relacionado
     if (!accessToken && cookies) {
       const cookieString = typeof cookies === 'string' ? cookies : 
         Object.entries(cookies)
           .map(([key, value]) => `${key}=${value}`)
           .join('; ');
 
-      // Supabase pode armazenar tokens em diferentes formatos de cookies
+      console.log('[AUTH-UTILS] Tentando extrair token dos cookies:', {
+        cookieStringLength: cookieString.length,
+        cookiePreview: cookieString.substring(0, 300)
+      });
+
       // Formato 1: sb-{project-ref}-auth-token (JSON com access_token e refresh_token)
       const cookieMatch = cookieString.match(/(?:^|;\s*)sb-[^=]+-auth-token=([^;]+)/);
       if (cookieMatch) {
@@ -55,9 +62,11 @@ export async function verifyAuthFromRequest(
           const tokenData = JSON.parse(decoded);
           accessToken = tokenData.access_token || tokenData.accessToken;
           refreshToken = tokenData.refresh_token || tokenData.refreshToken;
+          console.log('[AUTH-UTILS] Token extraído do cookie JSON');
         } catch {
           // Se não for JSON, pode ser apenas o access token
           accessToken = decodeURIComponent(cookieMatch[1]);
+          console.log('[AUTH-UTILS] Token extraído do cookie (não-JSON)');
         }
       }
 
@@ -67,24 +76,45 @@ export async function verifyAuthFromRequest(
       
       if (accessTokenMatch) {
         accessToken = decodeURIComponent(accessTokenMatch[1]);
+        console.log('[AUTH-UTILS] Token extraído do cookie access-token individual');
       }
       if (refreshTokenMatch) {
         refreshToken = decodeURIComponent(refreshTokenMatch[1]);
       }
 
-      // Formato 3: Tentar usar a sessão diretamente se disponível
-      // O Supabase pode ter uma sessão armazenada que podemos usar
-      if (!accessToken && refreshToken) {
-        // Tentar usar refresh token para obter nova sessão
-        try {
-          const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession({
-            refresh_token: refreshToken
-          });
-          if (!sessionError && sessionData?.session?.access_token) {
-            accessToken = sessionData.session.access_token;
+      // Formato 3: Tentar buscar qualquer cookie que contenha "token" ou "auth"
+      if (!accessToken) {
+        const tokenCookies = cookieString.match(/(?:^|;\s*)([^=]*token[^=]*)=([^;]+)/gi);
+        if (tokenCookies) {
+          console.log('[AUTH-UTILS] Encontrados cookies com "token":', tokenCookies.length);
+          // Tentar extrair de cada cookie encontrado
+          for (const tokenCookie of tokenCookies) {
+            try {
+              const match = tokenCookie.match(/=([^;]+)/);
+              if (match) {
+                const value = decodeURIComponent(match[1]);
+                // Tentar parsear como JSON
+                try {
+                  const parsed = JSON.parse(value);
+                  if (parsed.access_token || parsed.accessToken) {
+                    accessToken = parsed.access_token || parsed.accessToken;
+                    console.log('[AUTH-UTILS] Token extraído de cookie genérico');
+                    break;
+                  }
+                } catch {
+                  // Não é JSON, pode ser token direto
+                  if (value.length > 50 && value.match(/^[A-Za-z0-9\-_]+\./)) {
+                    // Parece ser um JWT token
+                    accessToken = value;
+                    console.log('[AUTH-UTILS] Token JWT extraído de cookie genérico');
+                    break;
+                  }
+                }
+              }
+            } catch (e) {
+              // Continuar tentando outros cookies
+            }
           }
-        } catch (refreshError) {
-          // Ignorar erro de refresh
         }
       }
     }
