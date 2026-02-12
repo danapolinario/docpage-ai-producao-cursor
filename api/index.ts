@@ -389,96 +389,97 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             user = userData;
                             console.log('[VERIFY] Usuário obtido via getUser()');
                           } else {
-                          console.log('[VERIFY] Erro ao obter sessão/usuário:', sessionError?.message || userError?.message);
-                          
-                          // Tentar obter sessão do localStorage diretamente
-                          // O Supabase armazena a sessão em uma chave específica: sb-{project-ref}-auth-token
-                          // Precisamos encontrar essa chave
-                          const supabaseUrlParts = SUPABASE_URL.split('//')[1]?.split('.')[0];
-                          const possibleKeys = Object.keys(localStorage).filter(key => 
-                            key.includes('supabase') || 
-                            (key.includes('sb-') && key.includes('auth')) ||
-                            (supabaseUrlParts && key.includes(supabaseUrlParts))
-                          );
-                          
-                          console.log('[VERIFY] Chaves do localStorage encontradas:', possibleKeys);
-                          console.log('[VERIFY] SUPABASE_URL:', SUPABASE_URL);
-                          
-                          // Tentar todas as chaves possíveis
-                          for (const sessionKey of possibleKeys) {
-                            try {
-                              const storedData = localStorage.getItem(sessionKey);
-                              if (storedData) {
-                                console.log(\`[VERIFY] Tentando chave: \${sessionKey}, tamanho: \${storedData.length}\`);
-                                
-                                let sessionData;
-                                try {
-                                  sessionData = JSON.parse(storedData);
-                                } catch {
-                                  // Se não for JSON, pode ser apenas o token
-                                  if (storedData.length > 50 && storedData.match(/^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/)) {
-                                    // Parece ser um token JWT
-                                    console.log('[VERIFY] Token JWT encontrado diretamente');
-                                    const { data: { user: userFromToken }, error: tokenError } = await supabase.auth.getUser(storedData);
+                            console.log('[VERIFY] Erro ao obter sessão/usuário:', sessionError?.message || userError?.message);
+                            
+                            // Tentar obter sessão do localStorage diretamente
+                            // O Supabase armazena a sessão em uma chave específica: sb-{project-ref}-auth-token
+                            // Precisamos encontrar essa chave
+                            const supabaseUrlParts = SUPABASE_URL.split('//')[1]?.split('.')[0];
+                            const possibleKeys = Object.keys(localStorage).filter(key => 
+                              key.includes('supabase') || 
+                              (key.includes('sb-') && key.includes('auth')) ||
+                              (supabaseUrlParts && key.includes(supabaseUrlParts))
+                            );
+                            
+                            console.log('[VERIFY] Chaves do localStorage encontradas:', possibleKeys);
+                            console.log('[VERIFY] SUPABASE_URL:', SUPABASE_URL);
+                            
+                            // Tentar todas as chaves possíveis
+                            for (const sessionKey of possibleKeys) {
+                              try {
+                                const storedData = localStorage.getItem(sessionKey);
+                                if (storedData) {
+                                  console.log(\`[VERIFY] Tentando chave: \${sessionKey}, tamanho: \${storedData.length}\`);
+                                  
+                                  let sessionData;
+                                  try {
+                                    sessionData = JSON.parse(storedData);
+                                  } catch {
+                                    // Se não for JSON, pode ser apenas o token
+                                    if (storedData.length > 50 && storedData.match(/^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/)) {
+                                      // Parece ser um token JWT
+                                      console.log('[VERIFY] Token JWT encontrado diretamente');
+                                      const { data: { user: userFromToken }, error: tokenError } = await supabase.auth.getUser(storedData);
+                                      if (!tokenError && userFromToken) {
+                                        user = userFromToken;
+                                        console.log('[VERIFY] Usuário obtido do token direto do localStorage');
+                                        break;
+                                      }
+                                    }
+                                    continue;
+                                  }
+                                  
+                                  // Tentar diferentes formatos de dados
+                                  let accessToken = null;
+                                  
+                                  if (sessionData.access_token) {
+                                    accessToken = sessionData.access_token;
+                                  } else if (sessionData.accessToken) {
+                                    accessToken = sessionData.accessToken;
+                                  } else if (sessionData.session && sessionData.session.access_token) {
+                                    accessToken = sessionData.session.access_token;
+                                  } else if (sessionData.user && sessionData.user.id) {
+                                    // Pode ser que já tenha o user no objeto
+                                    user = sessionData.user;
+                                    console.log('[VERIFY] Usuário encontrado diretamente no objeto de sessão');
+                                    break;
+                                  }
+                                  
+                                  if (accessToken) {
+                                    console.log('[VERIFY] Token encontrado no localStorage, tentando obter usuário...');
+                                    
+                                    // Tentar usar o token para obter usuário
+                                    const { data: { user: userFromToken }, error: tokenError } = await supabase.auth.getUser(accessToken);
                                     if (!tokenError && userFromToken) {
                                       user = userFromToken;
-                                      console.log('[VERIFY] Usuário obtido do token direto do localStorage');
+                                      console.log('[VERIFY] Usuário obtido do token do localStorage');
                                       break;
+                                    } else {
+                                      console.log('[VERIFY] Erro ao obter usuário do token:', tokenError?.message);
                                     }
                                   }
-                                  continue;
-                                }
-                                
-                                // Tentar diferentes formatos de dados
-                                let accessToken = null;
-                                
-                                if (sessionData.access_token) {
-                                  accessToken = sessionData.access_token;
-                                } else if (sessionData.accessToken) {
-                                  accessToken = sessionData.accessToken;
-                                } else if (sessionData.session && sessionData.session.access_token) {
-                                  accessToken = sessionData.session.access_token;
-                                } else if (sessionData.user && sessionData.user.id) {
-                                  // Pode ser que já tenha o user no objeto
-                                  user = sessionData.user;
-                                  console.log('[VERIFY] Usuário encontrado diretamente no objeto de sessão');
-                                  break;
-                                }
-                                
-                                if (accessToken) {
-                                  console.log('[VERIFY] Token encontrado no localStorage, tentando obter usuário...');
                                   
-                                  // Tentar usar o token para obter usuário
-                                  const { data: { user: userFromToken }, error: tokenError } = await supabase.auth.getUser(accessToken);
-                                  if (!tokenError && userFromToken) {
-                                    user = userFromToken;
-                                    console.log('[VERIFY] Usuário obtido do token do localStorage');
-                                    break;
-                                  } else {
-                                    console.log('[VERIFY] Erro ao obter usuário do token:', tokenError?.message);
-                                  }
-                                }
-                                
-                                // Tentar usar setSession se tiver os dados completos
-                                if (sessionData.access_token && sessionData.refresh_token) {
-                                  try {
-                                    const { data: { session: newSession }, error: setSessionError } = await supabase.auth.setSession({
-                                      access_token: sessionData.access_token,
-                                      refresh_token: sessionData.refresh_token
-                                    });
-                                    if (!setSessionError && newSession && newSession.user) {
-                                      user = newSession.user;
-                                      console.log('[VERIFY] Sessão restaurada via setSession()');
-                                      break;
+                                  // Tentar usar setSession se tiver os dados completos
+                                  if (sessionData.access_token && sessionData.refresh_token) {
+                                    try {
+                                      const { data: { session: newSession }, error: setSessionError } = await supabase.auth.setSession({
+                                        access_token: sessionData.access_token,
+                                        refresh_token: sessionData.refresh_token
+                                      });
+                                      if (!setSessionError && newSession && newSession.user) {
+                                        user = newSession.user;
+                                        console.log('[VERIFY] Sessão restaurada via setSession()');
+                                        break;
+                                      }
+                                    } catch (e) {
+                                      console.error('[VERIFY] Erro ao restaurar sessão:', e);
                                     }
-                                  } catch (e) {
-                                    console.error('[VERIFY] Erro ao restaurar sessão:', e);
                                   }
                                 }
+                              } catch (e) {
+                                console.error('[VERIFY] Erro ao ler sessão do localStorage:', e);
+                                continue;
                               }
-                            } catch (e) {
-                              console.error('[VERIFY] Erro ao ler sessão do localStorage:', e);
-                              continue;
                             }
                           }
                         }
