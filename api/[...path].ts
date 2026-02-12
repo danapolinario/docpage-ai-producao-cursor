@@ -257,12 +257,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   
                   const SUPABASE_URL = '${supabaseUrl}';
                   const SUPABASE_KEY = '${supabaseKey}';
-                  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                   
                   async function checkAccess() {
                     try {
-                      const { data: { user } } = await supabase.auth.getUser();
-                      if (!user) {
+                      // Verificar se Supabase está disponível
+                      if (!window.supabase || !window.supabase.createClient) {
+                        console.error('Supabase não está disponível');
+                        showAccessDenied();
+                        return;
+                      }
+                      
+                      const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                      
+                      const { data: { user }, error: userError } = await supabase.auth.getUser();
+                      if (userError || !user) {
+                        console.log('Usuário não autenticado:', userError?.message);
                         showAccessDenied();
                         return;
                       }
@@ -270,25 +279,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                       // Verificar se é admin
                       let isAdmin = false;
                       try {
-                        const { data: adminData } = await supabase
+                        const { data: adminData, error: adminError } = await supabase
                           .from('user_roles')
                           .select('role')
                           .eq('user_id', user.id)
                           .eq('role', 'admin')
                           .maybeSingle();
-                        isAdmin = !!adminData;
+                        isAdmin = !!adminData && !adminError;
+                        console.log('Verificação de admin:', { isAdmin, adminError: adminError?.message });
                       } catch (e) {
                         console.error('Erro ao verificar admin:', e);
                       }
                       
                       // Buscar landing page para verificar se é dono
-                      const { data: lpData } = await supabase
+                      const { data: lpData, error: lpError } = await supabase
                         .from('landing_pages')
                         .select('user_id')
                         .eq('subdomain', '${subdomain}')
                         .maybeSingle();
                       
+                      if (lpError) {
+                        console.error('Erro ao buscar landing page:', lpError);
+                        showAccessDenied();
+                        return;
+                      }
+                      
                       const isOwner = lpData && user.id === lpData.user_id;
+                      console.log('Verificação de acesso:', { isOwner, isAdmin, userId: user.id, lpUserId: lpData?.user_id });
                       
                       if (isOwner || isAdmin) {
                         // Tem acesso, mostrar conteúdo
@@ -314,13 +331,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   }
                   
                   // Carregar Supabase JS e verificar acesso
-                  if (window.supabase) {
+                  if (window.supabase && window.supabase.createClient) {
                     checkAccess();
                   } else {
                     const script = document.createElement('script');
                     script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-                    script.onload = checkAccess;
-                    script.onerror = showAccessDenied;
+                    script.onload = function() {
+                      // Verificar novamente se Supabase está disponível após carregar
+                      if (window.supabase && window.supabase.createClient) {
+                        checkAccess();
+                      } else {
+                        console.error('Supabase não foi carregado corretamente');
+                        showAccessDenied();
+                      }
+                    };
+                    script.onerror = function() {
+                      console.error('Erro ao carregar biblioteca Supabase');
+                      showAccessDenied();
+                    };
                     document.head.appendChild(script);
                   }
                 })();
