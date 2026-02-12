@@ -522,6 +522,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     \`;
                   }
                   
+                  // Wrapper para garantir que erros sejam tratados
+                  async function safeCheckAccess() {
+                    try {
+                      await checkAccess();
+                    } catch (error) {
+                      console.error('[VERIFY] Erro fatal ao verificar acesso:', error);
+                      showAccessDenied();
+                    }
+                  }
+                  
                   // Função para aguardar e tentar novamente se necessário
                   async function checkAccessWithRetry(retries = 3) {
                     for (let i = 0; i < retries; i++) {
