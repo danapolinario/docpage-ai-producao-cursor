@@ -326,63 +326,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         return;
                       }
                       
-                      // Obter usuário autenticado
-                      const { data: { user }, error: userError } = await supabase.auth.getUser();
+                      // Tentar obter sessão primeiro (pode funcionar melhor que getUser quando a sessão está no localStorage)
+                      let user = null;
+                      let session = null;
                       
-                      if (userError) {
-                        console.log('[VERIFY] Erro ao obter usuário:', userError.message);
-                        // Se o erro for apenas "Auth session missing", tentar obter sessão do localStorage
-                        if (userError.message.includes('session missing') || userError.message.includes('Auth session missing')) {
+                      // Primeiro tentar obter sessão
+                      const { data: { session: sessionData }, error: sessionError } = await supabase.auth.getSession();
+                      if (!sessionError && sessionData) {
+                        session = sessionData;
+                        user = sessionData.user;
+                        console.log('[VERIFY] Sessão obtida via getSession()');
+                      } else {
+                        // Se não conseguir sessão, tentar getUser
+                        const { data: { user: userData }, error: userError } = await supabase.auth.getUser();
+                        if (!userError && userData) {
+                          user = userData;
+                          console.log('[VERIFY] Usuário obtido via getUser()');
+                        } else {
+                          console.log('[VERIFY] Erro ao obter sessão/usuário:', sessionError?.message || userError?.message);
+                          
                           // Tentar obter sessão do localStorage diretamente
-                          const sessionKey = Object.keys(localStorage).find(key => key.includes('supabase.auth.token'));
+                          const sessionKey = Object.keys(localStorage).find(key => 
+                            key.includes('supabase.auth.token') || 
+                            key.includes('sb-') && key.includes('-auth-token')
+                          );
+                          
                           if (sessionKey) {
                             try {
-                              const sessionData = JSON.parse(localStorage.getItem(sessionKey) || '{}');
-                              if (sessionData.access_token) {
-                                // Tentar usar o token para obter usuário
-                                const { data: { user: userFromToken }, error: tokenError } = await supabase.auth.getUser(sessionData.access_token);
-                                if (!tokenError && userFromToken) {
-                                  console.log('[VERIFY] Usuário obtido do token do localStorage');
-                                  // Continuar com userFromToken
-                                  const finalUser = userFromToken;
+                              const storedData = localStorage.getItem(sessionKey);
+                              if (storedData) {
+                                const sessionData = JSON.parse(storedData);
+                                if (sessionData.access_token || sessionData.accessToken) {
+                                  const accessToken = sessionData.access_token || sessionData.accessToken;
+                                  console.log('[VERIFY] Token encontrado no localStorage, tentando obter usuário...');
                                   
-                                  // Verificar se é admin
-                                  let isAdmin = false;
-                                  try {
-                                    const { data: adminData, error: adminError } = await supabase
-                                      .from('user_roles')
-                                      .select('role')
-                                      .eq('user_id', finalUser.id)
-                                      .eq('role', 'admin')
-                                      .maybeSingle();
-                                    isAdmin = !!adminData && !adminError;
-                                    console.log('[VERIFY] Verificação de admin:', { isAdmin, adminError: adminError?.message });
-                                  } catch (e) {
-                                    console.error('[VERIFY] Erro ao verificar admin:', e);
-                                  }
-                                  
-                                  // Buscar landing page para verificar se é dono
-                                  const { data: lpData, error: lpError } = await supabase
-                                    .from('landing_pages')
-                                    .select('user_id')
-                                    .eq('subdomain', '${subdomain}')
-                                    .maybeSingle();
-                                  
-                                  if (lpError) {
-                                    console.error('[VERIFY] Erro ao buscar landing page:', lpError);
-                                    showAccessDenied();
-                                    return;
-                                  }
-                                  
-                                  const isOwner = lpData && finalUser.id === lpData.user_id;
-                                  console.log('[VERIFY] Verificação de acesso:', { isOwner, isAdmin, userId: finalUser.id, lpUserId: lpData?.user_id });
-                                  
-                                  if (isOwner || isAdmin) {
-                                    document.body.style.display = '';
-                                    return;
+                                  // Tentar usar o token para obter usuário
+                                  const { data: { user: userFromToken }, error: tokenError } = await supabase.auth.getUser(accessToken);
+                                  if (!tokenError && userFromToken) {
+                                    user = userFromToken;
+                                    console.log('[VERIFY] Usuário obtido do token do localStorage');
                                   } else {
-                                    showAccessDenied();
-                                    return;
+                                    console.log('[VERIFY] Erro ao obter usuário do token:', tokenError?.message);
                                   }
                                 }
                               }
@@ -391,6 +375,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             }
                           }
                         }
+                      }
+                      
+                      if (!user) {
+                        console.log('[VERIFY] Usuário não autenticado');
                         showAccessDenied();
                         return;
                       }
@@ -457,13 +445,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     \`;
                   }
                   
-                  // Aguardar um pouco para garantir que o DOM está pronto e tentar usar cliente existente
+                  // Função para aguardar e tentar novamente se necessário
+                  async function checkAccessWithRetry(retries = 3) {
+                    for (let i = 0; i < retries; i++) {
+                      try {
+                        await checkAccess();
+                        // Se chegou aqui sem erro, verificar se o body foi mostrado ou negado
+                        if (document.body.style.display !== 'none' || document.body.innerHTML.includes('Esta landing page ainda não foi publicada')) {
+                          return; // Já foi processado
+                        }
+                        // Se ainda está oculto e não foi negado, aguardar e tentar novamente
+                        if (i < retries - 1) {
+                          console.log(\`[VERIFY] Tentativa \${i + 1} falhou, aguardando e tentando novamente...\`);
+                          await new Promise(resolve => setTimeout(resolve, 500));
+                        }
+                      } catch (error) {
+                        console.error(\`[VERIFY] Erro na tentativa \${i + 1}:\`, error);
+                        if (i === retries - 1) {
+                          showAccessDenied();
+                        } else {
+                          await new Promise(resolve => setTimeout(resolve, 500));
+                        }
+                      }
+                    }
+                  }
+                  
+                  // Aguardar um pouco para garantir que o DOM está pronto e o Supabase carregou a sessão
                   if (document.readyState === 'loading') {
                     document.addEventListener('DOMContentLoaded', function() {
-                      setTimeout(checkAccess, 100);
+                      setTimeout(() => checkAccessWithRetry(), 300);
                     });
                   } else {
-                    setTimeout(checkAccess, 100);
+                    setTimeout(() => checkAccessWithRetry(), 300);
                   }
                   
                   // Carregar Supabase JS se necessário
@@ -471,16 +484,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     const script = document.createElement('script');
                     script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
                     script.onload = function() {
-                      setTimeout(checkAccess, 100);
+                      setTimeout(() => checkAccessWithRetry(), 300);
                     };
                     script.onerror = function() {
                       console.error('[VERIFY] Erro ao carregar biblioteca Supabase');
                       showAccessDenied();
                     };
                     document.head.appendChild(script);
-                  } else {
-                    // Supabase já está carregado, verificar acesso
-                    setTimeout(checkAccess, 100);
                   }
                 })();
               </script>
