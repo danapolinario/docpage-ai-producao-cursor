@@ -29,16 +29,22 @@ function extractSubdomainFromHost(): string | null {
   return null;
 }
 
-// Componente wrapper para rota raiz - detecta subdomínio e renderiza componente apropriado
+// Componente wrapper para rota raiz - detecta subdomínio ou domínio customizado e renderiza componente apropriado
 const RootRoute: React.FC = () => {
   const subdomain = extractSubdomainFromHost();
   
-  // Se houver subdomínio, renderizar LandingPageViewer
+  // Se houver subdomínio docpage (ex: drastellamardegan.docpage.com.br), renderizar LandingPageViewer
   if (subdomain) {
     return <LandingPageViewer />;
   }
   
-  // Caso contrário, renderizar App (home)
+  // Se houver dados da landing page injetados pelo SSR (domínio customizado, ex: www.drastellamardegan.com.br)
+  // O API retorna HTML com window.__LANDING_PAGE_DATA__ quando detecta domínio customizado
+  if (typeof window !== 'undefined' && (window as any).__LANDING_PAGE_DATA__) {
+    return <LandingPageViewer />;
+  }
+  
+  // Caso contrário, renderizar App (home DocPage)
   return <App />;
 };
 
