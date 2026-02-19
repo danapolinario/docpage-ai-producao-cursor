@@ -63,19 +63,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const xForwardedFor = req.headers['x-forwarded-for'];
   
   // Tentar múltiplos headers (Vercel pode usar diferentes)
-  // Prioridade: host > x-forwarded-host > x-vercel-original-host > x-host
-  let host = '';
-  if (Array.isArray(hostHeader)) {
-    host = hostHeader[0] || '';
-  } else if (hostHeader) {
-    host = hostHeader;
-  } else if (xForwardedHost) {
-    host = Array.isArray(xForwardedHost) ? xForwardedHost[0] : xForwardedHost;
-  } else if (xVercelOriginalHost) {
-    host = Array.isArray(xVercelOriginalHost) ? xVercelOriginalHost[0] : xVercelOriginalHost;
-  } else if (xHost) {
-    host = Array.isArray(xHost) ? xHost[0] : xHost;
-  }
+  // IMPORTANTE: Com rewrites, o Host pode ser sobrescrito. Priorizar headers que preservam o domínio original do cliente.
+  const getHeaderStr = (h: string | string[] | undefined) => (Array.isArray(h) ? h[0] : h) || '';
+  const hostFromHeader = getHeaderStr(hostHeader);
+  const hostFromXForwarded = getHeaderStr(xForwardedHost);
+  const hostFromXVercelOriginal = getHeaderStr(xVercelOriginalHost);
+  const hostFromXHost = getHeaderStr(xHost);
+  const candidates = [hostFromXVercelOriginal, hostFromXForwarded, hostFromHeader, hostFromXHost].filter(Boolean);
+  const hostForCustomDomain = candidates.find((h) => h && !h.toLowerCase().includes('docpage.com.br')) || hostFromHeader;
+  let host = hostFromHeader || hostFromXForwarded || hostFromXVercelOriginal || hostFromXHost;
   
   // Log detalhado para debug
   console.log('[SSR DEBUG] ============================================');
@@ -373,21 +369,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Lookup por domínio customizado (chosen_domain/custom_domain) quando host não é docpage.com.br
-    const requestHostname = host.split(':')[0].toLowerCase();
+    const hostForLookup = hostForCustomDomain || host;
+    const requestHostname = hostForLookup.split(':')[0].toLowerCase();
+    console.log('[CUSTOM DOMAIN] Verificando lookup:', { host, hostForLookup, requestHostname, path, willTry: !requestHostname.includes('docpage.com.br') });
     if (!requestHostname.includes('docpage.com.br')) {
-      const hostNormalized = normalizeHostForDomainLookup(host);
-      const hostWithWww = `www.${hostNormalized}`;
+      const hostNormalized = normalizeHostForDomainLookup(hostForLookup);
       if (hostNormalized && hostNormalized.length > 2) {
         try {
           const queryClient = supabaseAdmin || supabase;
           const { data: pages, error: domainError } = await queryClient
-            .from('landing_pages')
-            .select('*')
-            .or(`chosen_domain.eq."${hostNormalized}",chosen_domain.eq."${hostWithWww}",custom_domain.eq."${hostNormalized}",custom_domain.eq."${hostWithWww}"`)
-            .limit(2);
+            .rpc('get_landing_page_by_domain', { domain_input: hostNormalized });
 
-          if (!domainError && pages && pages.length > 0) {
-            const landingPage = pages[0];
+          if (domainError) {
+            console.error('[CUSTOM DOMAIN] Erro na query RPC:', domainError.message);
+          } else if (pages && (Array.isArray(pages) ? pages.length > 0 : pages)) {
+            const landingPage = Array.isArray(pages) ? pages[0] : pages;
             console.log('[CUSTOM DOMAIN] Landing page encontrada:', { hostNormalized, landingPageId: landingPage.id, subdomain: landingPage.subdomain });
 
             const isPublished = landingPage.status === 'published';
@@ -426,7 +422,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     res.setHeader('Content-Type', 'text/html; charset=utf-8');
                     res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, max-age=3600, s-maxage=3600');
                     res.setHeader('Vary', 'Host');
-                    res.setHeader('X-Served-From', 'static-html');
+                    res.setHeader('X-Served-From', 'custom-domain-static-html');
                     return res.send(htmlText);
                   }
                 }
@@ -438,7 +434,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const mockReq = {
               protocol: 'https',
               get: (h: string) => {
-                if (h === 'host') return host;
+                if (h === 'host') return hostForLookup;
                 const val = req.headers[h.toLowerCase()];
                 return (Array.isArray(val) ? val[0] : val) || '';
               },
@@ -448,7 +444,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, max-age=3600, s-maxage=3600');
             res.setHeader('Vary', 'Host');
-            res.setHeader('X-Served-From', hasPreview ? 'dynamic-ssr-preview' : 'dynamic-ssr');
+            res.setHeader('X-Served-From', 'custom-domain-landing');
             return res.status(200).send(htmlContent);
           }
         } catch (domainLookupError: any) {
