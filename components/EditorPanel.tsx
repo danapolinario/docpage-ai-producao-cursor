@@ -391,9 +391,23 @@ export const EditorPanel: React.FC<Props> = ({
               <div>
                  <h4 className="text-sm font-bold text-gray-700 mb-3">Estilo de Botões</h4>
                  <div className="flex gap-2">
-                   <button onClick={() => onUpdateDesign('borderRadius', 'none')} className={`flex-1 p-2 border text-xs bg-gray-100 ${design.borderRadius === 'none' ? 'border-blue-500 text-blue-700 font-bold' : ''}`}>Quadrado</button>
-                   <button onClick={() => onUpdateDesign('borderRadius', 'medium')} className={`flex-1 p-2 border text-xs bg-gray-100 rounded-lg ${design.borderRadius === 'medium' ? 'border-blue-500 text-blue-700 font-bold' : ''}`}>Suave</button>
-                   <button onClick={() => onUpdateDesign('borderRadius', 'full')} className={`flex-1 p-2 border text-xs bg-gray-100 rounded-full ${design.borderRadius === 'full' ? 'border-blue-500 text-blue-700 font-bold' : ''}`}>Redondo</button>
+                   {(['none', 'medium', 'full'] as const).map((value) => {
+                     const raw = design.borderRadius;
+                     const effective: 'none' | 'medium' | 'full' = (raw === 'none' || raw === 'full') ? raw : 'medium';
+                     const isSelected = effective === value;
+                     const label = value === 'none' ? 'Quadrado' : value === 'medium' ? 'Suave' : 'Redondo';
+                     const rounded = value === 'none' ? '' : value === 'medium' ? 'rounded-lg' : 'rounded-full';
+                     return (
+                       <button
+                         key={value}
+                         type="button"
+                         onClick={() => onUpdateDesign('borderRadius', value)}
+                         className={`flex-1 p-2 border-2 text-xs font-medium transition-colors ${rounded} ${isSelected ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-gray-100 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}`}
+                       >
+                         {label}
+                       </button>
+                     );
+                   })}
                  </div>
               </div>
            </div>

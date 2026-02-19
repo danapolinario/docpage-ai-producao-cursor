@@ -46,6 +46,11 @@ function extractSubdomain(host: string): string | null {
   return null;
 }
 
+/** Normaliza host para comparação: lowercase, sem porta, sem www. */
+function normalizeHostForDomainLookup(host: string): string {
+  return host.split(':')[0].toLowerCase().replace(/^www\./, '').trim();
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log('[API/[...PATH]] Handler chamado para:', req.url);
   
@@ -215,8 +220,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else {
           // Se não tem preview, verificar autenticação e permissões (apenas admin ou dono)
           console.log('[SUBDOMAIN DEBUG] Landing page não publicada sem preview, verificando autenticação...');
-          const cookies = req.headers.cookie || '';
-          const authHeader = req.headers.authorization || '';
+          const cookiesRaw = req.headers.cookie;
+          const authHeaderRaw = req.headers.authorization;
+          const cookies = (Array.isArray(cookiesRaw) ? cookiesRaw[0] : cookiesRaw) || '';
+          const authHeader = (Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw) || '';
           
           const authResult = await verifyAuthFromRequest(cookies, authHeader);
           
@@ -324,13 +331,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // IMPORTANTE: Se a rota for `/` (vazia) e o host for um subdomínio .docpage.com.br,
   // mas não foi detectado acima, pode ser um problema de header. Tentar novamente.
   if (!path || path === '' || path === '/') {
-    const hostname = host.split(':')[0].toLowerCase();
-    if (hostname.includes('.docpage.com.br') && !hostname.startsWith('www.') && !hostname.startsWith('docpage.')) {
-      const parts = hostname.split('.');
+    const retryHostname = host.split(':')[0].toLowerCase();
+    if (retryHostname.includes('.docpage.com.br') && !retryHostname.startsWith('www.') && !retryHostname.startsWith('docpage.')) {
+      const parts = retryHostname.split('.');
       if (parts.length >= 4) {
         const potentialSubdomain = parts[0];
         console.log('[SUBDOMAIN DEBUG] Tentando detectar subdomínio novamente para rota /:', {
-          hostname,
+          hostname: retryHostname,
           potentialSubdomain,
           parts
         });
@@ -361,6 +368,91 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         } catch (retryError) {
           console.error('[SUBDOMAIN DEBUG] Erro ao tentar detectar subdomínio novamente:', retryError);
+        }
+      }
+    }
+
+    // Lookup por domínio customizado (chosen_domain/custom_domain) quando host não é docpage.com.br
+    const requestHostname = host.split(':')[0].toLowerCase();
+    if (!requestHostname.includes('docpage.com.br')) {
+      const hostNormalized = normalizeHostForDomainLookup(host);
+      const hostWithWww = `www.${hostNormalized}`;
+      if (hostNormalized && hostNormalized.length > 2) {
+        try {
+          const queryClient = supabaseAdmin || supabase;
+          const { data: pages, error: domainError } = await queryClient
+            .from('landing_pages')
+            .select('*')
+            .or(`chosen_domain.eq."${hostNormalized}",chosen_domain.eq."${hostWithWww}",custom_domain.eq."${hostNormalized}",custom_domain.eq."${hostWithWww}"`)
+            .limit(2);
+
+          if (!domainError && pages && pages.length > 0) {
+            const landingPage = pages[0];
+            console.log('[CUSTOM DOMAIN] Landing page encontrada:', { hostNormalized, landingPageId: landingPage.id, subdomain: landingPage.subdomain });
+
+            const isPublished = landingPage.status === 'published';
+            if (!isPublished && !hasPreview) {
+              const cookiesRaw = req.headers.cookie;
+              const authHeaderRaw = req.headers.authorization;
+              const cookies = (Array.isArray(cookiesRaw) ? cookiesRaw[0] : cookiesRaw) || '';
+              const authHeader = (Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw) || '';
+              const authResult = await verifyAuthFromRequest(cookies, authHeader);
+              const isOwner = authResult.isAuthenticated && authResult.userId === landingPage.user_id;
+              const isAdmin = authResult.isAdmin;
+              if (!isOwner && !isAdmin) {
+                return res.status(403).send(`
+                  <!DOCTYPE html>
+                  <html lang="pt-BR">
+                  <head><meta charset="UTF-8" /><title>Acesso Negado</title></head>
+                  <body><h1>Esta landing page ainda não foi publicada</h1></body>
+                  </html>
+                `);
+              }
+            }
+
+            // Tentar HTML estático pelo subdomain
+            try {
+              const HTML_FOLDER = 'html';
+              const filePath = `${HTML_FOLDER}/${landingPage.subdomain}.html`;
+              const { data: { publicUrl } } = supabase.storage.from('landing-pages').getPublicUrl(filePath);
+              const fetchResponse = await fetch(publicUrl, { method: 'HEAD', headers: { 'Cache-Control': 'no-cache' } });
+              if (fetchResponse.ok) {
+                const fullResponse = await fetch(publicUrl, { headers: { 'Cache-Control': 'no-cache' } });
+                if (fullResponse.ok) {
+                  const htmlText = await fullResponse.text();
+                  const hasOldIndexTsx = htmlText.includes('src="/index.tsx"') || htmlText.includes("src='/index.tsx'");
+                  const hasCompiledAssets = htmlText.includes('/assets/') && (htmlText.includes('.js"') || htmlText.includes('.js\''));
+                  if (!hasOldIndexTsx || hasCompiledAssets) {
+                    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+                    res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, max-age=3600, s-maxage=3600');
+                    res.setHeader('Vary', 'Host');
+                    res.setHeader('X-Served-From', 'static-html');
+                    return res.send(htmlText);
+                  }
+                }
+              }
+            } catch (staticErr) {
+              console.log('[CUSTOM DOMAIN] HTML estático não disponível, usando SSR');
+            }
+
+            const mockReq = {
+              protocol: 'https',
+              get: (h: string) => {
+                if (h === 'host') return host;
+                const val = req.headers[h.toLowerCase()];
+                return (Array.isArray(val) ? val[0] : val) || '';
+              },
+              headers: req.headers as Record<string, string>,
+            };
+            const htmlContent = await renderLandingPage(landingPage, mockReq);
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, max-age=3600, s-maxage=3600');
+            res.setHeader('Vary', 'Host');
+            res.setHeader('X-Served-From', hasPreview ? 'dynamic-ssr-preview' : 'dynamic-ssr');
+            return res.status(200).send(htmlContent);
+          }
+        } catch (domainLookupError: any) {
+          console.error('[CUSTOM DOMAIN] Erro no lookup:', domainLookupError?.message);
         }
       }
     }

@@ -10,6 +10,7 @@ import {
 } from '../services/admin';
 import { signOut } from '../services/auth';
 import { syncSubscriptionsWithStripe } from '../services/subscriptions';
+import { DomainSetupInstructions } from './DomainSetupInstructions';
 
 interface Props {
   onLogout: () => void;
@@ -43,6 +44,7 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
   const [updatingAutoPublish, setUpdatingAutoPublish] = useState(false);
   const [syncingStripe, setSyncingStripe] = useState(false);
   const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
+  const [showDomainSetupModal, setShowDomainSetupModal] = useState(false);
 
   const loadData = async (syncStripe = false) => {
     try {
@@ -291,6 +293,27 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
               <span>{error}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Guia de configuração de domínio */}
+        <div className="mb-6">
+          <button
+            onClick={() => setShowDomainSetupModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Como configurar domínio
+          </button>
+        </div>
+
+        {showDomainSetupModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+            <div className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              <DomainSetupInstructions onClose={() => setShowDomainSetupModal(false)} />
             </div>
           </div>
         )}

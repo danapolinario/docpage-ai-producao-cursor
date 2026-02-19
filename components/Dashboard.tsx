@@ -112,7 +112,9 @@ export const Dashboard: React.FC<Props> = ({
   const [localDesign, setLocalDesign] = useState<DesignSettings>(design);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [localVisibility, setLocalVisibility] = useState<SectionVisibility>(visibility);
+  const [localBriefing, setLocalBriefing] = useState<BriefingData>(briefing);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingBriefing, setIsSavingBriefing] = useState(false);
   
   // Verificar se o usuário tem landing page mas não tem assinatura
   const hasLandingPageButNoSubscription = landingPageId && !subscription;
@@ -365,45 +367,69 @@ export const Dashboard: React.FC<Props> = ({
     </div>
   );
 
+  const handleSaveBriefing = async () => {
+    if (!landingPageId) return;
+    try {
+      setIsSavingBriefing(true);
+      await updateLandingPage(landingPageId, { briefing_data: localBriefing as any });
+      if (dashboardData) {
+        setDashboardData(prev => prev ? {
+          ...prev,
+          landingPage: { ...prev.landingPage, briefing_data: localBriefing }
+        } : prev);
+      }
+    } catch (err) {
+      console.error('Erro ao salvar Meus Dados:', err);
+    } finally {
+      setIsSavingBriefing(false);
+    }
+  };
+
+  const handleBriefingChange = (key: keyof BriefingData, value: string | string[]) => {
+    setLocalBriefing(prev => ({ ...prev, [key]: value }));
+  };
+
   const SettingsView = () => (
     <div className="max-w-2xl bg-white rounded-xl shadow-sm border border-gray-100 p-8">
        <h2 className="text-2xl font-bold text-gray-800 mb-6">Meus Dados</h2>
        <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
-               <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 font-medium">{briefing.name}</div>
+               <input type="text" value={localBriefing.name} onChange={(e) => handleBriefingChange('name', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Seu nome" />
              </div>
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">Especialidade</label>
-               <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-800">{briefing.specialty}</div>
+               <input type="text" value={localBriefing.specialty} onChange={(e) => handleBriefingChange('specialty', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ex: Cardiologia" />
              </div>
           </div>
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">CRM</label>
-               <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">{briefing.crm}</div>
+               <input type="text" value={localBriefing.crm} onChange={(e) => handleBriefingChange('crm', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Número CRM" />
              </div>
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">UF</label>
-               <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">{briefing.crmState}</div>
+               <input type="text" value={localBriefing.crmState} onChange={(e) => handleBriefingChange('crmState', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="UF" maxLength={2} />
              </div>
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">RQE</label>
-               <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">{briefing.rqe || '-'}</div>
+               <input type="text" value={localBriefing.rqe ?? ''} onChange={(e) => handleBriefingChange('rqe', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="RQE" />
              </div>
           </div>
           <div>
              <label className="block text-sm font-medium text-gray-700 mb-1">Email de Contato</label>
-             <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">{briefing.contactEmail}</div>
+             <input type="email" value={localBriefing.contactEmail ?? ''} onChange={(e) => handleBriefingChange('contactEmail', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="email@exemplo.com" />
           </div>
           <div>
              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone / WhatsApp</label>
-             <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">{briefing.contactPhone}</div>
+             <input type="tel" value={localBriefing.contactPhone ?? ''} onChange={(e) => handleBriefingChange('contactPhone', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="(00) 00000-0000" />
           </div>
        </div>
        <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end">
-          <button className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors">Salvar Alterações</button>
+          <button type="button" onClick={handleSaveBriefing} disabled={isSavingBriefing} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+            {isSavingBriefing ? 'Salvando...' : 'Salvar Alterações'}
+          </button>
        </div>
     </div>
   );
@@ -510,26 +536,31 @@ export const Dashboard: React.FC<Props> = ({
   };
 
   const handleUpdateDesign = async (key: keyof DesignSettings, value: any) => {
-    setLocalDesign(prev => ({ ...prev, [key]: value }));
-    
-    // Salvar automaticamente no banco
+    const updatedDesign = { ...localDesign, [key]: value };
+    setLocalDesign(updatedDesign);
+    // Atualização otimista: refletir no dashboardData para a UI atualizar na hora
+    if (dashboardData) {
+      setDashboardData(prev => prev ? {
+        ...prev,
+        landingPage: { ...prev.landingPage, design_settings: updatedDesign }
+      } : prev);
+    }
     if (landingPageId) {
       try {
         setIsSaving(true);
-        const updatedDesign = { ...localDesign, [key]: value };
         await updateLandingPage(landingPageId, {
           design_settings: updatedDesign as any,
         });
-        
-        // Atualizar dashboardData
+      } catch (err) {
+        console.error('Erro ao salvar design:', err);
+        // Reverter em caso de erro
+        setLocalDesign(localDesign);
         if (dashboardData) {
           setDashboardData(prev => prev ? {
             ...prev,
-            landingPage: { ...prev.landingPage, design_settings: updatedDesign }
+            landingPage: { ...prev.landingPage, design_settings: localDesign }
           } : prev);
         }
-      } catch (err) {
-        console.error('Erro ao salvar design:', err);
       } finally {
         setIsSaving(false);
       }
@@ -565,21 +596,27 @@ export const Dashboard: React.FC<Props> = ({
 
   const handleUpdateLayout = async (variant: LayoutVariant) => {
     if (landingPageId) {
+      // Atualizar UI imediatamente (otimistic update)
+      if (dashboardData) {
+        setDashboardData(prev => prev ? {
+          ...prev,
+          landingPage: { ...prev.landingPage, layout_variant: variant }
+        } : prev);
+      }
       try {
         setIsSaving(true);
         await updateLandingPage(landingPageId, {
           layout_variant: variant,
         });
-        
-        // Atualizar dashboardData
+      } catch (err) {
+        console.error('Erro ao salvar layout:', err);
+        // Reverter em caso de erro
         if (dashboardData) {
           setDashboardData(prev => prev ? {
             ...prev,
-            landingPage: { ...prev.landingPage, layout_variant: variant }
+            landingPage: { ...prev.landingPage, layout_variant: prev.landingPage.layout_variant }
           } : prev);
         }
-      } catch (err) {
-        console.error('Erro ao salvar layout:', err);
       } finally {
         setIsSaving(false);
       }
@@ -592,9 +629,8 @@ export const Dashboard: React.FC<Props> = ({
   };
 
   const handleThemeSelect = async (theme: ThemeType) => {
-    // Aplicar tema ao design
+    // Aplicar tema ao design em uma única atualização (evita múltiplos cliques)
     let newDesign: DesignSettings = { ...localDesign };
-    
     if (theme === ThemeType.CLINICAL) {
       newDesign = { ...newDesign, colorPalette: 'blue', secondaryColor: 'teal', fontPairing: 'sans', borderRadius: 'medium', photoStyle: 'minimal' };
     } else if (theme === ThemeType.CARING) {
@@ -602,26 +638,41 @@ export const Dashboard: React.FC<Props> = ({
     } else if (theme === ThemeType.MODERN) {
       newDesign = { ...newDesign, colorPalette: 'slate', secondaryColor: 'purple', fontPairing: 'sans', borderRadius: 'none', photoStyle: 'glass' };
     }
-    
-    await handleUpdateDesign('colorPalette', newDesign.colorPalette);
-    await handleUpdateDesign('secondaryColor', newDesign.secondaryColor);
-    await handleUpdateDesign('fontPairing', newDesign.fontPairing);
-    await handleUpdateDesign('borderRadius', newDesign.borderRadius);
-    await handleUpdateDesign('photoStyle', newDesign.photoStyle);
+
+    setLocalDesign(newDesign);
+    if (dashboardData) {
+      setDashboardData(prev => prev ? { ...prev, landingPage: { ...prev.landingPage, design_settings: newDesign } } : prev);
+    }
+    if (landingPageId) {
+      try {
+        setIsSaving(true);
+        await updateLandingPage(landingPageId, { design_settings: newDesign as any });
+      } catch (err) {
+        console.error('Erro ao salvar tema:', err);
+      } finally {
+        setIsSaving(false);
+      }
+    }
   };
 
-  // Sincronizar estados locais quando dashboardData mudar
+  // Sincronizar estados locais quando dashboardData mudar (não sobrescrever durante edição)
   useEffect(() => {
-    if (dashboardData?.landingPage) {
+    if (dashboardData?.landingPage && !isEditing) {
       setLocalContent(dashboardData.landingPage.content_data || content);
       setLocalDesign(dashboardData.landingPage.design_settings || design);
       setLocalVisibility(dashboardData.landingPage.section_visibility || visibility);
+      setLocalBriefing(dashboardData.landingPage.briefing_data || briefing);
       // Sincronizar testimonials também
       if (dashboardData.landingPage.content_data?.testimonials) {
         setTestimonials(dashboardData.landingPage.content_data.testimonials);
       }
     }
-  }, [dashboardData]);
+  }, [dashboardData, isEditing]);
+
+  // Layout efetivo: prioriza dashboardData para refletir alterações imediatas no modo edição
+  const effectiveLayoutVariant: LayoutVariant = (dashboardData?.landingPage?.layout_variant != null)
+    ? (Number(dashboardData.landingPage.layout_variant) as LayoutVariant)
+    : layoutVariant;
 
   const TestimonialsView = () => (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
@@ -1104,7 +1155,7 @@ export const Dashboard: React.FC<Props> = ({
                   content={localContent}
                   design={localDesign}
                   visibility={localVisibility}
-                  layoutVariant={layoutVariant}
+                  layoutVariant={effectiveLayoutVariant}
                   onUpdateContent={handleUpdateContent}
                   onUpdateDesign={handleUpdateDesign}
                   onUpdateLayout={handleUpdateLayout}
@@ -1137,7 +1188,7 @@ export const Dashboard: React.FC<Props> = ({
                       photoUrl={photoUrl}
                       aboutPhotoUrl={aboutPhotoUrl}
                       briefing={briefing}
-                      layoutVariant={layoutVariant}
+                      layoutVariant={effectiveLayoutVariant}
                     />
                   </div>
                 </div>
