@@ -331,18 +331,19 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
       link: "https://draterezawagner.com.br"
     },
     {
-      author: "Dra. Camila Torres",
-      specialty: "Dermatologia",
-      theme: "Estilo Moderno",
-      image: "https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=800&q=80",
-      tagColor: "bg-purple-100 text-purple-700"
+      author: "Dra. Stella Maris Osmo Mardegan",
+      specialty: "Pediatria",
+      theme: "Estilo Acolhedor",
+      image: "/dra-stella.jpg",
+      tagColor: "bg-green-100 text-green-700",
+      link: "https://draterezawagner.com.br"
     },
     {
       author: "Instituto Cuidar",
       specialty: "Pediatria",
-      theme: "Estilo Acolhedor",
+      theme: "Estilo Moderno",
       image: "https://images.unsplash.com/photo-1504813184591-01572f98c85f?auto=format&fit=crop&w=800&q=80",
-      tagColor: "bg-green-100 text-green-700"
+      tagColor: "bg-purple-100 text-purple-700"
     }
   ];
 
