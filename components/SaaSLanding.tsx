@@ -336,7 +336,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
       theme: "Estilo Acolhedor",
       image: "/dra-stella.jpg",
       tagColor: "bg-green-100 text-green-700",
-      link: "https://draterezawagner.com.br"
+      link: "https://www.drastellamardegan.com.br/"
     },
     {
       author: "Instituto Cuidar",
