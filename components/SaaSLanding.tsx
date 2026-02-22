@@ -340,7 +340,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
     },
     {
       author: "Instituto Cuidar",
-      specialty: "Pediatria",
+      specialty: "Clinica Médica",
       theme: "Estilo Moderno",
       image: "https://images.unsplash.com/photo-1504813184591-01572f98c85f?auto=format&fit=crop&w=800&q=80",
       tagColor: "bg-purple-100 text-purple-700"
