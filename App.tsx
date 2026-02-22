@@ -366,7 +366,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   useEffect(() => {
     initGoogleAnalytics();
     // Track página inicial
-    trackGAPageView('/', 'DocPage AI - Landing Pages para Médicos');
+    trackGAPageView('/', 'DocPage AI - Criação de Sites Profissionais para Médicos em Minutos');
   }, []);
 
   // Verificar autenticação ao carregar (sem bloquear o acesso)

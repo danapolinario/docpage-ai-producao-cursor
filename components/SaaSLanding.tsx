@@ -323,11 +323,12 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
 
   const examples = [
     {
-      author: "Dra. Ricardo Mendes",
-      specialty: "Otorrinolaringologia",
-      theme: "Estilo Clínico",
-      image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80",
-      tagColor: "bg-blue-100 text-blue-700"
+      author: "Dra. Tereza Wagner",
+      specialty: "Nefrologista",
+      theme: "Plano Autoridade",
+      image: "/dra-tereza-wagner-site.jpg",
+      tagColor: "bg-blue-100 text-blue-700",
+      link: "https://draterezawagner.com.br"
     },
     {
       author: "Dra. Camila Torres",
@@ -788,7 +789,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
             </div>
             <div className="inline-block px-4 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider flex items-center gap-1">
               <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
-              Adequado ao CFM 2.336/23
+              Adequado ao CFM
             </div>
           </div>
           
@@ -1074,6 +1075,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
                   </div>
                 </div>
                 <div className="relative h-64 overflow-hidden">
+                   <a href={ex.link} target="blank">
                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10 opacity-60"></div>
                    <img 
                      src={ex.image} 
@@ -1082,7 +1084,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
                      width={800}
                      height={400}
                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-                   />
+                   /></a>
                    <div className="absolute bottom-0 left-0 p-6 z-20 text-white">
                       <p className="text-xs font-bold opacity-80 uppercase tracking-widest mb-1">{ex.specialty}</p>
                       <h3 className="text-xl font-bold">{ex.author}</h3>
