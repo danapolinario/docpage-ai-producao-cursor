@@ -595,8 +595,7 @@ export const CheckoutFlow: React.FC<Props> = ({
         landingPageData: landingPageDataPayload,
       });
 
-      // Track início do checkout
-      trackCheckoutStep(3, 'Redirecionando para Stripe Checkout');
+      trackCheckoutStep(4, 'Redirecionando para Stripe Checkout');
       
       // Salvar estado no localStorage antes de redirecionar para o Stripe
       // Isso permite restaurar o estado quando o usuário voltar com canceled=true

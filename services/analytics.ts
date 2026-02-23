@@ -9,6 +9,13 @@
  */
 
 import { supabase } from '../lib/supabase';
+import {
+  trackLandingPageView as trackGAPageView,
+  trackLandingPageClick as trackGAClick,
+  trackWhatsAppClick as trackGAWhatsApp,
+  trackPhoneClick as trackGAPhone,
+  trackEmailClick as trackGAEmail,
+} from './google-analytics';
 
 export interface AnalyticsEvent {
   id?: string;

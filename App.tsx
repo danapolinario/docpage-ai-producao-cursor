@@ -16,7 +16,6 @@ import { generateLandingPageContent, enhancePhoto, generateOfficePhoto, refineLa
 import { isAuthenticated, getCurrentUser, onAuthStateChange, signOut } from './services/auth';
 import { createLandingPage, updateLandingPage, publishLandingPage, generateSubdomain, getMyLandingPages } from './services/landing-pages';
 import {
-  initGoogleAnalytics,
   trackBriefingStart,
   trackBriefingComplete,
   trackStyleSelect,
@@ -31,6 +30,8 @@ import {
   trackPaymentComplete,
   trackDashboardView,
   trackPageView as trackGAPageView,
+  trackEvent,
+  trackError,
 } from './services/google-analytics';
 
 const INITIAL_DESIGN: DesignSettings = {
@@ -188,8 +189,8 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     const canceled = searchParams.get('canceled') === 'true';
     const fullUrl = window.location.href;
     
-    // Verificar se voltou do Stripe (canceled=true) em qualquer rota
     if (canceled) {
+      trackEvent('checkout_canceled', { event_category: 'conversion' });
       setIsRestoringState(true);
       
       // Se não está na rota /checkout, redirecionar para lá
@@ -362,11 +363,8 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     };
   }, [checkCheckoutRoute]);
 
-  // Inicializar Google Analytics
   useEffect(() => {
-    initGoogleAnalytics();
-    // Track página inicial
-    trackGAPageView('/', 'DocPage AI - Criação de Sites Profissionais para Médicos em Minutos');
+    trackGAPageView('/', 'DocPage AI - Landing Pages para Médicos');
   }, []);
 
   // Verificar autenticação ao carregar (sem bloquear o acesso)
@@ -539,6 +537,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   };
 
   const handleUpdateLayout = (variant: LayoutVariant) => {
+    trackEvent('layout_select', { event_category: 'user_journey', variant });
     setState(prev => ({ ...prev, layoutVariant: variant }));
   };
 
@@ -560,21 +559,20 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
         generateOfficePhoto(originalUrl)  // Foto ambientada no consultório
       ]);
 
-      // Fotos ficam em base64 temporariamente até o pagamento
       setState(prev => ({ 
         ...prev, 
-        photoUrl: enhancedUrl,  // Foto profissional de perfil (substitui a original no preview)
-        aboutPhotoUrl: officeUrl,  // Foto do consultório (exibida abaixo)
+        photoUrl: enhancedUrl,
+        aboutPhotoUrl: officeUrl,
         isPhotoAIEnhanced: true, 
         isLoading: false 
       }));
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      trackError('photo_enhance', e?.message || 'Falha ao melhorar foto');
       setState(prev => ({ ...prev, isLoading: false, error: 'Falha ao melhorar foto. Tente novamente.' }));
     }
   };
 
-  // Handler para melhorar apenas a foto de perfil
   const handleEnhanceProfilePhoto = async () => {
     if (!state.photoUrl) return;
     
@@ -588,8 +586,9 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
         isPhotoAIEnhanced: true,
         isLoading: false 
       }));
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      trackError('photo_enhance_profile', e?.message || 'Falha ao melhorar foto de perfil');
       setState(prev => ({ ...prev, isLoading: false, error: 'Falha ao melhorar foto de perfil. Tente novamente.' }));
     }
   };
@@ -648,14 +647,20 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
         }
       }
 
+      trackEvent('content_generated', {
+        event_category: 'user_journey',
+        specialty: state.briefing.specialty,
+      });
+
       setState(prev => ({ 
         ...prev, 
         generatedContent: sanitizedContent,
         aboutPhotoUrl: officePhotoUrl || prev.aboutPhotoUrl,
         isLoading: false 
       }));
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      trackError('content_generation', e?.message || 'Erro desconhecido');
       setState(prev => ({ ...prev, isLoading: false, error: 'Erro ao gerar conteúdo. Verifique sua conexão.' }));
     }
   };
@@ -760,8 +765,9 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
         return newState;
       });
 
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      trackError('ai_refine', e?.message || 'Falha ao refinar conteúdo');
       setState(prev => ({ ...prev, isLoading: false, error: 'Não foi possível aplicar as alterações.' }));
     }
   };
@@ -792,6 +798,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   const handleLogout = async () => {
     try {
       await signOut();
+      trackEvent('logout', { event_category: 'auth' });
       setIsAuthenticatedUser(false);
       setState(INITIAL_STATE);
       setCurrentLandingPageId(null);
@@ -800,11 +807,11 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     }
   };
 
-  // Handler para sucesso de autenticação
   const handleAuthSuccess = async () => {
     setIsAuthenticatedUser(true);
     setShowAuthModal(false);
     setState(prev => ({ ...prev, error: null }));
+    trackEvent('login', { event_category: 'auth', method: 'otp' });
 
     // Aguardar mais tempo para garantir que a sessão está sincronizada
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1197,7 +1204,10 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
             <BriefingForm 
               data={state.briefing} 
               onChange={updateBriefing} 
-              onNext={() => setState(prev => ({ ...prev, step: 1 }))}
+              onNext={() => {
+                trackBriefingComplete({ specialty: state.briefing.specialty, name: state.briefing.name });
+                setState(prev => ({ ...prev, step: 1 }));
+              }}
               isDevMode={isDevMode}
             />
           </div>

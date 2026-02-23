@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { trackPaymentComplete, trackPageView as trackGAPageView } from '../services/google-analytics';
 
 interface StripeSuccessProps {
   onSuccess?: (data: { landingPageId: string; landingPageUrl: string; domain: string }) => void;
@@ -19,6 +20,11 @@ export const StripeSuccess: React.FC<StripeSuccessProps> = ({ onSuccess }) => {
   } | null>(null);
 
   const sessionId = searchParams.get('session_id');
+  const trackedRef = useRef(false);
+
+  useEffect(() => {
+    trackGAPageView('/checkout/success', 'Pagamento Confirmado');
+  }, []);
 
   useEffect(() => {
     if (!sessionId) {
@@ -27,7 +33,6 @@ export const StripeSuccess: React.FC<StripeSuccessProps> = ({ onSuccess }) => {
       return;
     }
 
-    // Aguardar alguns segundos para o webhook processar e fazer polling
     const checkSubscription = async () => {
       try {
         // Buscar usuário autenticado
@@ -111,6 +116,23 @@ export const StripeSuccess: React.FC<StripeSuccessProps> = ({ onSuccess }) => {
           landingPageUrl,
           domain,
         });
+
+        if (!trackedRef.current) {
+          trackedRef.current = true;
+          try {
+            const { data: checkout } = await supabase
+              .from('pending_checkouts')
+              .select('plan_name, plan_price')
+              .eq('stripe_session_id', sessionId)
+              .maybeSingle();
+
+            const planName = checkout?.plan_name || 'Desconhecido';
+            const planPrice = checkout?.plan_price ? Number(checkout.plan_price) : undefined;
+            trackPaymentComplete(planName, planPrice);
+          } catch {
+            trackPaymentComplete('Desconhecido');
+          }
+        }
 
         setIsLoading(false);
 
