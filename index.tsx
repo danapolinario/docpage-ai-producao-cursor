@@ -10,6 +10,7 @@ import { DashboardPage } from './components/DashboardPage';
 import { StripeSuccess } from './components/StripeSuccess';
 import { TermsOfService } from './components/TermsOfService';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
+import { GuiaSucessoPage } from './components/GuiaSucessoPage';
 import { useSearchParams } from 'react-router-dom';
 
 // Função para extrair subdomínio do hostname
@@ -86,6 +87,8 @@ root.render(
           <Route path="/checkout" element={<CheckoutRoute />} />
           <Route path="/termos-de-uso" element={<TermsOfService />} />
           <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
+          <Route path="/guiadesucesso" element={<GuiaSucessoPage />} />
+          <Route path="/marketing-medico-primeiros-passos" element={<GuiaSucessoPage />} />
           <Route path="/dev" element={<DevRoute />} />
           <Route path="/:subdomain" element={<LandingPageViewer />} />
           <Route path="/" element={<RootRoute />} />
