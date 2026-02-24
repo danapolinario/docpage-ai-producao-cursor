@@ -177,8 +177,8 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [hasAppliedRecommendedTheme, setHasAppliedRecommendedTheme] = useState(false);
 
-  // Flag para indicar que está restaurando estado (evita redirecionamento prematuro)
   const [isRestoringState, setIsRestoringState] = React.useState(false);
+  const stepScrollInitialMount = React.useRef(true);
 
   // Restaurar estado do localStorage quando voltar do Stripe com canceled=true
   useEffect(() => {
@@ -395,16 +395,16 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     };
   }, []);
 
-  // Scroll para o topo no mobile quando o step muda
+  // Scroll para o topo no mobile quando o step muda (não no mount inicial, para não disparar evento scroll do GA4)
   useEffect(() => {
-    // Verificar se está no mobile (largura < 768px)
+    if (stepScrollInitialMount.current) {
+      stepScrollInitialMount.current = false;
+      return;
+    }
     const isMobile = window.innerWidth < 768;
-    
     if (isMobile && state.step !== undefined) {
-      // Pequeno delay para garantir que o DOM foi atualizado
       setTimeout(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        // Também tentar scroll no elemento main se existir
         const mainElement = document.querySelector('main');
         if (mainElement) {
           mainElement.scrollTo({ top: 0, behavior: 'smooth' });
@@ -413,9 +413,9 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     }
   }, [state.step]);
 
-  // Track step changes
+  // Track step changes (só disparar briefing_start quando o formulário de briefing estiver visível, não na homepage)
   useEffect(() => {
-    if (state.step === 0) {
+    if (!showSaaSIntro && state.step === 0) {
       trackBriefingStart();
     } else if (state.step === 1) {
       trackGAPageView('/step/content', 'Configuração de Conteúdo');
@@ -438,7 +438,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
         }
       }, 300);
     }
-  }, [state.step]);
+  }, [state.step, showSaaSIntro]);
 
   // Salvamento automático removido - landing page só será salva após assinatura e pagamento
 
