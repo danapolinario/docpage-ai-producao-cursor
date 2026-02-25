@@ -1,16 +1,16 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useLocation } from 'react-router-dom';
-import { BriefingForm } from './components/BriefingForm';
-import { ContentConfig } from './components/ContentConfig';
-import { PhotoUploader } from './components/PhotoUploader';
-import { VisualConfig } from './components/VisualConfig';
-import { Preview } from './components/Preview';
-import { EditorPanel } from './components/EditorPanel';
-import { PricingPage } from './components/PricingPage';
 import { SaaSLanding } from './components/SaaSLanding';
 import { Auth } from './components/Auth';
 import { Confetti } from './components/common/Confetti';
+
+const BriefingForm = lazy(() => import('./components/BriefingForm').then(m => ({ default: m.BriefingForm })));
+const ContentConfig = lazy(() => import('./components/ContentConfig').then(m => ({ default: m.ContentConfig })));
+const PhotoUploader = lazy(() => import('./components/PhotoUploader').then(m => ({ default: m.PhotoUploader })));
+const VisualConfig = lazy(() => import('./components/VisualConfig').then(m => ({ default: m.VisualConfig })));
+const Preview = lazy(() => import('./components/Preview').then(m => ({ default: m.Preview })));
+const EditorPanel = lazy(() => import('./components/EditorPanel').then(m => ({ default: m.EditorPanel })));
+const PricingPage = lazy(() => import('./components/PricingPage').then(m => ({ default: m.PricingPage })));
 import { AppState, BriefingData, ThemeType, DesignSettings, SectionVisibility, LandingPageContent, LayoutVariant } from './types';
 import { generateLandingPageContent, enhancePhoto, generateOfficePhoto, refineLandingPage, sanitizeContent } from './services/gemini';
 import { isAuthenticated, getCurrentUser, onAuthStateChange, signOut } from './services/auth';
@@ -987,18 +987,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     );
   };
 
-  // Mostrar loading apenas brevemente enquanto verifica autenticação
-  if (checkingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Não bloquear renderização na verificação de auth - conteúdo aparece imediatamente
   if (showSaaSIntro) {
     return (
       <>
@@ -1198,7 +1187,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
 
       {/* Main Content */}
       <main className={`flex-1 relative ${state.step >= 3 ? 'overflow-hidden flex flex-col bg-gray-100' : 'overflow-y-auto'}`}>
-        
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
         {state.step === 0 && (
           <div className="max-w-7xl mx-auto px-4 py-8 w-full">
             <BriefingForm 
@@ -1397,6 +1386,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
             />
           </div>
         )}
+        </Suspense>
       </main>
 
       {/* Loading Overlay */}

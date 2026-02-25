@@ -1,17 +1,23 @@
-import React from 'react';
+import '@/index.css';
+import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
-import { initGoogleAnalytics } from './services/google-analytics';
 import App from './App';
-import { AdminPage } from './components/AdminPage';
-import { LandingPageViewer } from './components/LandingPageViewer';
-import { DashboardPage } from './components/DashboardPage';
-import { StripeSuccess } from './components/StripeSuccess';
-import { TermsOfService } from './components/TermsOfService';
-import { PrivacyPolicy } from './components/PrivacyPolicy';
-import { GuiaSucessoPage } from './components/GuiaSucessoPage';
-import { useSearchParams } from 'react-router-dom';
+
+const AdminPage = lazy(() => import('./components/AdminPage').then(m => ({ default: m.AdminPage })));
+const LandingPageViewer = lazy(() => import('./components/LandingPageViewer').then(m => ({ default: m.LandingPageViewer })));
+const DashboardPage = lazy(() => import('./components/DashboardPage').then(m => ({ default: m.DashboardPage })));
+const StripeSuccess = lazy(() => import('./components/StripeSuccess'));
+const TermsOfService = lazy(() => import('./components/TermsOfService').then(m => ({ default: m.TermsOfService })));
+const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicy })));
+const GuiaSucessoPage = lazy(() => import('./components/GuiaSucessoPage').then(m => ({ default: m.GuiaSucessoPage })));
+
+const PageFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 // Função para extrair subdomínio do hostname
 function extractSubdomainFromHost(): string | null {
@@ -67,9 +73,6 @@ const CheckoutRoute: React.FC = () => {
   return <App />;
 };
 
-// Inicializar Google Analytics
-initGoogleAnalytics();
-
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
@@ -80,19 +83,21 @@ root.render(
   <React.StrictMode>
     <HelmetProvider>
       <BrowserRouter>
-        <Routes>
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/checkout/success" element={<StripeSuccess />} />
-          <Route path="/checkout" element={<CheckoutRoute />} />
-          <Route path="/termos-de-uso" element={<TermsOfService />} />
-          <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
-          <Route path="/guiadesucesso" element={<GuiaSucessoPage />} />
-          <Route path="/marketing-medico-primeiros-passos" element={<GuiaSucessoPage />} />
-          <Route path="/dev" element={<DevRoute />} />
-          <Route path="/:subdomain" element={<LandingPageViewer />} />
-          <Route path="/" element={<RootRoute />} />
-        </Routes>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/checkout/success" element={<StripeSuccess />} />
+            <Route path="/checkout" element={<CheckoutRoute />} />
+            <Route path="/termos-de-uso" element={<TermsOfService />} />
+            <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
+            <Route path="/guiadesucesso" element={<GuiaSucessoPage />} />
+            <Route path="/marketing-medico-primeiros-passos" element={<GuiaSucessoPage />} />
+            <Route path="/dev" element={<DevRoute />} />
+            <Route path="/:subdomain" element={<LandingPageViewer />} />
+            <Route path="/" element={<RootRoute />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </HelmetProvider>
   </React.StrictMode>

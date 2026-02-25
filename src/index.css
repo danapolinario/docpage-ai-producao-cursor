@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.preview-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.preview-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.preview-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.1);
+  border-radius: 10px;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+.animate-slide-down {
+  animation: slideDown 0.3s ease-out;
+}
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+.animate-slide-up {
+  animation: slideUp 0.5s ease-out forwards;
+}
+.animate-auto-scroll {
+  animation: autoScroll 15s ease-in-out infinite alternate;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes autoScroll {
+  0% { transform: translateY(0); }
+  20% { transform: translateY(0); }
+  100% { transform: translateY(calc(-100% + 400px)); }
+}
+@keyframes scrollX {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Feature Box Animations */
+@keyframes typeLine {
+  0% { width: 0; opacity: 0.5; }
+  50% { width: 80%; opacity: 1; }
+  100% { width: 80%; opacity: 1; }
+}
+@keyframes scanMove {
+  0% { top: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+@keyframes floatUI {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes pulseScale {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+@keyframes blob {
+  0% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  50% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+  100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+}
+
+.anim-type-1 { animation: typeLine 2s ease-out infinite; }
+.anim-type-2 { animation: typeLine 2s ease-out 0.5s infinite; }
+.anim-type-3 { animation: typeLine 2s ease-out 1s infinite; }
+
+.anim-scan { animation: scanMove 3s linear infinite; }
+
+.anim-float-1 { animation: floatUI 4s ease-in-out infinite; }
+.anim-float-2 { animation: floatUI 5s ease-in-out 1s infinite; }
+.anim-float-3 { animation: floatUI 3s ease-in-out 0.5s infinite; }
