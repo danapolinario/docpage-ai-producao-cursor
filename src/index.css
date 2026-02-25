@@ -92,3 +92,41 @@ body {
 .anim-float-1 { animation: floatUI 4s ease-in-out infinite; }
 .anim-float-2 { animation: floatUI 5s ease-in-out 1s infinite; }
 .anim-float-3 { animation: floatUI 3s ease-in-out 0.5s infinite; }
+
+/* Mobile: reduzir custo de backdrop-blur e blur decorativo em GPUs limitadas */
+@media (max-width: 768px) {
+  [class*="backdrop-blur"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .blur-3xl { filter: blur(24px); }
+  .blur-xl { filter: blur(16px); }
+  .blur-2xl { filter: blur(20px); }
+  [class*="blur-["] { filter: blur(40px); }
+}
+
+/* content-visibility: reduzir paint/layout de seções abaixo da dobra */
+#how-it-works,
+#examples,
+#pricing,
+#faq {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
+/* prefers-reduced-motion: desabilitar animações quando usuário prefere */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-up,
+  .animate-slide-down,
+  .animate-auto-scroll,
+  .anim-type-1,
+  .anim-type-2,
+  .anim-type-3,
+  .anim-scan,
+  .anim-float-1,
+  .anim-float-2,
+  .anim-float-3 {
+    animation: none !important;
+  }
+}

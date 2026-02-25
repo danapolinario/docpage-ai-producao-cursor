@@ -159,51 +159,47 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
 
   // --- Marquee Logic (Move on Scroll Only) ---
   useEffect(() => {
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
     let scrollTimeout: ReturnType<typeof setTimeout>;
     let lastScrollY = window.scrollY;
     let lastScrollTime = Date.now();
-    const baseDuration = 10; // Duração base em segundos (mais rápido = menor duração)
-    const minDuration = 10; // Duração mínima (velocidade máxima)
-    const maxDuration = 10; // Duração máxima (velocidade mínima/pausada)
+    let lastThrottleRun = 0;
+    const minDuration = 10;
+    const maxDuration = 10;
+    const throttleMs = typeof window !== 'undefined' && window.innerWidth < 768 ? 100 : 0;
 
-    // Initialize as paused
     if (marqueeRef.current) {
       marqueeRef.current.style.animationPlayState = 'paused';
       marqueeRef.current.style.animationDuration = `${maxDuration}s`;
     }
 
     const handleScroll = () => {
+      const now = Date.now();
+      if (throttleMs > 0 && now - lastThrottleRun < throttleMs) return;
+      lastThrottleRun = now;
+
       const currentScrollY = window.scrollY;
-      const currentTime = Date.now();
-      const timeDelta = currentTime - lastScrollTime;
+      const timeDelta = now - lastScrollTime;
       const scrollDelta = Math.abs(currentScrollY - lastScrollY);
-      
-      // Calcular velocidade do scroll (pixels por segundo)
       const scrollVelocity = timeDelta > 0 ? scrollDelta / (timeDelta / 1000) : 0;
-      
-      // Aumentar velocidade baseada na velocidade do scroll
-      // Scroll rápido = animação mais rápida (menor duração)
-      // Scroll lento = animação mais lenta (maior duração)
+
       if (marqueeRef.current && scrollVelocity > 0) {
-        // Normalizar velocidade (ajustar esses valores conforme necessário)
-        // Velocidade de 0-500px/s mapeia para duração de 20s a 5s
-        const normalizedVelocity = Math.min(scrollVelocity / 500, 1); // Limitar entre 0 e 1
+        const normalizedVelocity = Math.min(scrollVelocity / 500, 1);
         const newDuration = maxDuration - (normalizedVelocity * (maxDuration - minDuration));
-        
         marqueeRef.current.style.animationDuration = `${newDuration}s`;
         marqueeRef.current.style.animationPlayState = 'running';
       }
 
       lastScrollY = currentScrollY;
-      lastScrollTime = currentTime;
+      lastScrollTime = now;
 
       clearTimeout(scrollTimeout);
-      
-      // Pause animation after scrolling stops
       scrollTimeout = setTimeout(() => {
         if (marqueeRef.current) {
           marqueeRef.current.style.animationPlayState = 'paused';
-          marqueeRef.current.style.animationDuration = `${maxDuration}s`; // Reset para velocidade normal
+          marqueeRef.current.style.animationDuration = `${maxDuration}s`;
         }
       }, 150);
     };
@@ -232,6 +228,12 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
   ];
 
   useEffect(() => {
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      if (displayedSuffix !== suffixes[0]) setDisplayedSuffix(suffixes[0]);
+      return;
+    }
+
     const currentFullSuffix = suffixes[suffixIndex];
     
     const handleTyping = () => {
@@ -1080,6 +1082,10 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10 opacity-60"></div>
                    <img 
                      src={ex.image} 
+                     srcSet={ex.image.includes('unsplash') 
+                       ? `${ex.image.replace('w=800', 'w=400')} 400w, ${ex.image} 800w`
+                       : undefined}
+                     sizes="(max-width: 768px) 100vw, 33vw"
                      alt={`Site profissional criado com DocPage AI - ${ex.author}, ${ex.specialty}`} 
                      loading="lazy"
                      decoding="async"

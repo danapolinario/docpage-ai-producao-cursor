@@ -159,6 +159,11 @@
       window.gtag = gtag;
     </script>
 
+    <!-- Critical CSS: evita FOUC no hero antes do hydration -->
+    <style>
+      body{font-family:'Plus Jakarta Sans',sans-serif;margin:0;min-height:100vh;background:#fff}
+      #root{min-height:100vh;display:flex;flex-direction:column}
+    </style>
     <!-- Resource Hints for Performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -168,7 +173,7 @@
     <!-- Fontes: carregamento assíncrono para não bloquear FCP -->
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" as="style" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" media="(min-width: 769px)" />
     <noscript>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" />
     </noscript>
