@@ -28,6 +28,10 @@
       "destination": "/spa.html"
     },
     {
+      "source": "/checkout/success",
+      "destination": "/spa.html"
+    },
+    {
       "source": "/checkout",
       "destination": "/spa.html"
     },
