@@ -8,10 +8,12 @@
   "trailingSlash": false,
   "functions": {
     "api/index.ts": {
-      "includeFiles": "api/render.ts"
+      "includeFiles": "api/render.ts",
+      "maxDuration": 25
     },
     "api/[...path].ts": {
-      "includeFiles": "api/render.ts"
+      "includeFiles": "api/render.ts",
+      "maxDuration": 25
     }
   },
   "rewrites": [

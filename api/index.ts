@@ -149,65 +149,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Primeiro, verificar se existe HTML estático no Storage
+    let subdomainServedStatic = false;
     try {
       const HTML_FOLDER = 'html';
       const filePath = `${HTML_FOLDER}/${subdomain}.html`;
       
-      // Obter URL pública do arquivo
       const { data: { publicUrl } } = supabase.storage
         .from('landing-pages')
         .getPublicUrl(filePath);
       
-      console.log('[SSR] Verificando HTML estático em:', publicUrl);
+      console.log('[SSR] Buscando HTML estático em:', publicUrl);
       
-      // Tentar fazer fetch da URL pública (mais confiável que download)
-      const fetchResponse = await fetch(publicUrl, {
-        method: 'HEAD', // Usar HEAD primeiro para verificar se existe sem baixar
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
-      });
-      
-      console.log('[SSR] HEAD response status:', fetchResponse.status);
-      
-      if (fetchResponse.ok) {
-        // Arquivo existe, fazer fetch completo
-        console.log('[SSR] ✓ HTML estático encontrado, fazendo fetch completo');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      try {
         const fullResponse = await fetch(publicUrl, {
-          headers: {
-            'Cache-Control': 'no-cache'
-          }
+          headers: { 'Cache-Control': 'no-cache' },
+          signal: controller.signal,
         });
+        clearTimeout(timeout);
         
-          if (fullResponse.ok) {
+        if (fullResponse.ok) {
           const htmlText = await fullResponse.text();
           
-          console.log('[SSR] ✓ HTML estático baixado com sucesso, tamanho:', htmlText.length);
-          console.log('[SSR] Primeiros 200 caracteres:', htmlText.substring(0, 200));
+          console.log('[SSR] ✓ HTML estático baixado, tamanho:', htmlText.length);
           
-          // IMPORTANTE: Verificar se o HTML não é o index.html padrão do DocPage
-          // O HTML estático deve conter dados específicos do médico, não o HTML genérico
           const isDefaultIndex = htmlText.includes('DocPage AI - Crie Site Profissional') && 
-                                 !htmlText.includes('id="root"') && // O HTML estático deve ter id="root"
-                                 htmlText.length < 5000; // HTML estático deve ser maior que o index padrão
+                                 !htmlText.includes('id="root"') && 
+                                 htmlText.length < 5000;
           
-          // Verificar se o HTML estático contém referência a /index.tsx (antigo, precisa regenerar)
           const hasOldIndexTsx = htmlText.includes('src="/index.tsx"') || htmlText.includes("src='/index.tsx'");
           const hasCompiledAssets = htmlText.includes('/assets/') && (htmlText.includes('.js"') || htmlText.includes('.js\''));
           
           if (isDefaultIndex) {
-            console.error('[SSR] ⚠️ ATENÇÃO: HTML estático parece ser o index.html padrão!');
-            console.error('[SSR] Continuando com SSR dinâmico...');
-            // Não retornar, continuar com SSR dinâmico
+            console.error('[SSR] ⚠️ HTML estático parece ser o index.html padrão, usando SSR');
           } else if (hasOldIndexTsx && !hasCompiledAssets) {
-            console.warn('[SSR] ⚠️ ATENÇÃO: HTML estático contém referência antiga a /index.tsx!');
-            console.warn('[SSR] HTML estático precisa ser regenerado. Usando SSR dinâmico...');
-            // Não retornar, continuar com SSR dinâmico para gerar HTML correto
+            console.warn('[SSR] ⚠️ HTML estático antigo com /index.tsx, usando SSR');
           } else {
             console.log('[SSR] ✓ HTML estático validado, servindo...');
-            if (hasCompiledAssets) {
-              console.log('[SSR] ✓ HTML estático contém assets compilados corretos');
-            }
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
             res.setHeader('Vary', 'Host');
@@ -216,19 +195,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             res.setHeader('X-Subdomain', subdomain);
             res.setHeader('Link', `<https://${subdomain}.docpage.com.br>; rel="canonical"`);
             res.setHeader('X-Robots-Tag', 'index, follow');
-            
-            res.status(200).send(htmlText);
-            return;
+            subdomainServedStatic = true;
+            return res.status(200).send(htmlText);
           }
         } else {
-          console.log('[SSR] Erro ao fazer fetch completo do HTML estático:', fullResponse.status);
+          console.log('[SSR] Storage retornou status:', fullResponse.status);
         }
-      } else {
-        console.log('[SSR] HTML estático não encontrado (status:', fetchResponse.status, ')');
+      } catch (fetchErr: any) {
+        clearTimeout(timeout);
+        console.log('[SSR] Storage fetch erro:', fetchErr?.name === 'AbortError' ? 'timeout (8s)' : fetchErr?.message);
       }
     } catch (staticError: any) {
-      console.log('[SSR] Erro ao verificar HTML estático, fazendo SSR dinâmico:', staticError?.message);
-      console.error('[SSR] Stack:', staticError?.stack);
+      console.log('[SSR] Erro ao verificar HTML estático:', staticError?.message);
     }
 
     // Fallback: SSR dinâmico
@@ -381,10 +359,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const subdomainCanonicalDomain = landingPage.chosen_domain || landingPage.custom_domain || `${subdomain}.docpage.com.br`;
       const htmlContent = await renderLandingPage(landingPage, mockReq, { noIndex: subdomainHasCustomDomain });
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, max-age=3600, s-maxage=3600');
+      res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : (subdomainServedStatic === false ? 'public, s-maxage=0, max-age=0, must-revalidate' : 'public, max-age=3600, s-maxage=3600'));
       res.setHeader('Vary', 'Host');
       res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('X-Served-From', hasPreview ? 'dynamic-ssr-preview' : 'dynamic-ssr');
+      res.setHeader('X-Served-From', hasPreview ? 'dynamic-ssr-preview' : 'dynamic-ssr-fallback');
       res.setHeader('Link', `<https://${subdomainCanonicalDomain}>; rel="canonical"`);
       if (subdomainHasCustomDomain) {
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -440,19 +418,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           // Tentar HTML estático pelo subdomain
           const customDomainCanonical = landingPage.chosen_domain || landingPage.custom_domain;
+          let servedStaticHtml = false;
           try {
             const HTML_FOLDER = 'html';
             const filePath = `${HTML_FOLDER}/${landingPage.subdomain}.html`;
             const { data: { publicUrl } } = supabase.storage.from('landing-pages').getPublicUrl(filePath);
-            const fetchResponse = await fetch(publicUrl, { method: 'HEAD', headers: { 'Cache-Control': 'no-cache' } });
-            if (fetchResponse.ok) {
-              const fullResponse = await fetch(publicUrl, { headers: { 'Cache-Control': 'no-cache' } });
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
+            try {
+              const fullResponse = await fetch(publicUrl, {
+                headers: { 'Cache-Control': 'no-cache' },
+                signal: controller.signal,
+              });
+              clearTimeout(timeout);
               if (fullResponse.ok) {
                 let htmlText = await fullResponse.text();
                 const hasOldIndexTsx = htmlText.includes('src="/index.tsx"') || htmlText.includes("src='/index.tsx'");
                 const hasCompiledAssets = htmlText.includes('/assets/') && (htmlText.includes('.js"') || htmlText.includes('.js\''));
                 if (!hasOldIndexTsx || hasCompiledAssets) {
-                  // SEO: Substituir URLs de subdomínio pelo domínio customizado no HTML estático
                   if (customDomainCanonical) {
                     const subdomainUrl = `https://${landingPage.subdomain}.docpage.com.br`;
                     const customUrl = `https://${customDomainCanonical}`;
@@ -466,32 +449,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   res.setHeader('X-Served-From', 'custom-domain-static-html');
                   res.setHeader('Link', `<${canonicalUrl}>; rel="canonical"`);
                   res.setHeader('X-Robots-Tag', 'index, follow');
+                  servedStaticHtml = true;
                   return res.status(200).send(htmlText);
                 }
+              } else {
+                console.log('[CUSTOM DOMAIN] Storage fetch falhou:', fullResponse.status);
               }
+            } catch (fetchErr: any) {
+              clearTimeout(timeout);
+              console.log('[CUSTOM DOMAIN] Storage fetch erro:', fetchErr?.name === 'AbortError' ? 'timeout (8s)' : fetchErr?.message);
             }
-          } catch (staticErr) {
-            console.log('[CUSTOM DOMAIN] HTML estático não disponível, usando SSR');
+          } catch (staticErr: any) {
+            console.log('[CUSTOM DOMAIN] HTML estático não disponível:', staticErr?.message);
           }
 
-          const mockReq = {
-            protocol: 'https',
-            get: (h: string) => {
-              if (h === 'host') return hostForLookup;
-              const val = req.headers[h.toLowerCase()];
-              return (Array.isArray(val) ? val[0] : val) || '';
-            },
-            headers: req.headers as Record<string, string>,
-          };
-          const htmlContent = await renderLandingPage(landingPage, mockReq);
+          if (!servedStaticHtml) {
+            const mockReq = {
+              protocol: 'https',
+              get: (h: string) => {
+                if (h === 'host') return hostForLookup;
+                const val = req.headers[h.toLowerCase()];
+                return (Array.isArray(val) ? val[0] : val) || '';
+              },
+              headers: req.headers as Record<string, string>,
+            };
+            const htmlContent = await renderLandingPage(landingPage, mockReq);
             const customCanonicalUrl = `https://${customDomainCanonical || landingPage.subdomain + '.docpage.com.br'}`;
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
-            res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, max-age=3600, s-maxage=3600');
+            res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, s-maxage=0, max-age=0, must-revalidate');
             res.setHeader('Vary', 'Host');
-            res.setHeader('X-Served-From', 'custom-domain-landing');
+            res.setHeader('X-Served-From', 'custom-domain-landing-ssr-fallback');
             res.setHeader('Link', `<${customCanonicalUrl}>; rel="canonical"`);
             res.setHeader('X-Robots-Tag', 'index, follow');
             return res.status(200).send(htmlContent);
+          }
         }
       } catch (domainLookupError: any) {
         console.error('[CUSTOM DOMAIN] Erro no lookup:', domainLookupError?.message);
