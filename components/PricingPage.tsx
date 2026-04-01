@@ -21,6 +21,9 @@ interface Props {
   selectedDomain: string;
   initialViewMode?: 'plans' | 'checkout' | 'success' | 'dashboard';
   landingPageId?: string; // ID da landing page para carregar no dashboard
+  leadEmail?: string; // E-mail do lead para pré-preencher no checkout
+  leadId?: string; // ID do lead para vincular à landing page
+  onLeadCheckoutStarted?: () => void; // Chamado ao entrar no checkout (para atualizar status do lead)
   onCheckoutSuccess?: (data: { landingPageId: string; landingPageUrl: string; domain: string }) => void;
 }
 
@@ -38,6 +41,9 @@ export const PricingPage: React.FC<Props> = ({
   selectedDomain,
   initialViewMode = 'plans',
   landingPageId,
+  leadEmail,
+  leadId,
+  onLeadCheckoutStarted,
   onCheckoutSuccess
 }) => {
   const navigate = useNavigate();
@@ -71,6 +77,15 @@ export const PricingPage: React.FC<Props> = ({
       }
     }
   }, [landingPageId, initialViewMode, selectedDomain]);
+
+  // Atualizar status do lead ao entrar no checkout (apenas uma vez)
+  const hasCalledCheckoutStarted = React.useRef(false);
+  useEffect(() => {
+    if (viewMode === 'checkout' && onLeadCheckoutStarted && !hasCalledCheckoutStarted.current) {
+      hasCalledCheckoutStarted.current = true;
+      onLeadCheckoutStarted();
+    }
+  }, [viewMode, onLeadCheckoutStarted]);
 
   // Buscar dados da landing page quando vem do dashboard (domínio, CPF, plano)
   useEffect(() => {
@@ -558,6 +573,8 @@ export const PricingPage: React.FC<Props> = ({
           prefilledDomain={prefilledDomain}
           prefilledCpf={prefilledCpf}
           prefilledHasCustomDomain={prefilledHasCustomDomain}
+          prefilledEmail={leadEmail}
+          leadId={leadId}
         />
       </div>
     );

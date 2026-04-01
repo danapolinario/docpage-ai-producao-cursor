@@ -5,8 +5,12 @@ import {
   getAdminStats,
   getAutoPublishSetting,
   updateAutoPublishSetting,
+  getLeadCaptureSetting,
+  updateLeadCaptureSetting,
+  getAllLeads,
   LandingPageWithUser,
-  LandingPageStatus 
+  LandingPageStatus,
+  AdminLeadRow,
 } from '../services/admin';
 import { signOut } from '../services/auth';
 import { syncSubscriptionsWithStripe } from '../services/subscriptions';
@@ -32,6 +36,17 @@ const SUBSCRIPTION_STATUS_LABELS: Record<string, { label: string; color: string;
   paused: { label: 'Pausada', color: 'text-gray-700', bg: 'bg-gray-100' },
 };
 
+const LEAD_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  lead_captured: { label: 'Lead capturado', color: 'text-slate-700', bg: 'bg-slate-100' },
+  briefing_started: { label: 'Briefing iniciado', color: 'text-blue-700', bg: 'bg-blue-100' },
+  content_generated: { label: 'Conteúdo gerado', color: 'text-indigo-700', bg: 'bg-indigo-100' },
+  photo_uploaded: { label: 'Foto enviada', color: 'text-violet-700', bg: 'bg-violet-100' },
+  visual_configured: { label: 'Visual configurado', color: 'text-purple-700', bg: 'bg-purple-100' },
+  editor_completed: { label: 'Editor concluído', color: 'text-amber-700', bg: 'bg-amber-100' },
+  checkout_started: { label: 'Checkout iniciado', color: 'text-orange-700', bg: 'bg-orange-100' },
+  subscription_completed: { label: 'Assinatura concluída', color: 'text-green-700', bg: 'bg-green-100' },
+};
+
 export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
   const [landingPages, setLandingPages] = useState<LandingPageWithUser[]>([]);
   const [stats, setStats] = useState({ total: 0, published: 0, pending: 0, draft: 0 });
@@ -42,9 +57,15 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [autoPublishEnabled, setAutoPublishEnabled] = useState(false);
   const [updatingAutoPublish, setUpdatingAutoPublish] = useState(false);
+  const [leadCaptureEnabled, setLeadCaptureEnabled] = useState(true);
+  const [updatingLeadCapture, setUpdatingLeadCapture] = useState(false);
   const [syncingStripe, setSyncingStripe] = useState(false);
   const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
   const [showDomainSetupModal, setShowDomainSetupModal] = useState(false);
+  const [adminSection, setAdminSection] = useState<'pages' | 'leads'>('pages');
+  const [leads, setLeads] = useState<AdminLeadRow[]>([]);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+  const [leadSearchTerm, setLeadSearchTerm] = useState('');
 
   const loadData = async (syncStripe = false) => {
     try {
@@ -76,10 +97,11 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
         }
       }
       
-      const [pages, statsData, autoPublish] = await Promise.all([
+      const [pages, statsData, autoPublish, leadCapture] = await Promise.all([
         getAllLandingPages(),
         getAdminStats(),
         getAutoPublishSetting(),
+        getLeadCaptureSetting(),
       ]);
       
       // As subscriptions já vêm junto com as landing pages da função admin-get-pages
@@ -91,6 +113,7 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
       setLandingPages(pages);
       setStats(statsData);
       setAutoPublishEnabled(autoPublish);
+      setLeadCaptureEnabled(leadCapture);
       setError(null);
     } catch (err: any) {
       console.error('Error loading admin data:', err);
@@ -103,6 +126,45 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (adminSection !== 'leads') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setLeadsLoading(true);
+        const rows = await getAllLeads();
+        if (!cancelled) {
+          setLeads(rows);
+          setError(null);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          console.error('Error loading leads:', err);
+          setError(err.message || 'Erro ao carregar leads');
+        }
+      } finally {
+        if (!cancelled) setLeadsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminSection]);
+
+  const refreshLeads = async () => {
+    try {
+      setLeadsLoading(true);
+      const rows = await getAllLeads();
+      setLeads(rows);
+      setError(null);
+    } catch (err: any) {
+      console.error('Error loading leads:', err);
+      setError(err.message || 'Erro ao carregar leads');
+    } finally {
+      setLeadsLoading(false);
+    }
+  };
 
   const handleStatusChange = async (pageId: string, newStatus: LandingPageStatus) => {
     try {
@@ -134,6 +196,21 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
       setError(err.message || 'Erro ao atualizar configuração');
     } finally {
       setUpdatingAutoPublish(false);
+    }
+  };
+
+  const handleToggleLeadCapture = async () => {
+    try {
+      setUpdatingLeadCapture(true);
+      const newValue = !leadCaptureEnabled;
+      await updateLeadCaptureSetting(newValue);
+      setLeadCaptureEnabled(newValue);
+      setError(null);
+    } catch (err: any) {
+      console.error('Error updating lead capture setting:', err);
+      setError(err.message || 'Erro ao atualizar configuração');
+    } finally {
+      setUpdatingLeadCapture(false);
     }
   };
 
@@ -232,6 +309,17 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
     return matchesStatus && matchesSearch;
   });
 
+  const filteredLeads = leads.filter((lead) => {
+    const q = leadSearchTerm.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      lead.name.toLowerCase().includes(q) ||
+      lead.email.toLowerCase().includes(q) ||
+      (lead.whatsapp && lead.whatsapp.toLowerCase().includes(q)) ||
+      LEAD_STATUS_LABELS[lead.status]?.label.toLowerCase().includes(q)
+    );
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -318,6 +406,131 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
           </div>
         )}
 
+        {/* Abas: Landing Pages | Leads */}
+        <div className="mb-8 border-b border-gray-200">
+          <nav className="flex gap-1" aria-label="Secções do painel">
+            <button
+              type="button"
+              onClick={() => setAdminSection('pages')}
+              className={`px-4 py-3 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
+                adminSection === 'pages'
+                  ? 'border-amber-500 text-amber-800 bg-white'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+              }`}
+            >
+              Landing Pages
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdminSection('leads')}
+              className={`px-4 py-3 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
+                adminSection === 'leads'
+                  ? 'border-amber-500 text-amber-800 bg-white'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+              }`}
+            >
+              Leads
+            </button>
+          </nav>
+        </div>
+
+        {adminSection === 'leads' ? (
+          <>
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+              <div className="flex flex-col sm:flex-row gap-4 sm:items-end sm:justify-between">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Buscar leads</label>
+                  <input
+                    type="text"
+                    value={leadSearchTerm}
+                    onChange={(e) => setLeadSearchTerm(e.target.value)}
+                    placeholder="Nome, e-mail, WhatsApp ou estado..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => refreshLeads()}
+                  disabled={leadsLoading}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Atualizar
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                {leadsLoading && leads.length === 0 ? (
+                  <div className="px-6 py-16 text-center text-slate-500">
+                    <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                    Carregando leads...
+                  </div>
+                ) : (
+                  <table className="w-full">
+                    <thead className="bg-slate-50 border-b border-gray-100">
+                      <tr>
+                        <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Nome</th>
+                        <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">E-mail</th>
+                        <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WhatsApp</th>
+                        <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Conta</th>
+                        <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Criado</th>
+                        <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Atualizado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredLeads.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                            {leadSearchTerm.trim()
+                              ? 'Nenhum lead corresponde à busca.'
+                              : 'Nenhum lead registado.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredLeads.map((lead) => {
+                          const st = LEAD_STATUS_LABELS[lead.status];
+                          return (
+                            <tr key={lead.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 font-medium text-gray-900">{lead.name}</td>
+                              <td className="px-6 py-4 text-sm text-gray-700">{lead.email}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{formatWhatsApp(lead.whatsapp)}</td>
+                              <td className="px-6 py-4">
+                                <span
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${st?.bg || 'bg-gray-100'} ${st?.color || 'text-gray-600'}`}
+                                >
+                                  {st?.label || lead.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600">
+                                {lead.user_id ? (
+                                  <span className="text-green-700 font-medium">Vinculado</span>
+                                ) : (
+                                  <span className="text-slate-500">Anónimo</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                                {new Date(lead.created_at).toLocaleString('pt-BR')}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                                {new Date(lead.updated_at).toLocaleString('pt-BR')}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
         {/* Auto Publish Settings */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-8">
           <div className="flex items-center justify-between">
@@ -345,6 +558,39 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
             <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="text-sm text-amber-800">
                 ✓ Publicação automática está <strong>HABILITADA</strong>. Novas landing pages serão automaticamente publicadas.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Lead capture modal (home SaaS) */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Modal de Captura de Lead</h3>
+              <p className="text-sm text-gray-600">
+                Quando desligado, &quot;Começar&quot; na home abre o briefing direto — sem criar linha em <code className="text-xs bg-slate-100 px-1 rounded">leads</code> até o utilizador passar pelo fluxo com captura ou outro evento que crie lead.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleLeadCapture}
+              disabled={updatingLeadCapture}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${
+                leadCaptureEnabled ? 'bg-amber-600' : 'bg-gray-300'
+              } ${updatingLeadCapture ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  leadCaptureEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+          {!leadCaptureEnabled && (
+            <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+              <p className="text-sm text-slate-700">
+                Modal <strong>desligado</strong>: funil sem modal na entrada; <code className="text-xs bg-slate-100 px-1 rounded">updateLeadProgress</code> / vínculo OTP só quando existir <code className="text-xs bg-slate-100 px-1 rounded">leadData</code>.
               </p>
             </div>
           )}
@@ -604,6 +850,8 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
             </table>
           </div>
         </div>
+          </>
+        )}
       </main>
     </div>
   );

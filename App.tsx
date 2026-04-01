@@ -1,7 +1,8 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { SaaSLanding } from './components/SaaSLanding';
 import { Auth } from './components/Auth';
+import { LeadCaptureModal } from './components/LeadCaptureModal';
 import { Confetti } from './components/common/Confetti';
 
 const BriefingForm = lazy(() => import('./components/BriefingForm').then(m => ({ default: m.BriefingForm })));
@@ -11,10 +12,29 @@ const VisualConfig = lazy(() => import('./components/VisualConfig').then(m => ({
 const Preview = lazy(() => import('./components/Preview').then(m => ({ default: m.Preview })));
 const EditorPanel = lazy(() => import('./components/EditorPanel').then(m => ({ default: m.EditorPanel })));
 const PricingPage = lazy(() => import('./components/PricingPage').then(m => ({ default: m.PricingPage })));
-import { AppState, BriefingData, ThemeType, DesignSettings, SectionVisibility, LandingPageContent, LayoutVariant } from './types';
+import { AppState, BriefingData, ThemeType, DesignSettings, SectionVisibility, LandingPageContent, LayoutVariant, LeadData, LeadProgressPayload } from './types';
 import { generateLandingPageContent, enhancePhoto, generateOfficePhoto, refineLandingPage, sanitizeContent } from './services/gemini';
 import { isAuthenticated, getCurrentUser, onAuthStateChange, signOut } from './services/auth';
-import { createLandingPage, updateLandingPage, publishLandingPage, generateSubdomain, getMyLandingPages } from './services/landing-pages';
+import {
+  createLandingPage,
+  updateLandingPage,
+  publishLandingPage,
+  generateSubdomain,
+  getMyLandingPages,
+  type LandingPageRow,
+} from './services/landing-pages';
+import {
+  updateLeadStatus,
+  buildLeadProgressPayload,
+  updateLeadProgress,
+  getLeadByResumeToken,
+  getLeadForFunnelResume,
+  leadRowToLeadData,
+  clearLeadResumeLocalStorage,
+  linkLeadToUser,
+  DUPLICATE_LEAD_EMAIL_MESSAGE,
+} from './services/leads';
+import { getLeadCaptureSetting } from './services/admin';
 import {
   trackBriefingStart,
   trackBriefingComplete,
@@ -80,6 +100,65 @@ const INITIAL_STATE: AppState = {
   error: null,
 };
 
+/** Se o briefing ainda não tem nome (ex.: não persistido na LP), usa o nome do lead. */
+function applyLeadNameToBriefingIfEmpty(
+  briefing: BriefingData,
+  leadName: string | undefined | null
+): BriefingData {
+  if ((briefing.name ?? '').trim()) return briefing;
+  const n = (leadName ?? '').trim();
+  if (!n) return briefing;
+  return { ...briefing, name: n };
+}
+
+function mergeProgressPayload(progress: LeadProgressPayload): Partial<AppState> {
+  return {
+    step: progress.step,
+    briefing: progress.briefing,
+    theme: progress.theme,
+    designSettings: progress.designSettings,
+    sectionVisibility: progress.sectionVisibility,
+    layoutVariant: progress.layoutVariant,
+    photoUrl: progress.photoUrl,
+    aboutPhotoUrl: progress.aboutPhotoUrl,
+    isPhotoAIEnhanced: progress.isPhotoAIEnhanced,
+    generatedContent: progress.generatedContent,
+    modificationsLeft: progress.modificationsLeft ?? INITIAL_STATE.modificationsLeft,
+  };
+}
+
+function normalizeLeadEmail(e: string | undefined | null): string {
+  return (e ?? '').trim().toLowerCase();
+}
+
+function emailsMatchLead(userEmail: string | undefined | null, leadEmail: string | undefined | null): boolean {
+  const a = normalizeLeadEmail(userEmail);
+  const b = normalizeLeadEmail(leadEmail);
+  if (!a || !b) return false;
+  return a === b;
+}
+
+/**
+ * Fase 2 — regra única ref vs progress_data (BD):
+ * Se o snapshot em memória indica wizard ainda em curso (step < 5 e nome no briefing),
+ * usar o ref de imediato (evita desfasagem do debounce de updateLeadProgress).
+ * Caso contrário, usar progress_data devolvido por getLeadByResumeToken (se existir).
+ */
+function wizardRefHasPriorityOverDbProgress(snap: LeadProgressPayload | null): boolean {
+  if (!snap) return false;
+  if (snap.step >= 5) return false;
+  if (!(snap.briefing?.name ?? '').trim()) return false;
+  return true;
+}
+
+function pickLatestPublishedLandingPage(pages: LandingPageRow[]): LandingPageRow | null {
+  const published = pages.filter((lp) => lp.status === 'published');
+  if (published.length === 0) return null;
+  const ts = (lp: LandingPageRow) => lp.published_at || lp.updated_at || lp.created_at;
+  published.sort((a, b) => ts(b).localeCompare(ts(a)));
+  return published[0];
+}
+
 // --- DUMMY DATA FOR DEV NAVIGATION ---
 const DUMMY_BRIEFING: BriefingData = {
   name: 'Dr. Ricardo Mendes',
@@ -136,6 +215,18 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
       if (path === '/checkout' && (fromDashboard || hasLandingPageId)) {
         return false;
       }
+      if (localStorage.getItem('lead_resume_token')) {
+        return false;
+      }
+      try {
+        const raw = localStorage.getItem('lead_data');
+        if (raw) {
+          const j = JSON.parse(raw) as LeadData;
+          if (j?.resumeToken) return false;
+        }
+      } catch {
+        /* ignore */
+      }
     }
     return true;
   });
@@ -175,10 +266,31 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   const [isCreatingLandingPage, setIsCreatingLandingPage] = useState(false); // Flag para evitar redirecionamentos durante criação
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  /** Sobrepõe `leadData?.email` no Auth (ex.: duplicado na modal de lead). */
+  const [authModalPrefillEmail, setAuthModalPrefillEmail] = useState<string | undefined>(undefined);
+  const [authModalBannerMessage, setAuthModalBannerMessage] = useState<string | null>(null);
   const [hasAppliedRecommendedTheme, setHasAppliedRecommendedTheme] = useState(false);
+  const [showLeadCapture, setShowLeadCapture] = useState(false);
+  /** Definido no admin (`lead_capture_enabled`); default true até carregar. */
+  const [leadCaptureEnabled, setLeadCaptureEnabled] = useState(true);
+  const [leadData, setLeadData] = useState<LeadData | null>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('lead_data');
+      if (stored) {
+        try {
+          return JSON.parse(stored) as LeadData;
+        } catch {
+          return null;
+        }
+      }
+    }
+    return null;
+  });
 
   const [isRestoringState, setIsRestoringState] = React.useState(false);
   const stepScrollInitialMount = React.useRef(true);
+  /** Snapshot do wizard para pós-login OTP (Fase 2); só preenchido com funil ativo e lead. */
+  const wizardProgressRef = useRef<LeadProgressPayload | null>(null);
 
   // Restaurar estado do localStorage quando voltar do Stripe com canceled=true
   useEffect(() => {
@@ -244,6 +356,50 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
       }
     }
   }, []); // Executar apenas uma vez quando o componente monta
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const enabled = await getLeadCaptureSetting();
+        if (!cancelled) setLeadCaptureEnabled(enabled);
+      } catch (e) {
+        console.warn('lead_capture_enabled:', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** Home: utilizador logado tem alguma LP com status `published`? (para CTA / Painel) */
+  type HomePublishedState = 'idle' | 'loading' | 'published' | 'not_published';
+  const [homePublishedState, setHomePublishedState] = useState<HomePublishedState>('idle');
+
+  useEffect(() => {
+    if (!showSaaSIntro || !isAuthenticatedUser) {
+      setHomePublishedState('idle');
+      return;
+    }
+    let cancelled = false;
+    setHomePublishedState('loading');
+    (async () => {
+      try {
+        const landingPages = await getMyLandingPages();
+        if (cancelled) return;
+        const hasPublished = landingPages.some((lp) => lp.status === 'published');
+        setHomePublishedState(hasPublished ? 'published' : 'not_published');
+      } catch {
+        if (!cancelled) setHomePublishedState('not_published');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showSaaSIntro, isAuthenticatedUser]);
+
+  const funnelContinueMode =
+    Boolean(isAuthenticatedUser) && homePublishedState === 'not_published';
 
   // Detectar se está na rota /checkout e ajustar estado inicial
   // Função para verificar e ajustar o estado do checkout
@@ -386,7 +542,9 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     const { data: { subscription } } = onAuthStateChange((user) => {
       setIsAuthenticatedUser(!!user);
       if (user) {
-        setShowAuthModal(false); // Fechar modal de auth quando logar
+        setShowAuthModal(false);
+        setAuthModalPrefillEmail(undefined);
+        setAuthModalBannerMessage(null);
       }
     });
 
@@ -412,6 +570,24 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
       }, 100);
     }
   }, [state.step]);
+
+  // Helper para atualizar status do lead (ignora dev-lead-id)
+  const safeUpdateLeadStatus = React.useCallback(async (status: Parameters<typeof updateLeadStatus>[1]) => {
+    const lid = leadData?.id;
+    if (!lid || lid === 'dev-lead-id') return;
+    try {
+      await updateLeadStatus(lid, status, leadData?.resumeToken ?? null);
+    } catch (e) {
+      console.warn('Erro ao atualizar status do lead:', e);
+    }
+  }, [leadData?.id, leadData?.resumeToken]);
+
+  // Atualizar status do lead: briefing_started ao montar BriefingForm (step 0)
+  useEffect(() => {
+    if (!showSaaSIntro && state.step === 0 && leadData) {
+      safeUpdateLeadStatus('briefing_started');
+    }
+  }, [showSaaSIntro, state.step, leadData, safeUpdateLeadStatus]);
 
   // Track step changes (só disparar briefing_start quando o formulário de briefing estiver visível, não na homepage)
   useEffect(() => {
@@ -666,7 +842,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   };
 
   const handleContentApproved = () => {
-     // Move to Photo Step
+     safeUpdateLeadStatus('content_generated');
      trackGAPageView('/step/photo', 'Upload de Foto');
      setState(prev => ({ ...prev, step: 2 }));
   };
@@ -681,6 +857,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
         setState(prev => ({ ...prev, isLoading: true, loadingMessage: 'Gerando foto ambientada no consultório...' }));
         const officePhotoUrl = await generateOfficePhoto(state.photoUrl);
         
+        safeUpdateLeadStatus('photo_uploaded');
         setState(prev => {
           let nextState = { 
             ...prev, 
@@ -699,6 +876,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
         });
       } catch (error) {
         console.error('Erro ao gerar foto do consultório:', error);
+        safeUpdateLeadStatus('photo_uploaded');
         // Continua mesmo se falhar a geração da foto do consultório
         setState(prev => {
           let nextState = { ...prev, isLoading: false, step: 3 };
@@ -714,6 +892,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
       }
     } else {
       // Se já tem foto melhorada ou não tem foto, apenas avançar
+      safeUpdateLeadStatus('photo_uploaded');
       setState(prev => {
         let nextState = { ...prev, isLoading: false, step: 3 };
 
@@ -729,7 +908,7 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   };
 
   const handleVisualConfigNext = () => {
-     // Move to Editor
+     safeUpdateLeadStatus('visual_configured');
      setIsSidebarOpen(false); // Force Sidebar close
      trackPreviewView();
      setState(prev => ({ ...prev, step: 4 }));
@@ -773,17 +952,147 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   };
 
   const handleEditorFinish = () => {
+    safeUpdateLeadStatus('editor_completed');
     // Ir para step 5 (Publicar) sem salvar ainda
     // O salvamento acontecerá apenas após assinatura e pagamento
     setState(prev => ({ ...prev, step: 5 })); // Step 5 = Publicar (Pricing)
   };
+
+  // Persistir leadData + tokens de retomada no localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (leadData) {
+      localStorage.setItem('lead_data', JSON.stringify(leadData));
+      if (leadData.resumeToken) {
+        localStorage.setItem('lead_resume_token', leadData.resumeToken);
+      }
+      localStorage.setItem('lead_id', leadData.id);
+    } else {
+      clearLeadResumeLocalStorage();
+    }
+  }, [leadData]);
+
+  // Retomar funil anónimo por resume_token (Fase 1)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let cancelled = false;
+
+    const path = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+    const fromDashboard = searchParams.get('from') === 'dashboard';
+    const hasLandingPageId = localStorage.getItem('checkout_landing_page_id');
+    if (path === '/checkout' && (fromDashboard || hasLandingPageId)) {
+      return undefined;
+    }
+
+    const token =
+      localStorage.getItem('lead_resume_token') ||
+      (() => {
+        try {
+          const raw = localStorage.getItem('lead_data');
+          if (!raw) return null;
+          const j = JSON.parse(raw) as LeadData;
+          return j?.resumeToken ?? null;
+        } catch {
+          return null;
+        }
+      })();
+
+    if (!token) return undefined;
+
+    (async () => {
+      try {
+        const row = await getLeadByResumeToken(token);
+        if (cancelled) return;
+
+        if (!row) {
+          clearLeadResumeLocalStorage();
+          setLeadData(null);
+          setShowSaaSIntro(true);
+          return;
+        }
+
+        const storedId = localStorage.getItem('lead_id');
+        if (storedId && storedId !== row.id) {
+          clearLeadResumeLocalStorage();
+          setLeadData(null);
+          setShowSaaSIntro(true);
+          return;
+        }
+
+        setLeadData({
+          id: row.id,
+          name: row.name,
+          email: row.email,
+          whatsapp: row.whatsapp || undefined,
+          marketingConsent: row.marketing_consent,
+          resumeToken: row.resume_token,
+        });
+
+        const pd = row.progress_data;
+        if (pd && typeof pd === 'object' && typeof pd.step === 'number') {
+          setState((prev) => {
+            const next = { ...prev, ...mergeProgressPayload(pd as LeadProgressPayload) };
+            return {
+              ...next,
+              briefing: applyLeadNameToBriefingIfEmpty(next.briefing, row.name),
+            };
+          });
+          const pm = (pd as LeadProgressPayload).pricingViewMode;
+          if (pm) setPricingViewMode(pm);
+        } else {
+          setState((prev) => ({
+            ...prev,
+            briefing: applyLeadNameToBriefingIfEmpty(prev.briefing, row.name),
+          }));
+        }
+
+        setShowSaaSIntro(false);
+      } catch (e) {
+        console.warn('Retomada de lead:', e);
+        if (!cancelled) {
+          clearLeadResumeLocalStorage();
+          setLeadData(null);
+          setShowSaaSIntro(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Debounce: persistir progresso do wizard para leads.progress_data
+  useEffect(() => {
+    const token = leadData?.resumeToken;
+    if (!token || leadData.id === 'dev-lead-id' || showSaaSIntro) return;
+
+    const handle = window.setTimeout(() => {
+      updateLeadProgress(token, buildLeadProgressPayload(state, pricingViewMode)).catch((err) =>
+        console.warn('Persistência do funil:', err)
+      );
+    }, 450);
+
+    return () => clearTimeout(handle);
+  }, [state, pricingViewMode, leadData?.resumeToken, leadData?.id, showSaaSIntro]);
+
+  useEffect(() => {
+    if (!leadData || showSaaSIntro) {
+      wizardProgressRef.current = null;
+      return;
+    }
+    wizardProgressRef.current = buildLeadProgressPayload(state, pricingViewMode);
+  }, [state, pricingViewMode, leadData, showSaaSIntro]);
 
   const handleRestart = () => {
     setState(INITIAL_STATE);
     setViewMode('desktop');
     setIsSidebarOpen(true);
     setHasAppliedRecommendedTheme(false);
-    setIsCreatingLandingPage(false); // Resetar flag ao reiniciar
+    setIsCreatingLandingPage(false);
+    setLeadData(null);
   };
   
   const handleGoHome = () => {
@@ -791,8 +1100,10 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     setViewMode('desktop');
     setIsSidebarOpen(true);
     setShowSaaSIntro(true);
+    setShowLeadCapture(false);
     setHasAppliedRecommendedTheme(false);
-    setIsCreatingLandingPage(false); // Resetar flag ao voltar para home
+    setIsCreatingLandingPage(false);
+    setLeadData(null);
   };
 
   const handleLogout = async () => {
@@ -802,33 +1113,38 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
       setIsAuthenticatedUser(false);
       setState(INITIAL_STATE);
       setCurrentLandingPageId(null);
+      clearLeadResumeLocalStorage();
+      setLeadData(null);
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
     }
   };
 
+  const closeAuthModal = () => {
+    setShowAuthModal(false);
+    setAuthModalPrefillEmail(undefined);
+    setAuthModalBannerMessage(null);
+  };
+
   const handleAuthSuccess = async () => {
     setIsAuthenticatedUser(true);
-    setShowAuthModal(false);
+    closeAuthModal();
     setState(prev => ({ ...prev, error: null }));
     trackEvent('login', { event_category: 'auth', method: 'otp' });
 
-    // Aguardar mais tempo para garantir que a sessão está sincronizada
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     try {
-      // Fazer refresh da sessão para garantir que está atualizada
       const { supabase } = await import('./lib/supabase');
       console.log('handleAuthSuccess: Fazendo refresh da sessão...');
       const { data: { session: refreshResult }, error: refreshError } = await supabase.auth.refreshSession();
-      
+
       if (refreshError) {
         console.error('Erro ao refresh da sessão no handleAuthSuccess:', refreshError);
       }
-      
+
       if (!refreshResult) {
         console.warn('Refresh da sessão retornou null');
-        // Tentar mais uma vez
         await new Promise(resolve => setTimeout(resolve, 1000));
         const { data: { session: retryRefresh } } = await supabase.auth.refreshSession();
         if (!retryRefresh) {
@@ -836,70 +1152,148 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
           return;
         }
       }
-      
-      // Aguardar mais um pouco após refresh
+
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Verificar se o usuário tem landing pages (apenas se não estiver criando uma nova)
+
       if (isCreatingLandingPage) {
         console.log('handleAuthSuccess: Usuário está criando landing page, ignorando redirecionamento automático');
         return;
       }
 
-      console.log('handleAuthSuccess: Buscando landing pages do usuário...');
-      const landingPages = await getMyLandingPages();
-      
-      console.log('handleAuthSuccess: Landing pages encontradas:', landingPages?.length || 0);
-      
-      if (landingPages && landingPages.length > 0) {
-        // Pegar a landing page mais recente (primeira do array já ordenado)
-        const latestLandingPage = landingPages[0];
-        
-        console.log('handleAuthSuccess: Landing page encontrada, redirecionando para dashboard:', {
-          id: latestLandingPage.id,
-          subdomain: latestLandingPage.subdomain,
-          status: latestLandingPage.status
-        });
-        
-        // Redirecionar para o dashboard
-        setCurrentLandingPageId(latestLandingPage.id);
-        setPricingViewMode('dashboard');
-        
-        // Carregar dados da landing page no estado (para o Preview/Dashboard)
-        // Usar os dados da landing page mais recente
-        if (latestLandingPage.briefing_data) {
-          setState(prev => ({
-            ...prev,
-            briefing: latestLandingPage.briefing_data,
-            generatedContent: latestLandingPage.content_data,
-            designSettings: latestLandingPage.design_settings,
-            sectionVisibility: latestLandingPage.section_visibility || INITIAL_VISIBILITY,
-            layoutVariant: (latestLandingPage.layout_variant || 1) as LayoutVariant,
-            photoUrl: latestLandingPage.photo_url,
-            aboutPhotoUrl: latestLandingPage.about_photo_url,
-            step: 5, // Step 5 = PricingPage que mostrará o dashboard
-          }));
-          
-          // Fechar a home e ir para o dashboard
-          setShowSaaSIntro(false);
-          
-          console.log('handleAuthSuccess: Redirecionamento para dashboard concluído');
-        } else {
-          console.warn('handleAuthSuccess: Landing page sem briefing_data');
-        }
-      } else {
-        console.log('handleAuthSuccess: Usuário não tem landing pages ainda. Mantendo na home.');
-        // Se não tiver landing pages, manter na home (showSaaSIntro = true)
-        // O usuário pode criar uma nova
+      const user = await getCurrentUser();
+      if (!user?.id) {
+        console.warn('handleAuthSuccess: sem utilizador após refresh');
+        return;
       }
-    } catch (error: any) {
+
+      const userEmail = user.email;
+      const landingPages = await getMyLandingPages();
+      console.log('handleAuthSuccess: Landing pages encontradas:', landingPages?.length || 0);
+
+      let effectiveLeadData: LeadData | null = leadData;
+      /** progress_data já devolvido por getLeadForFunnelResume (evita 2ª RPC após OTP). */
+      let progressHydratedFromEmailRpc: LeadProgressPayload | null = null;
+      if (!effectiveLeadData) {
+        try {
+          const row = await getLeadForFunnelResume();
+          if (row) {
+            effectiveLeadData = leadRowToLeadData(row);
+            progressHydratedFromEmailRpc =
+              row.progress_data && typeof row.progress_data === 'object'
+                ? (row.progress_data as LeadProgressPayload)
+                : null;
+            setLeadData(effectiveLeadData);
+            console.log('handleAuthSuccess: lead hidratado por e-mail (BD)', effectiveLeadData.id);
+          }
+        } catch (e) {
+          console.warn('handleAuthSuccess: getLeadForFunnelResume:', e);
+        }
+      }
+
+      const hasPublished = landingPages.some((lp) => lp.status === 'published');
+
+      const applyLandingPageToState = (lp: LandingPageRow) => {
+        setCurrentLandingPageId(lp.id);
+        setPricingViewMode('dashboard');
+        if (lp.briefing_data) {
+          setState((prev) => ({
+            ...prev,
+            briefing: lp.briefing_data,
+            generatedContent: lp.content_data,
+            designSettings: lp.design_settings,
+            sectionVisibility: lp.section_visibility || INITIAL_VISIBILITY,
+            layoutVariant: (lp.layout_variant || 1) as LayoutVariant,
+            photoUrl: lp.photo_url,
+            aboutPhotoUrl: lp.about_photo_url,
+            step: 5,
+          }));
+        }
+        setShowSaaSIntro(false);
+      };
+
+      if (hasPublished) {
+        const publishedLp = pickLatestPublishedLandingPage(landingPages);
+        if (publishedLp?.briefing_data) {
+          if (
+            effectiveLeadData &&
+            emailsMatchLead(userEmail, effectiveLeadData.email) &&
+            effectiveLeadData.id !== 'dev-lead-id'
+          ) {
+            try {
+              await linkLeadToUser(effectiveLeadData.id, user.id);
+            } catch (e) {
+              console.warn('handleAuthSuccess: linkLeadToUser (published):', e);
+            }
+          }
+          applyLandingPageToState(publishedLp);
+          console.log('handleAuthSuccess: dashboard com LP publicada');
+        } else {
+          console.warn('handleAuthSuccess: LP publicada sem briefing_data');
+        }
+        return;
+      }
+
+      if (effectiveLeadData && emailsMatchLead(userEmail, effectiveLeadData.email)) {
+        if (effectiveLeadData.id !== 'dev-lead-id') {
+          try {
+            await linkLeadToUser(effectiveLeadData.id, user.id);
+          } catch (e) {
+            console.warn('handleAuthSuccess: linkLeadToUser:', e);
+          }
+        }
+
+        let dbProgress: LeadProgressPayload | null = progressHydratedFromEmailRpc;
+        if (dbProgress == null && effectiveLeadData.resumeToken) {
+          try {
+            const row = await getLeadByResumeToken(effectiveLeadData.resumeToken);
+            dbProgress = row?.progress_data ?? null;
+          } catch (e) {
+            console.warn('handleAuthSuccess: getLeadByResumeToken:', e);
+          }
+        }
+
+        const snap = wizardProgressRef.current;
+        if (wizardRefHasPriorityOverDbProgress(snap)) {
+          setState((prev) => {
+            const next = { ...prev, ...mergeProgressPayload(snap!) };
+            return {
+              ...next,
+              briefing: applyLeadNameToBriefingIfEmpty(next.briefing, effectiveLeadData.name),
+            };
+          });
+          if (snap!.pricingViewMode) setPricingViewMode(snap!.pricingViewMode);
+          setShowSaaSIntro(false);
+          console.log('handleAuthSuccess: retomar wizard (ref)');
+          return;
+        }
+
+        if (dbProgress && typeof dbProgress.step === 'number') {
+          setState((prev) => {
+            const next = { ...prev, ...mergeProgressPayload(dbProgress) };
+            return {
+              ...next,
+              briefing: applyLeadNameToBriefingIfEmpty(next.briefing, effectiveLeadData.name),
+            };
+          });
+          if (dbProgress.pricingViewMode) setPricingViewMode(dbProgress.pricingViewMode);
+          setShowSaaSIntro(false);
+          console.log('handleAuthSuccess: retomar wizard (progress_data)');
+          return;
+        }
+      }
+
+      if (landingPages.length > 0) {
+        const latestLandingPage = landingPages[0];
+        console.log('handleAuthSuccess: dashboard com draft / legado', {
+          id: latestLandingPage.id,
+          status: latestLandingPage.status,
+        });
+        applyLandingPageToState(latestLandingPage);
+      } else {
+        console.log('handleAuthSuccess: sem landing pages — mantém ecrã atual');
+      }
+    } catch (error: unknown) {
       console.error('Erro ao verificar landing pages após login:', error);
-      console.error('Detalhes do erro:', {
-        message: error.message,
-        error: error
-      });
-      // Em caso de erro, apenas fechar o modal e manter na home
-      // Não bloquear o acesso do usuário
     }
   };
 
@@ -913,6 +1307,16 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   // --- DEV NAVIGATION ---
   const handleDevNavigation = (step: number, mode?: 'plans' | 'checkout' | 'dashboard') => {
     setShowSaaSIntro(false);
+    setShowLeadCapture(false);
+    // Dev mode: preencher leadData default para ter email no checkout
+    if (!leadData) {
+      setLeadData({
+        id: 'dev-lead-id',
+        name: 'Dev User',
+        email: 'dev@docpage.com.br',
+        marketingConsent: false,
+      });
+    }
     
     // Reset auto theme recommendation when jumping between steps
     if (step <= 3) {
@@ -958,6 +1362,94 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     }
   };
 
+  /** CTA principal da SaaS landing: retoma funil / rascunho ou abre captura de lead. */
+  const handleSaaSHomePrimaryAction = async () => {
+    if (isAuthenticatedUser && !isCreatingLandingPage) {
+      try {
+        const landingPages = await getMyLandingPages();
+        const hasPublished = landingPages.some((lp) => lp.status === 'published');
+
+        if (hasPublished) {
+          const publishedLp =
+            pickLatestPublishedLandingPage(landingPages) ??
+            landingPages.find((lp) => lp.status === 'published');
+          if (!publishedLp) return;
+          setCurrentLandingPageId(publishedLp.id);
+          setPricingViewMode('dashboard');
+          if (publishedLp.briefing_data) {
+            setState((prev) => ({
+              ...prev,
+              briefing: publishedLp.briefing_data,
+              generatedContent: publishedLp.content_data,
+              designSettings: publishedLp.design_settings,
+              sectionVisibility: publishedLp.section_visibility || INITIAL_VISIBILITY,
+              layoutVariant: (publishedLp.layout_variant || 1) as LayoutVariant,
+              photoUrl: publishedLp.photo_url,
+              aboutPhotoUrl: publishedLp.about_photo_url,
+              step: 5,
+            }));
+          }
+          setShowSaaSIntro(false);
+          return;
+        }
+
+        const row = await getLeadForFunnelResume();
+        if (row) {
+          setLeadData(leadRowToLeadData(row));
+          const pd = row.progress_data as LeadProgressPayload | null;
+          if (pd && typeof pd.step === 'number') {
+            setState((prev) => {
+              const next = { ...prev, ...mergeProgressPayload(pd) };
+              return {
+                ...next,
+                briefing: applyLeadNameToBriefingIfEmpty(next.briefing, row.name),
+              };
+            });
+            if (pd.pricingViewMode) setPricingViewMode(pd.pricingViewMode);
+          } else {
+            setState((prev) => ({
+              ...prev,
+              briefing: applyLeadNameToBriefingIfEmpty(prev.briefing, row.name),
+            }));
+          }
+          setShowSaaSIntro(false);
+          setShowLeadCapture(false);
+          return;
+        }
+
+        if (landingPages.length > 0) {
+          const latestLandingPage = landingPages[0];
+          setCurrentLandingPageId(latestLandingPage.id);
+          setPricingViewMode('dashboard');
+          if (latestLandingPage.briefing_data) {
+            setState((prev) => ({
+              ...prev,
+              briefing: latestLandingPage.briefing_data,
+              generatedContent: latestLandingPage.content_data,
+              designSettings: latestLandingPage.design_settings,
+              sectionVisibility: latestLandingPage.section_visibility || INITIAL_VISIBILITY,
+              layoutVariant: (latestLandingPage.layout_variant || 1) as LayoutVariant,
+              photoUrl: latestLandingPage.photo_url,
+              aboutPhotoUrl: latestLandingPage.about_photo_url,
+              step: 5,
+            }));
+          }
+          setShowSaaSIntro(false);
+          return;
+        }
+      } catch (error: unknown) {
+        console.error('Erro ao retomar a partir da home:', error);
+      }
+    }
+
+    if (leadCaptureEnabled) {
+      setShowLeadCapture(true);
+    } else {
+      setShowLeadCapture(false);
+      setShowSaaSIntro(false);
+    }
+  };
+
   const WizardHeader = ({ currentStep }: { currentStep: number }) => {
     const steps = ['Dados', 'Conteúdo', 'Foto', 'Visual', 'Editor', 'Publicar'];
     return (
@@ -992,94 +1484,53 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     return (
       <>
         <SaaSLanding 
-          onStart={async () => {
-            // Se não autenticado, apenas fecha a home
-            if (!isAuthenticatedUser) {
-              setShowSaaSIntro(false);
-              return;
-            }
-
-            // Se autenticado, redirecionar para o dashboard se tiver landing page (apenas se não estiver criando uma nova)
-            if (isCreatingLandingPage) {
-              console.log('onStart: Usuário está criando landing page, ignorando redirecionamento automático');
-              setShowSaaSIntro(false);
-              return;
-            }
-
-            try {
-              console.log('onStart: Buscando landing pages do usuário...');
-              const landingPages = await getMyLandingPages();
-              
-              console.log('onStart: Landing pages encontradas:', landingPages?.length || 0);
-              
-              if (landingPages && landingPages.length > 0) {
-                // Pegar a landing page mais recente
-                const latestLandingPage = landingPages[0];
-                
-                console.log('onStart: Landing page encontrada, redirecionando para dashboard:', {
-                  id: latestLandingPage.id,
-                  subdomain: latestLandingPage.subdomain,
-                  status: latestLandingPage.status
-                });
-                
-                // Redirecionar para o dashboard
-                setCurrentLandingPageId(latestLandingPage.id);
-                setPricingViewMode('dashboard');
-                
-                // Carregar dados da landing page no estado
-                if (latestLandingPage.briefing_data) {
-                  setState(prev => ({
-                    ...prev,
-                    briefing: latestLandingPage.briefing_data,
-                    generatedContent: latestLandingPage.content_data,
-                    designSettings: latestLandingPage.design_settings,
-                    sectionVisibility: latestLandingPage.section_visibility || INITIAL_VISIBILITY,
-                    layoutVariant: (latestLandingPage.layout_variant || 1) as LayoutVariant,
-                    photoUrl: latestLandingPage.photo_url,
-                    aboutPhotoUrl: latestLandingPage.about_photo_url,
-                    step: 5, // Step 5 = PricingPage que mostrará o dashboard
-                  }));
-                  
-                  // Fechar a home e ir para o dashboard
-                  setShowSaaSIntro(false);
-                  
-                  console.log('onStart: Redirecionamento para dashboard concluído');
-                } else {
-                  console.warn('onStart: Landing page sem briefing_data');
-                  setShowSaaSIntro(false);
-                }
-              } else {
-                console.log('onStart: Usuário não tem landing pages ainda. Iniciando criação.');
-                // Se não tiver landing pages, fecha a home e permite criar uma nova
-                setShowSaaSIntro(false);
-              }
-            } catch (error: any) {
-              console.error('Erro ao verificar landing pages:', error);
-              // Em caso de erro, apenas fecha a home
-              setShowSaaSIntro(false);
-            }
-          }}
+          onStart={handleSaaSHomePrimaryAction}
+          funnelContinueMode={funnelContinueMode}
           onDevNavigation={isDevMode ? handleDevNavigation : undefined}
           onLoginClick={() => {
             console.log('Login clicado na home');
+            setAuthModalPrefillEmail(undefined);
+            setAuthModalBannerMessage(null);
             setShowAuthModal(true);
           }}
           isAuthenticated={isAuthenticatedUser || false}
           onLogout={handleLogout}
         />
         
+        {/* Modal de Captura de Lead - antes do BriefingForm */}
+        {showLeadCapture && (
+          <LeadCaptureModal
+            onSuccess={(data) => {
+              setLeadData(data);
+              setShowLeadCapture(false);
+              setShowSaaSIntro(false);
+              setState((prev) => ({
+                ...prev,
+                briefing: applyLeadNameToBriefingIfEmpty(prev.briefing, data.name),
+              }));
+            }}
+            onClose={() => setShowLeadCapture(false)}
+            onDuplicateEmail={(email) => {
+              setShowLeadCapture(false);
+              setAuthModalPrefillEmail(email);
+              setAuthModalBannerMessage(DUPLICATE_LEAD_EMAIL_MESSAGE);
+              setShowAuthModal(true);
+            }}
+          />
+        )}
+
         {/* Modal de Autenticação - deve aparecer mesmo quando showSaaSIntro é true */}
         {showAuthModal && (
           <div 
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in"
-            onClick={() => setShowAuthModal(false)}
+            onClick={closeAuthModal}
           >
             <div 
               className="bg-white rounded-2xl shadow-2xl max-w-md w-full relative animate-slide-up"
               onClick={(e) => e.stopPropagation()}
             >
               <button
-                onClick={() => setShowAuthModal(false)}
+                onClick={closeAuthModal}
                 className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
               >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1087,7 +1538,9 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
                 </svg>
               </button>
               <Auth 
-                onSuccess={handleAuthSuccess} 
+                onSuccess={handleAuthSuccess}
+                initialEmail={authModalPrefillEmail ?? leadData?.email}
+                bannerMessage={authModalBannerMessage}
               />
             </div>
           </div>
@@ -1171,7 +1624,11 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
               </button>
             ) : (
               <button
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => {
+                  setAuthModalPrefillEmail(undefined);
+                  setAuthModalBannerMessage(null);
+                  setShowAuthModal(true);
+                }}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2"
                 title="Entrar"
               >
@@ -1374,14 +1831,18 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
               selectedDomain=""
               initialViewMode={pricingViewMode}
               landingPageId={currentLandingPageId || localStorage.getItem('checkout_landing_page_id') || undefined}
+              leadEmail={leadData?.email}
+              leadId={leadData?.id}
+              onLeadCheckoutStarted={() => safeUpdateLeadStatus('checkout_started')}
               onCheckoutSuccess={(data) => {
-                // Limpar landingPageId do localStorage após sucesso
+                safeUpdateLeadStatus('subscription_completed');
+                clearLeadResumeLocalStorage();
+                setLeadData(null);
                 localStorage.removeItem('checkout_landing_page_id');
-                // Atualizar estado de autenticação após checkout bem-sucedido
                 setIsAuthenticatedUser(true);
                 setCurrentLandingPageId(data.landingPageId);
                 setPricingViewMode('dashboard');
-                setIsCreatingLandingPage(false); // Finalizou a criação, pode permitir redirecionamentos novamente
+                setIsCreatingLandingPage(false);
               }}
             />
           </div>
@@ -1402,14 +1863,14 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
       {!showSaaSIntro && showAuthModal && (
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => setShowAuthModal(false)}
+          onClick={closeAuthModal}
         >
           <div 
             className="bg-white rounded-2xl shadow-2xl max-w-md w-full relative animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              onClick={() => setShowAuthModal(false)}
+              onClick={closeAuthModal}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1417,7 +1878,9 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
               </svg>
             </button>
             <Auth 
-              onSuccess={handleAuthSuccess} 
+              onSuccess={handleAuthSuccess}
+              initialEmail={authModalPrefillEmail ?? leadData?.email}
+              bannerMessage={authModalBannerMessage}
             />
           </div>
         </div>

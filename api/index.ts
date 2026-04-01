@@ -124,6 +124,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('[SSR] Request URL:', req.url);
     console.log('[SSR] Request Host:', host);
     
+    // SEO: Verificar se existe domínio customizado para redirect 301 (antes de servir qualquer conteúdo)
+    if (!hasPreview) {
+      try {
+        const queryClientRedirect = supabaseAdmin || supabase;
+        const { data: lpForRedirect } = await queryClientRedirect
+          .from('landing_pages')
+          .select('chosen_domain, custom_domain, status')
+          .eq('subdomain', subdomain)
+          .single();
+        
+        const seoRedirectDomain = lpForRedirect?.chosen_domain || lpForRedirect?.custom_domain;
+        if (seoRedirectDomain && lpForRedirect?.status === 'published') {
+          const redirectUrl = `https://${seoRedirectDomain}${req.url && req.url !== '/' ? req.url : ''}`;
+          console.log('[SSR] 301 Redirect subdomínio → domínio customizado:', { subdomain, seoRedirectDomain, redirectUrl });
+          res.setHeader('Location', redirectUrl);
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+          res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+          return res.status(301).send('');
+        }
+      } catch (redirectCheckErr: any) {
+        console.log('[SSR] Erro ao verificar redirect de domínio, continuando normalmente:', redirectCheckErr?.message);
+      }
+    }
+
     // Primeiro, verificar se existe HTML estático no Storage
     try {
       const HTML_FOLDER = 'html';
@@ -185,13 +209,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               console.log('[SSR] ✓ HTML estático contém assets compilados corretos');
             }
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
-            res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600'); // Cache de 1 hora
+            res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
             res.setHeader('Vary', 'Host');
             res.setHeader('X-Content-Type-Options', 'nosniff');
             res.setHeader('X-Served-From', 'static-html');
             res.setHeader('X-Subdomain', subdomain);
+            res.setHeader('Link', `<https://${subdomain}.docpage.com.br>; rel="canonical"`);
+            res.setHeader('X-Robots-Tag', 'index, follow');
             
-            // Enviar e finalizar resposta
             res.status(200).send(htmlText);
             return;
           }
@@ -251,7 +276,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Verificar autenticação e permissões
       // IMPORTANTE: Se landing page está publicada, permitir acesso público
       const isPublished = landingPage.status === 'published';
-      
+
       if (isPublished) {
         console.log('[SSR] ✓ Landing page publicada, acesso público permitido');
       } else {
@@ -351,12 +376,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         headers: req.headers,
       };
       
-      const htmlContent = await renderLandingPage(landingPage, mockReq);
+      // noIndex se servindo via subdomínio mas LP tem domínio customizado (cenário preview/draft)
+      const subdomainHasCustomDomain = !!(landingPage.chosen_domain || landingPage.custom_domain);
+      const subdomainCanonicalDomain = landingPage.chosen_domain || landingPage.custom_domain || `${subdomain}.docpage.com.br`;
+      const htmlContent = await renderLandingPage(landingPage, mockReq, { noIndex: subdomainHasCustomDomain });
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, max-age=3600, s-maxage=3600');
       res.setHeader('Vary', 'Host');
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('X-Served-From', hasPreview ? 'dynamic-ssr-preview' : 'dynamic-ssr');
+      res.setHeader('Link', `<https://${subdomainCanonicalDomain}>; rel="canonical"`);
+      if (subdomainHasCustomDomain) {
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      } else {
+        res.setHeader('X-Robots-Tag', 'index, follow');
+      }
       return res.status(200).send(htmlContent);
     } catch (error: any) {
       console.error('[SSR] ✗ Erro ao renderizar SSR:', error?.message || error);
@@ -405,6 +439,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
 
           // Tentar HTML estático pelo subdomain
+          const customDomainCanonical = landingPage.chosen_domain || landingPage.custom_domain;
           try {
             const HTML_FOLDER = 'html';
             const filePath = `${HTML_FOLDER}/${landingPage.subdomain}.html`;
@@ -413,14 +448,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (fetchResponse.ok) {
               const fullResponse = await fetch(publicUrl, { headers: { 'Cache-Control': 'no-cache' } });
               if (fullResponse.ok) {
-                const htmlText = await fullResponse.text();
+                let htmlText = await fullResponse.text();
                 const hasOldIndexTsx = htmlText.includes('src="/index.tsx"') || htmlText.includes("src='/index.tsx'");
                 const hasCompiledAssets = htmlText.includes('/assets/') && (htmlText.includes('.js"') || htmlText.includes('.js\''));
                 if (!hasOldIndexTsx || hasCompiledAssets) {
+                  // SEO: Substituir URLs de subdomínio pelo domínio customizado no HTML estático
+                  if (customDomainCanonical) {
+                    const subdomainUrl = `https://${landingPage.subdomain}.docpage.com.br`;
+                    const customUrl = `https://${customDomainCanonical}`;
+                    htmlText = htmlText.split(subdomainUrl).join(customUrl);
+                    console.log('[CUSTOM DOMAIN] URLs substituídas no HTML estático:', { from: subdomainUrl, to: customUrl });
+                  }
+                  const canonicalUrl = `https://${customDomainCanonical || landingPage.subdomain + '.docpage.com.br'}`;
                   res.setHeader('Content-Type', 'text/html; charset=utf-8');
                   res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, max-age=3600, s-maxage=3600');
                   res.setHeader('Vary', 'Host');
                   res.setHeader('X-Served-From', 'custom-domain-static-html');
+                  res.setHeader('Link', `<${canonicalUrl}>; rel="canonical"`);
+                  res.setHeader('X-Robots-Tag', 'index, follow');
                   return res.status(200).send(htmlText);
                 }
               }
@@ -439,10 +484,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             headers: req.headers as Record<string, string>,
           };
           const htmlContent = await renderLandingPage(landingPage, mockReq);
+            const customCanonicalUrl = `https://${customDomainCanonical || landingPage.subdomain + '.docpage.com.br'}`;
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, max-age=3600, s-maxage=3600');
             res.setHeader('Vary', 'Host');
             res.setHeader('X-Served-From', 'custom-domain-landing');
+            res.setHeader('Link', `<${customCanonicalUrl}>; rel="canonical"`);
+            res.setHeader('X-Robots-Tag', 'index, follow');
             return res.status(200).send(htmlContent);
         }
       } catch (domainLookupError: any) {

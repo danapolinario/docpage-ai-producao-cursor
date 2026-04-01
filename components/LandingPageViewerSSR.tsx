@@ -15,6 +15,7 @@ interface LandingPageData {
   about_photo_url: string | null;
   status: string;
   custom_domain: string | null;
+  chosen_domain: string | null;
   meta_title?: string | null;
   meta_description?: string | null;
   meta_keywords?: string[] | null;
@@ -40,6 +41,7 @@ export const LandingPageViewerSSR: React.FC<LandingPageViewerSSRProps> = ({ land
         metaDescription={landingPage.meta_description}
         metaKeywords={landingPage.meta_keywords}
         customDomain={landingPage.custom_domain}
+        chosenDomain={landingPage.chosen_domain}
       />
       <Preview
         content={landingPage.content_data}

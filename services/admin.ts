@@ -35,6 +35,19 @@ export interface LandingPageWithUser {
 
 export type LandingPageStatus = 'draft' | 'published';
 
+/** Linha devolvida por get_all_leads_admin (sem resume_token nem progress_data). */
+export interface AdminLeadRow {
+  id: string;
+  name: string;
+  email: string;
+  whatsapp: string | null;
+  status: string;
+  user_id: string | null;
+  landing_page_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /**
  * Login de administrador via edge function
  */
@@ -254,6 +267,81 @@ export async function updateAutoPublishSetting(enabled: boolean): Promise<void> 
 
   if (error) {
     console.error('Error updating auto publish setting:', error);
+    throw new Error(error.message || 'Erro ao atualizar configuração');
+  }
+}
+
+/**
+ * Modal de captura na home SaaS (legível por anon — ver RLS em lead_capture_enabled).
+ */
+export async function getLeadCaptureSetting(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('admin_settings')
+      .select('value')
+      .eq('key', 'lead_capture_enabled')
+      .maybeSingle();
+
+    if (error || !data) {
+      return true;
+    }
+
+    const value = data.value;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') return value === 'true' || value === 'True';
+    if (typeof value === 'number') return value !== 0;
+    return true;
+  } catch (e) {
+    console.error('getLeadCaptureSetting:', e);
+    return true;
+  }
+}
+
+/**
+ * Lista todos os leads (apenas administradores; RPC com SECURITY DEFINER).
+ */
+export async function getAllLeads(): Promise<AdminLeadRow[]> {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
+  }
+
+  const { data, error } = await supabase.rpc('get_all_leads_admin');
+
+  if (error) {
+    console.error('getAllLeads:', error);
+    throw new Error(error.message || 'Erro ao buscar leads');
+  }
+
+  return (data ?? []) as AdminLeadRow[];
+}
+
+export async function updateLeadCaptureSetting(enabled: boolean): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error('Usuário não autenticado');
+  }
+
+  const isAdmin = await checkIsAdmin();
+  if (!isAdmin) {
+    throw new Error('Apenas administradores podem alterar configurações');
+  }
+
+  const { error } = await supabase
+    .from('admin_settings')
+    .upsert({
+      key: 'lead_capture_enabled',
+      value: enabled,
+      updated_by: user.id,
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'key',
+    });
+
+  if (error) {
+    console.error('Error updating lead capture setting:', error);
     throw new Error(error.message || 'Erro ao atualizar configuração');
   }
 }

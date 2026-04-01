@@ -1,8 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /admin
-Disallow: /dashboard
-Disallow: /checkout/
-Disallow: /dev
-
-Sitemap: https://docpage.com.br/sitemap.xml

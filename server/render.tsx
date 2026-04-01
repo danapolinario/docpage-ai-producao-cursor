@@ -16,6 +16,7 @@ interface LandingPageData {
   about_photo_url: string | null;
   status: string;
   custom_domain: string | null;
+  chosen_domain: string | null;
   meta_title?: string | null;
   meta_description?: string | null;
   meta_keywords?: string[] | null;
@@ -24,8 +25,9 @@ interface LandingPageData {
 
 export async function renderLandingPage(landingPage: LandingPageData, req: any): Promise<string> {
   const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const pageUrl = landingPage.custom_domain 
-    ? `https://${landingPage.custom_domain}` 
+  const canonicalDomain = landingPage.chosen_domain || landingPage.custom_domain;
+  const pageUrl = canonicalDomain
+    ? `https://${canonicalDomain}` 
     : `https://${landingPage.subdomain}.docpage.com.br`;
 
   // Função para verificar se meta tag é genérica do DocPage AI
@@ -276,7 +278,7 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     <meta name="twitter:description" content="${escapeHtml(description)}" />
     <meta name="twitter:image" content="${escapeHtml(ogImageSecure)}" />
     <meta name="twitter:image:alt" content="${escapeHtml(landingPage.briefing_data.name)} - ${escapeHtml(landingPage.briefing_data.specialty)}" />
-    <meta name="twitter:domain" content="${escapeHtml(landingPage.custom_domain ? landingPage.custom_domain.replace(/^https?:\/\//, '') : baseUrl.replace('https://', '').replace('http://', ''))}" />
+    <meta name="twitter:domain" content="${escapeHtml(canonicalDomain || `${landingPage.subdomain}.docpage.com.br`)}" />
     
     <!-- Mobile & PWA -->
     <meta name="theme-color" content="#3B82F6" />

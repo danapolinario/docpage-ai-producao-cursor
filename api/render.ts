@@ -42,6 +42,7 @@ interface LandingPageData {
   about_photo_url: string | null;
   status: string;
   custom_domain: string | null;
+  chosen_domain: string | null;
   meta_title?: string | null;
   meta_description?: string | null;
   meta_keywords?: string[] | null;
@@ -129,7 +130,11 @@ function getCompiledAssets(): { js: string; css?: string } {
   return { js: '/index.tsx' };
 }
 
-export async function renderLandingPage(landingPage: LandingPageData, req: any): Promise<string> {
+interface RenderOptions {
+  noIndex?: boolean;
+}
+
+export async function renderLandingPage(landingPage: LandingPageData, req: any, options?: RenderOptions): Promise<string> {
   try {
     console.log('[RENDER] Iniciando renderização SSR para landing page:', {
       id: landingPage.id,
@@ -142,8 +147,9 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     });
     
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const pageUrl = landingPage.custom_domain 
-      ? `https://${landingPage.custom_domain}` 
+    const canonicalDomain = landingPage.chosen_domain || landingPage.custom_domain;
+    const pageUrl = canonicalDomain
+      ? `https://${canonicalDomain}` 
       : `https://${landingPage.subdomain}.docpage.com.br`;
     
     // Descobrir assets compilados
@@ -378,7 +384,7 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     <meta name="description" content="${escapeHtml(description)}" />
     <meta name="keywords" content="${escapeHtml(keywords)}" />
     <meta name="author" content="${escapeHtml(briefing.name || 'Médico')}" />
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="robots" content="${options?.noIndex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'}" />
     <meta name="language" content="pt-BR" />
     <meta name="revisit-after" content="7 days" />
     <meta name="rating" content="general" />
@@ -412,7 +418,7 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     <meta name="twitter:description" content="${escapeHtml(description)}" />
     <meta name="twitter:image" content="${escapeHtml(ogImage)}" />
     <meta name="twitter:image:alt" content="${escapeHtml(briefing.name || 'Médico')} - ${escapeHtml(briefing.specialty || 'Especialista')}" />
-    <meta name="twitter:domain" content="${escapeHtml(landingPage.custom_domain || baseUrl.replace('https://', '').replace('http://', ''))}" />
+    <meta name="twitter:domain" content="${escapeHtml(canonicalDomain || `${landingPage.subdomain}.docpage.com.br`)}" />
     
     <!-- Mobile & PWA -->
     <meta name="theme-color" content="#3B82F6" />

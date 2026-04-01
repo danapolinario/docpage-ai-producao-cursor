@@ -11,7 +11,7 @@ interface Props {
 }
 
 const SPECIALTIES = ['Alergologia e Imunologia', 'Angiologia', 'Cardiologia', 'Cardiologia Pediátrica', 'Dermatologia', 'Endocrinologia e Metabologia', 'Gastroenterologia', 'Gastroenterologia Pediátrica', 'Geriatria', 'Hematologia e Hemoterapia', 'Infectologia', 'Medicina do Sono', 'Medicina de Família e Comunidade', 'Medicina do Trabalho', 'Medicina Esportiva', 'Nefrologia', 'Neurologia', 'Neuropediatria', 'Nutrologia', 'Oncologia Clínica', 'Otorrinolaringologia', 'Pediatria', 'Pneumologia', 'Psiquiatria', 'Psiquiatria Infantil', 'Reumatologia', 'Cirurgia do Aparelho Digestivo', 'Cirurgia Cabeça e Pescoço', 'Cirurgia Cardiovascular', 'Cirurgia Geral', 'Cirurgia Oncológica', 'Cirurgia Pediátrica', 'Cirurgia Plástica', 'Cirurgia Torácica', 'Cirurgia Vascular', 'Coloproctologia', 'Ginecologia e Obstetrícia', 'Mastologia', 'Neurocirurgia', 'Oftalmologia', 'Ortopedia e Traumatologia', 'Urologia', 'Reprodução Humana', 'Anestesiologia (Medicina da Dor)', 'Genética Médica', 'Hepatologia', 'Cuidados Paliativos'];
-const AUDIENCES = ['Idosos', 'Crianças', 'Atletas', 'Mulheres', 'Gestantes', 'Executivos', 'Adolescentes', 'Recém-nascidos e Lactentes', 'Crianças e Adolescentes', 'Gestantes e Tentantes (Reprodução)', 'Mulheres em Climatério/Menopausa', 'Saúde da Mulher Integral', 'Saúde do Homem', 'Idosos e Longevidade', 'Atletas Amadores e Profissionais', 'Executivos e Profissionais de Alta Performance', 'Pacientes com Doenças Autoimunes', 'Pacientes Oncológicos', 'Pessoas em Processo de Emagrecimento', 'Pacientes com Dores Crônicas', 'Saúde Mental e Bem-estar Emocional', 'Neurodivergentes (TEA/TDAH)', 'Pacientes Pós-Bariátricos', 'Check-up e Prevenção'];
+const AUDIENCES = ['Adultos', 'Idosos', 'Crianças', 'Atletas', 'Mulheres', 'Homens', 'Gestantes', 'Executivos', 'Adolescentes', 'Recém-nascidos e Lactentes', 'Crianças e Adolescentes', 'Gestantes e Tentantes (Reprodução)', 'Mulheres em Climatério/Menopausa', 'Saúde da Mulher Integral', 'Saúde do Homem', 'Idosos e Longevidade', 'Atletas Amadores e Profissionais', 'Executivos e Profissionais de Alta Performance', 'Pacientes com Doenças Autoimunes', 'Pacientes Oncológicos', 'Pessoas em Processo de Emagrecimento', 'Pacientes com Dores Crônicas', 'Saúde Mental e Bem-estar Emocional', 'Neurodivergentes (TEA/TDAH)', 'Pacientes Pós-Bariátricos', 'Check-up e Prevenção'];
 const SERVICES = ['Consulta de Rotina', 'Check-up', 'Cirurgia', 'Exames', 'Terapia', 'Reabilitação', 'Consulta Especializada', 'Teleconsulta / Atendimento Online', 'Check-up Personalizado', 'Segunda Opinião Médica', 'Avaliação Pré-Operatória', 'Acompanhamento Pré-Natal', 'Puericultura (Acompanhamento Infantil)', 'Avaliação de Bioimpedância', 'Pequenos Procedimentos Ambulatoriais', 'Cirurgia Minimamente Invasiva', 'Cirurgia Robótica', 'Infiltrações Articulares', 'Bloqueios de Dor', 'Biópsias', 'Cauterização de Lesões', 'Retirada de Sinais e Cistos', 'Tratamentos a Laser', 'Eletrocardiograma (ECG)', 'Ultrassonografia com Doppler', 'Polissonografia', 'Espirometria', 'Exames Laboratoriais de Rotina', 'Teste Ergométrico', 'Soroterapia e Reposição de Vitaminas', 'Implantes Hormonais (Sottopelle)', 'Neuromodulação', 'Reabilitação Funcional', 'Gestão de Doenças Crônicas', 'Procedimentos Estéticos Médicos (Injetáveis)', 'Terapia de Reposição Hormonal'];
 const STATES = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 
@@ -66,7 +66,13 @@ export const BriefingForm: React.FC<Props> = ({ data, onChange, onNext, isDevMod
           <span className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm">1</span>
           Informações Básicas
         </h2>
-        
+
+        <h3 className="text-1xl text-gray-800 mb-6 flex items-center gap-2">
+          Esse é nosso briefing, a partir dele, nossa IA vai escrever o conteúdo do seu site. Adicione o máximo de informações que considera relevantes na sua trajetória e para seus objetivos atuais.
+        </h3>
+        <h3 className="text-1xl text-gray-800 font-bold mb-6 flex items-center gap-2">
+        Tempo estimado: 5min
+      </h3>
         <div className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo (inclua Dr. ou Dra.)</label>
@@ -75,7 +81,7 @@ export const BriefingForm: React.FC<Props> = ({ data, onChange, onNext, isDevMod
               name="name"
               value={data.name}
               onChange={handleChange}
-              placeholder="Dr. João Silva"
+              placeholder="Dr. Ricardo Mendes"
               className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -133,7 +139,7 @@ export const BriefingForm: React.FC<Props> = ({ data, onChange, onNext, isDevMod
                placeholder="Digite vírgula para adicionar..."
              />
              <MultiSelect 
-               label="Público Alvo"
+               label="Público-alvo"
                value={data.targetAudience}
                onChange={handleMultiSelectChange('targetAudience')}
                suggestions={AUDIENCES}
@@ -157,7 +163,7 @@ export const BriefingForm: React.FC<Props> = ({ data, onChange, onNext, isDevMod
                name="bio"
                value={data.bio || ''}
                onChange={handleChange}
-               placeholder="Formado na USP, com 15 anos de experiência..."
+               placeholder="Formado pela Faculdade de Medicina da Universidade de São Paulo, com 10 anos de experiência..."
                className="w-full p-3 border border-gray-300 rounded-lg h-24 focus:ring-2 focus:ring-blue-500 resize-none text-sm"
              />
           </div>
@@ -186,22 +192,24 @@ export const BriefingForm: React.FC<Props> = ({ data, onChange, onNext, isDevMod
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2 border-t border-gray-100">
              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Email Profissional</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email Profissional (opcional)</label>
                 <input
                   type="email"
                   name="contactEmail"
                   value={data.contactEmail}
                   onChange={handleChange}
+                  placeholder="email@email.com"
                   className="w-full p-2 border border-gray-200 rounded text-sm"
                 />
              </div>
              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">WhatsApp / Telefone</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp para atendimento</label>
                 <input
                   type="text"
                   name="contactPhone"
                   value={data.contactPhone}
                   onChange={handleChange}
+                  placeholder="(11) 99999-9999"
                   className="w-full p-2 border border-gray-200 rounded text-sm"
                 />
              </div>
@@ -218,7 +226,7 @@ export const BriefingForm: React.FC<Props> = ({ data, onChange, onNext, isDevMod
                 : 'bg-gray-300 cursor-not-allowed'
             }`}
           >
-            Próximo: Estilo Visual
+            Próximo
           </button>
         </div>
       </div>
@@ -228,7 +236,7 @@ export const BriefingForm: React.FC<Props> = ({ data, onChange, onNext, isDevMod
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
           <h3 className="font-bold text-gray-800 mb-2">Dica do Especialista</h3>
           <p className="text-sm text-gray-600 leading-relaxed">
-            Use vírgulas para separar especialidades e serviços. Adicione todos os endereços onde você atende para que o sistema gere os mapas corretamente.
+            Use vírgulas para separar especialidades, público-alvo e serviços. Adicione todos os endereços onde você atende para que o sistema gere os mapas corretamente.
           </p>
           <SeoRating data={data} />
         </div>

@@ -69,7 +69,7 @@ export const PrivacyPolicy: React.FC = () => {
               <section>
                 <h2 className="text-2xl font-semibold text-gray-900 mb-4">8. Contato</h2>
                 <p>
-                  Se você tiver dúvidas sobre esta Política de Privacidade ou sobre como tratamos seus dados pessoais, entre em contato conosco através do email: privacidade@docpage.com.br
+                  Se você tiver dúvidas sobre esta Política de Privacidade ou sobre como tratamos seus dados pessoais, entre em contato conosco através do email: contato@docpage.com.br
                 </p>
               </section>
             </div>

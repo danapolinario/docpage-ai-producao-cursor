@@ -3,6 +3,7 @@ import { Plan, BriefingData, LandingPageContent, DesignSettings } from '../types
 import { createCheckoutSession } from '../services/stripe';
 import { sendOTP, verifyCode, resendOTP } from '../services/auth';
 import { checkDomainAvailability, updateLandingPage, createLandingPage } from '../services/landing-pages';
+import { linkLeadToLandingPage } from '../services/leads';
 import { uploadPhotoFromBase64 } from '../services/storage';
 import SuccessModal from './SuccessModal';
 import { supabase } from '../lib/supabase';
@@ -25,6 +26,8 @@ interface Props {
   prefilledDomain?: string | null;
   prefilledCpf?: string | null;
   prefilledHasCustomDomain?: boolean;
+  prefilledEmail?: string; // E-mail do lead para pré-preencher
+  leadId?: string; // ID do lead para vincular à landing page ao criar
 }
 
 type CheckoutStep = 1 | 2 | 3;
@@ -44,7 +47,9 @@ export const CheckoutFlow: React.FC<Props> = ({
   onError,
   prefilledDomain,
   prefilledCpf,
-  prefilledHasCustomDomain = false
+  prefilledHasCustomDomain = false,
+  prefilledEmail,
+  leadId
 }) => {
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -58,9 +63,8 @@ export const CheckoutFlow: React.FC<Props> = ({
   } | null>(null);
   
   // Step 1: Account States
-  // Não inicializar com briefing.contactEmail - o usuário deve informar o email no Step 1
-  const [email, setEmail] = useState('');
-  const [confirmEmail, setConfirmEmail] = useState('');
+  const [email, setEmail] = useState(prefilledEmail || '');
+  const [confirmEmail, setConfirmEmail] = useState(prefilledEmail || '');
   const [emailError, setEmailError] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [codeError, setCodeError] = useState('');
@@ -568,6 +572,15 @@ export const CheckoutFlow: React.FC<Props> = ({
           about_photo_url: uploadedAboutPhotoUrl || null,
         });
 
+      }
+
+      // Vincular lead à landing page quando disponível
+      if (leadId && leadId !== 'dev-lead-id') {
+        try {
+          await linkLeadToLandingPage(leadId, landingPageId);
+        } catch (linkError) {
+          console.warn('Erro ao vincular lead à landing page:', linkError);
+        }
       }
 
       // Criar Checkout Session no Stripe

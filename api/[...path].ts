@@ -113,10 +113,108 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   });
   console.log('[SSR DEBUG] ============================================');
   
+  // SEO: Servir robots.txt e sitemap.xml dinâmicos para todos os domínios
+  const requestPath = Array.isArray(req.query.path) ? req.query.path.join('/') : (req.query.path || '');
+  const hostHostname = host.split(':')[0].toLowerCase();
+  const isLandingPageHost = !!subdomain || !hostHostname.includes('docpage.com.br');
+  const isMainDocpage = hostHostname === 'docpage.com.br' || hostHostname === 'www.docpage.com.br';
+  
+  if (requestPath === 'robots.txt' || requestPath === 'sitemap.xml') {
+    // Domínio principal docpage.com.br
+    if (isMainDocpage) {
+      if (requestPath === 'robots.txt') {
+        const robotsContent = `User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /dashboard\nDisallow: /checkout/\nDisallow: /dev\n\nSitemap: https://docpage.com.br/sitemap.xml\n`;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.status(200).send(robotsContent);
+      }
+      if (requestPath === 'sitemap.xml') {
+        const sitemapContent = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9\n        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">\n  <url>\n    <loc>https://docpage.com.br/</loc>\n    <lastmod>2026-02-05</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n  </url>\n  <url>\n    <loc>https://docpage.com.br/termos-de-uso</loc>\n    <lastmod>2026-02-05</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.5</priority>\n  </url>\n  <url>\n    <loc>https://docpage.com.br/politica-de-privacidade</loc>\n    <lastmod>2026-02-05</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.5</priority>\n  </url>\n  <url>\n    <loc>https://docpage.com.br/marketing-medico-primeiros-passos</loc>\n    <lastmod>2026-02-18</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>\n</urlset>`;
+        res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.status(200).send(sitemapContent);
+      }
+    }
+
+    // Subdomínios e domínios customizados de landing pages
+    if (isLandingPageHost) {
+      try {
+        const queryClientSeo = supabaseAdmin || supabase;
+        let lpSeo: any = null;
+        
+        if (subdomain) {
+          const { data } = await queryClientSeo
+            .from('landing_pages')
+            .select('chosen_domain, custom_domain, subdomain, status, published_at')
+            .eq('subdomain', subdomain)
+            .single();
+          lpSeo = data;
+        } else {
+          const hostForLookupSeo = (candidates.find((h: string) => h && !h.toLowerCase().includes('docpage.com.br')) || host).split(':')[0].toLowerCase().replace(/^www\./, '');
+          const { data: pages } = await queryClientSeo
+            .rpc('get_landing_page_by_domain', { domain_input: hostForLookupSeo });
+          lpSeo = Array.isArray(pages) ? pages[0] : pages;
+        }
+
+        if (lpSeo) {
+          const seoDomain = lpSeo.chosen_domain || lpSeo.custom_domain || `${lpSeo.subdomain}.docpage.com.br`;
+          const isSubdomainWithCustom = subdomain && (lpSeo.chosen_domain || lpSeo.custom_domain);
+
+          if (requestPath === 'robots.txt') {
+            let robotsContent: string;
+            if (isSubdomainWithCustom) {
+              robotsContent = `User-agent: *\nDisallow: /\n`;
+            } else {
+              robotsContent = `User-agent: *\nAllow: /\n\nSitemap: https://${seoDomain}/sitemap.xml\n`;
+            }
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            return res.status(200).send(robotsContent);
+          }
+
+          if (requestPath === 'sitemap.xml') {
+            const lastmod = lpSeo.published_at ? new Date(lpSeo.published_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+            const sitemapContent = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>https://${seoDomain}/</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n  </url>\n</urlset>`;
+            res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            return res.status(200).send(sitemapContent);
+          }
+        }
+      } catch (seoErr: any) {
+        console.log('[SEO] Erro ao gerar robots.txt/sitemap.xml dinâmico:', seoErr?.message);
+      }
+    }
+  }
+
   // Se for subdomínio, verificar se existe HTML estático primeiro
   if (subdomain) {
     console.log('[SUBDOMAIN DEBUG] Subdomain detected:', subdomain);
     
+    // SEO: Verificar se existe domínio customizado para redirect 301 (antes de servir qualquer conteúdo)
+    if (!hasPreview) {
+      try {
+        const queryClientRedirect = supabaseAdmin || supabase;
+        const { data: lpForRedirect } = await queryClientRedirect
+          .from('landing_pages')
+          .select('chosen_domain, custom_domain, status')
+          .eq('subdomain', subdomain)
+          .single();
+        
+        const seoRedirectDomain = lpForRedirect?.chosen_domain || lpForRedirect?.custom_domain;
+        if (seoRedirectDomain && lpForRedirect?.status === 'published') {
+          const currentPath = Array.isArray(req.query.path) ? `/${req.query.path.join('/')}` : (req.query.path ? `/${req.query.path}` : '');
+          const redirectUrl = `https://${seoRedirectDomain}${currentPath}`;
+          console.log('[SSR] 301 Redirect subdomínio → domínio customizado:', { subdomain, seoRedirectDomain, redirectUrl });
+          res.setHeader('Location', redirectUrl);
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+          res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+          return res.status(301).send('');
+        }
+      } catch (redirectCheckErr: any) {
+        console.log('[SSR] Erro ao verificar redirect de domínio, continuando normalmente:', redirectCheckErr?.message);
+      }
+    }
+
     // Primeiro, verificar se existe HTML estático no Storage
     try {
       const HTML_FOLDER = 'html';
@@ -165,9 +263,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               console.log('[SSR] ✓ HTML estático contém assets compilados corretos');
             }
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
-            res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600'); // Cache de 1 hora
+            res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
             res.setHeader('Vary', 'Host');
             res.setHeader('X-Served-From', 'static-html');
+            res.setHeader('Link', `<https://${subdomain}.docpage.com.br>; rel="canonical"`);
+            res.setHeader('X-Robots-Tag', 'index, follow');
             return res.send(htmlText);
           }
         }
@@ -306,12 +406,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         headers: req.headers,
       };
       
-      const htmlContent = await renderLandingPage(landingPage, mockReq);
+      // noIndex se servindo via subdomínio mas LP tem domínio customizado (cenário preview/draft)
+      const subdomainHasCustomDomain = !!(landingPage.chosen_domain || landingPage.custom_domain);
+      const subdomainCanonicalDomain = landingPage.chosen_domain || landingPage.custom_domain || `${subdomain}.docpage.com.br`;
+      const htmlContent = await renderLandingPage(landingPage, mockReq, { noIndex: subdomainHasCustomDomain });
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, max-age=3600, s-maxage=3600');
       res.setHeader('Vary', 'Host');
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('X-Served-From', hasPreview ? 'dynamic-ssr-preview' : 'dynamic-ssr');
+      res.setHeader('Link', `<https://${subdomainCanonicalDomain}>; rel="canonical"`);
+      if (subdomainHasCustomDomain) {
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      } else {
+        res.setHeader('X-Robots-Tag', 'index, follow');
+      }
       return res.status(200).send(htmlContent);
     } catch (error: any) {
       console.error('[SSR] ✗ Erro ao renderizar SSR:', error?.message || error);
@@ -355,11 +464,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               },
               headers: req.headers,
             };
-            const html = await renderLandingPage(landingPage, mockReq);
+            const retryHasCustomDomain = !!(landingPage.chosen_domain || landingPage.custom_domain);
+            const html = await renderLandingPage(landingPage, mockReq, { noIndex: retryHasCustomDomain });
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
+            if (retryHasCustomDomain) {
+              res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+            }
             return res.send(html);
           }
         } catch (retryError) {
@@ -407,6 +520,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             // Tentar HTML estático pelo subdomain
+            const customDomainCanonical = landingPage.chosen_domain || landingPage.custom_domain;
             try {
               const HTML_FOLDER = 'html';
               const filePath = `${HTML_FOLDER}/${landingPage.subdomain}.html`;
@@ -415,14 +529,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               if (fetchResponse.ok) {
                 const fullResponse = await fetch(publicUrl, { headers: { 'Cache-Control': 'no-cache' } });
                 if (fullResponse.ok) {
-                  const htmlText = await fullResponse.text();
+                  let htmlText = await fullResponse.text();
                   const hasOldIndexTsx = htmlText.includes('src="/index.tsx"') || htmlText.includes("src='/index.tsx'");
                   const hasCompiledAssets = htmlText.includes('/assets/') && (htmlText.includes('.js"') || htmlText.includes('.js\''));
                   if (!hasOldIndexTsx || hasCompiledAssets) {
+                    // SEO: Substituir URLs de subdomínio pelo domínio customizado no HTML estático
+                    if (customDomainCanonical) {
+                      const subdomainUrl = `https://${landingPage.subdomain}.docpage.com.br`;
+                      const customUrl = `https://${customDomainCanonical}`;
+                      htmlText = htmlText.split(subdomainUrl).join(customUrl);
+                    }
+                    const canonicalUrlStatic = `https://${customDomainCanonical || landingPage.subdomain + '.docpage.com.br'}`;
                     res.setHeader('Content-Type', 'text/html; charset=utf-8');
                     res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, max-age=3600, s-maxage=3600');
                     res.setHeader('Vary', 'Host');
                     res.setHeader('X-Served-From', 'custom-domain-static-html');
+                    res.setHeader('Link', `<${canonicalUrlStatic}>; rel="canonical"`);
+                    res.setHeader('X-Robots-Tag', 'index, follow');
                     return res.send(htmlText);
                   }
                 }
@@ -441,10 +564,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               headers: req.headers as Record<string, string>,
             };
             const htmlContent = await renderLandingPage(landingPage, mockReq);
+            const customCanonicalUrl = `https://${customDomainCanonical || landingPage.subdomain + '.docpage.com.br'}`;
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : 'public, max-age=3600, s-maxage=3600');
             res.setHeader('Vary', 'Host');
             res.setHeader('X-Served-From', 'custom-domain-landing');
+            res.setHeader('Link', `<${customCanonicalUrl}>; rel="canonical"`);
+            res.setHeader('X-Robots-Tag', 'index, follow');
             return res.status(200).send(htmlContent);
           }
         } catch (domainLookupError: any) {

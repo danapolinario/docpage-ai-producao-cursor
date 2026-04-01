@@ -3,9 +3,13 @@ import { sendOTP, verifyCode, resendOTP } from '../services/auth';
 
 interface Props {
   onSuccess?: () => void;
+  /** Pré-preenche o e-mail (ex.: lead capturado no funil). */
+  initialEmail?: string;
+  /** Aviso informativo (ex.: e-mail já cadastrado como lead — fazer login). */
+  bannerMessage?: string | null;
 }
 
-export const Auth: React.FC<Props> = ({ onSuccess }) => {
+export const Auth: React.FC<Props> = ({ onSuccess, initialEmail, bannerMessage }) => {
   const [email, setEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [name, setName] = useState('');
@@ -15,6 +19,17 @@ export const Auth: React.FC<Props> = ({ onSuccess }) => {
   const [success, setSuccess] = useState<string | null>(null);
   const [canResendCode, setCanResendCode] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(0);
+  const lastSeededInitialEmailRef = React.useRef<string | undefined>(undefined);
+
+  // Sincroniza quando initialEmail muda (novo lead / modal reaberto com outro valor).
+  // Não reintroduz initialEmail ao voltar de «Alterar email» se o prop for o mesmo.
+  React.useEffect(() => {
+    const trimmed = initialEmail?.trim();
+    if (!trimmed || isCodeSent) return;
+    if (lastSeededInitialEmailRef.current === trimmed) return;
+    lastSeededInitialEmailRef.current = trimmed;
+    setEmail(trimmed);
+  }, [initialEmail, isCodeSent]);
 
   // Countdown para reenvio de código
   React.useEffect(() => {
@@ -119,6 +134,12 @@ export const Auth: React.FC<Props> = ({ onSuccess }) => {
               : 'Digite seu email para receber um código de acesso'}
           </p>
         </div>
+
+        {bannerMessage && !isCodeSent && (
+          <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-sm leading-relaxed">
+            {bannerMessage}
+          </div>
+        )}
 
         {/* Mensagens de Erro/Sucesso */}
         {error && (

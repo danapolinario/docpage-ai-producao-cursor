@@ -15,8 +15,9 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 // Função para renderizar HTML (simplificada, baseada em api/render.ts)
 async function renderLandingPageHTML(landingPage: any): Promise<string> {
   const baseUrl = "https://docpage.com.br";
-  const pageUrl = landingPage.custom_domain 
-    ? `https://${landingPage.custom_domain}` 
+  const canonicalDomain = landingPage.chosen_domain || landingPage.custom_domain;
+  const pageUrl = canonicalDomain
+    ? `https://${canonicalDomain}` 
     : `https://${landingPage.subdomain}.docpage.com.br`;
 
   const briefing = landingPage.briefing_data || {};
@@ -231,7 +232,7 @@ async function renderLandingPageHTML(landingPage: any): Promise<string> {
     <meta name="twitter:description" content="${escapeHtml(description)}" />
     <meta name="twitter:image" content="${escapeHtml(ogImage)}" />
     <meta name="twitter:image:alt" content="${escapeHtml(briefing.name || 'Médico')} - ${escapeHtml(briefing.specialty || 'Especialista')}" />
-    <meta name="twitter:domain" content="${escapeHtml(landingPage.custom_domain || baseUrl.replace('https://', '').replace('http://', ''))}" />
+    <meta name="twitter:domain" content="${escapeHtml(canonicalDomain || `${landingPage.subdomain}.docpage.com.br`)}" />
     
     <!-- Mobile & PWA -->
     <meta name="theme-color" content="#3B82F6" />
@@ -393,7 +394,8 @@ serve(async (req) => {
     // Gerar HTML chamando a API do Vercel para garantir que use os assets corretos
     // Isso garante que o HTML gerado tenha os mesmos caminhos de assets que o SSR dinâmico
     const vercelUrl = "https://docpage.com.br"; // URL fixa do Vercel
-    const apiUrl = `${vercelUrl}/api`;
+    // Usar ?preview para contornar redirect 301 (subdomínio → domínio customizado)
+    const apiUrl = `${vercelUrl}/api?preview`;
     
     console.log('[GENERATE STATIC HTML] Chamando API do Vercel para gerar HTML:', apiUrl);
     console.log('[GENERATE STATIC HTML] Subdomain:', landingPage.subdomain);
@@ -407,6 +409,7 @@ serve(async (req) => {
         'X-Vercel-Original-Host': `${landingPage.subdomain}.docpage.com.br`,
         'User-Agent': 'Supabase-Edge-Function/1.0',
       },
+      redirect: 'manual',
     });
     
     let html: string;
@@ -435,6 +438,21 @@ serve(async (req) => {
         JSON.stringify({ error: "Erro ao gerar HTML" }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
+    }
+
+    // SEO: Garantir que HTML estático tenha robots "index, follow" (pode ter vindo com "noindex" do preview)
+    html = html.replace(
+      '<meta name="robots" content="noindex, nofollow"',
+      '<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"'
+    );
+
+    // SEO: Substituir URLs de subdomínio pelo domínio customizado se disponível
+    const canonicalDomainForReplace = landingPage.chosen_domain || landingPage.custom_domain;
+    if (canonicalDomainForReplace) {
+      const subdomainUrl = `https://${landingPage.subdomain}.docpage.com.br`;
+      const customUrl = `https://${canonicalDomainForReplace}`;
+      html = html.split(subdomainUrl).join(customUrl);
+      console.log('[GENERATE STATIC HTML] URLs substituídas:', { from: subdomainUrl, to: customUrl });
     }
 
     // Upload para Storage

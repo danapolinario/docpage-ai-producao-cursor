@@ -5,11 +5,15 @@ import { Confetti } from './common/Confetti';
 
 interface Props {
   onStart: () => void;
+  /** Logado sem LP publicada: oculta Meu Painel e troca CTAs para “Continuar meu site”. */
+  funnelContinueMode?: boolean;
   onDevNavigation?: (step: number, mode?: 'plans' | 'checkout' | 'dashboard') => void;
   onLoginClick?: () => void;
   isAuthenticated?: boolean;
   onLogout?: () => void;
 }
+
+const CONTINUE_SITE_LABEL = 'Continuar meu site';
 
 // --- Helper Hook for Scroll Animation ---
 const useOnScreen = (options: any) => {
@@ -136,8 +140,18 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ step, index, isLast, onVisi
   );
 };
 
-export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLoginClick, isAuthenticated, onLogout }) => {
+export const SaaSLanding: React.FC<Props> = ({
+  onStart,
+  funnelContinueMode = false,
+  onDevNavigation,
+  onLoginClick,
+  isAuthenticated,
+  onLogout,
+}) => {
   const navigate = useNavigate();
+  const heroPrimaryLabel = funnelContinueMode ? CONTINUE_SITE_LABEL : 'Experimentar Grátis';
+  const midPageGreenLabel = funnelContinueMode ? CONTINUE_SITE_LABEL : 'Comece Agora - É Grátis!';
+  const footerBannerLabel = funnelContinueMode ? CONTINUE_SITE_LABEL : 'Criar Meu Site Grátis';
   const [activeModal, setActiveModal] = useState<'none' | 'terms' | 'privacy'>('none');
   const [showDevMenu, setShowDevMenu] = useState(false);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
@@ -324,6 +338,15 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
   ];
 
   const examples = [
+
+    {
+      author: "Dra. Mariana Becker",
+      specialty: "Geriatria",
+      theme: "Plano Autoridade",
+      image: "/dra-mariana-becker.jpg",
+      tagColor: "bg-purple-100 text-purple-700",
+      link: "https://dramarianabeckergeriatra.com.br"
+    },
     {
       author: "Dra. Tereza Wagner",
       specialty: "Nefrologista",
@@ -338,14 +361,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
       theme: "Estilo Acolhedor",
       image: "/dra-stella.jpg",
       tagColor: "bg-green-100 text-green-700",
-      link: "https://www.drastellamardegan.com.br/"
-    },
-    {
-      author: "Instituto Cuidar",
-      specialty: "Clinica Médica",
-      theme: "Estilo Moderno",
-      image: "https://images.unsplash.com/photo-1504813184591-01572f98c85f?auto=format&fit=crop&w=800&q=80",
-      tagColor: "bg-purple-100 text-purple-700"
+      link: "https://www.drastellamardegan.com.br"
     }
   ];
 
@@ -537,6 +553,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+             <button onClick={() => scrollToSection('testimonials')} className="hover:text-blue-600 transition-colors">Depoimentos</button>
              <button onClick={() => scrollToSection('how-it-works')} className="hover:text-blue-600 transition-colors">Como funciona</button>
              <button onClick={() => scrollToSection('examples')} className="hover:text-blue-600 transition-colors">Exemplos</button>
              <button onClick={() => scrollToSection('pricing')} className="hover:text-blue-600 transition-colors">Planos</button>
@@ -573,12 +590,14 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
              )}
              {isAuthenticated ? (
                 <>
+                  {!funnelContinueMode && (
                   <button 
                     onClick={() => navigate('/dashboard')} 
                     className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-full transition-colors"
                   >
                     Meu Painel
                   </button>
+                  )}
                   <button 
                     onClick={onLogout} 
                     className="text-sm font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 px-4 py-2 rounded-full transition-colors hover:bg-slate-200 flex items-center gap-2"
@@ -614,7 +633,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
 
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-2">
-            {isAuthenticated && (
+            {isAuthenticated && !funnelContinueMode && (
               <button 
                 onClick={() => navigate('/dashboard')} 
                 className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-full transition-colors"
@@ -663,6 +682,12 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
 
                   {/* Mobile Menu Items */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                    <button
+                      onClick={() => scrollToSection('testimonials')}
+                      className="w-full text-left px-4 py-3 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                    >
+                      Depoimentos
+                    </button>
                     <button
                       onClick={() => scrollToSection('how-it-works')}
                       className="w-full text-left px-4 py-3 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors font-medium"
@@ -729,6 +754,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
                     {/* Login/Auth Actions */}
                     {isAuthenticated ? (
                       <>
+                        {!funnelContinueMode && (
                         <button
                           onClick={() => {
                             navigate('/dashboard');
@@ -738,6 +764,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
                         >
                           Meu Painel
                         </button>
+                        )}
                         <button
                           onClick={() => {
                             if (onLogout) onLogout();
@@ -787,6 +814,10 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 pt-8 pb-12 text-center">
           <div className="flex flex-col md:flex-row items-center justify-center gap-3 mb-6">
+            
+            <div className="inline-block px-4 py-1.5 rounded-full bg-white border border-teal-100 text-teal-700 text-xs font-bold uppercase tracking-wider">
+              <img src="/powered-gemini.jpg" width="120px"/>
+            </div>
             <div className="inline-block px-4 py-1.5 rounded-full bg-teal-50 border border-teal-100 text-teal-700 text-xs font-bold uppercase tracking-wider">
               ✨ O Novo Padrão para Médicos
             </div>
@@ -812,7 +843,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
               onClick={onStart}
               className="px-8 py-4 bg-slate-900 text-white rounded-full font-bold text-lg hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1"
             >
-              Experimentar Grátis
+              {heroPrimaryLabel}
             </button>
             <button 
               onClick={() => scrollToSection('examples')}
@@ -999,7 +1030,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
                 onClick={onStart} 
                 className="px-12 py-5 bg-green-600 text-white rounded-full font-bold text-xl shadow-xl shadow-green-200 hover:bg-green-700 transition-all hover:-translate-y-1 hover:shadow-2xl"
               >
-                Comece Agora - É Grátis!
+                {midPageGreenLabel}
               </button>
             </div>
          </div>
@@ -1048,10 +1079,28 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
                      onClick={onStart}
                      className={`w-full py-3 rounded-lg font-bold transition-colors ${plan.ctaColor}`}
                    >
-                     {plan.cta}
+                     {funnelContinueMode ? CONTINUE_SITE_LABEL : plan.cta}
                    </button>
                 </div>
              ))}
+          </div>
+        </div>
+      </div>
+
+{/* Testimonial Section - Mariana Becker */}
+      <div id="testimonials" className="py-24 bg-white border-b border-slate-200">
+        <div className="max-w-4xl mx-auto px-6">
+          <h2 className="text-center text-3xl md:text-4xl font-bold mb-16 text-slate-900">O que dizem nossos médicos</h2>
+          <div className="bg-slate-50 rounded-3xl p-8 md:p-12 border border-slate-100 shadow-sm ">
+            <div className="text-6xl font-serif text-slate-300">"</div>
+            <p className="text-lg md:text-sm text-slate-700 leading-relaxed mb-8">
+              Fiquei muito satisfeita com a experiência de criar meu site pelo DocPage AI. O processo foi simples, rápido e muito intuitivo, mesmo para quem não tem familiaridade com tecnologia.
+              Em pouco tempo consegui ter um site profissional, organizado e alinhado com a forma como gosto de apresentar meu trabalho na geriatria e na medicina do estilo de vida. A plataforma facilita bastante a presença digital do médico de forma prática e elegante.
+              Parabéns à equipe pela proposta inovadora e pelo suporte durante todo o processo. Recomendo a outros médicos que desejam ter um site profissional sem complicação.
+            </p>
+            <cite className="not-italic font-sans text-sm font-bold text-slate-600">
+              Mariana Becker Geraldi Quagliato — CRM 143833/SP
+            </cite>
           </div>
         </div>
       </div>
@@ -1152,7 +1201,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
             <h2 className="text-4xl md:text-5xl font-bold mb-8 leading-tight">Comece Hoje. <br/>Veja o Resultado Antes de Pagar.</h2>
             <p className="text-xl text-slate-300 mb-12 max-w-2xl mx-auto">Centenas de médicos já descobriram que autoridade digital não precisa ser cara nem complicada.</p>
             <button onClick={onStart} className="px-12 py-5 bg-green-500 text-white rounded-full font-bold text-xl hover:bg-green-600 transition-all shadow-xl hover:scale-105">
-               Criar Meu Site Grátis
+               {footerBannerLabel}
             </button>
          </div>
       </section>
@@ -1163,12 +1212,34 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
           
           <div className="col-span-1 md:col-span-1">
              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-blue-600 rounded-lg"></div>
-                <span className="font-bold text-xl text-white">DocPage AI</span>
+                <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.reload()}>
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-500 rounded-lg shadow-lg shadow-blue-900/20 flex items-center justify-center relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-purple-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <svg className="w-4 h-4 relative z-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <circle cx="8" cy="8" r="1.5" fill="currentColor" opacity="0.9" />
+                <circle cx="16" cy="8" r="1.5" fill="currentColor" opacity="0.9" />
+                <circle cx="12" cy="16" r="1.5" fill="currentColor" opacity="0.9" />
+                <path d="M8 8 L12 16 M16 8 L12 16 M8 8 L16 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
+                <circle cx="6" cy="6" r="0.5" fill="currentColor" opacity="0.7">
+                  <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="18" cy="6" r="0.5" fill="currentColor" opacity="0.7">
+                  <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" begin="0.5s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="12" cy="18" r="0.5" fill="currentColor" opacity="0.7">
+                  <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" begin="1s" repeatCount="indefinite" />
+                </circle>
+              </svg>
+            </div>
+            <span className="font-bold text-xl tracking-tight">DocPage AI</span>
+          </div>
              </div>
              <p className="text-slate-500 mb-6 leading-relaxed">
                A plataforma líder em criação de sites éticos para médicos e profissionais da saúde.
              </p>
+             <div className="inline-block px-4 py-1.5 rounded-full bg-white border border-teal-100 text-teal-700 text-xs font-bold uppercase tracking-wider">
+              <img src="/powered-gemini.jpg" width="120px"/>
+            </div><br/><br/>
              <div className="flex gap-4">
                 <a href="https://www.instagram.com/docpage.ai" target="_blank" className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center hover:bg-blue-600 hover:text-white transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-instagram" viewBox="0 0 16 16"> <path d="M8 0C5.829 0 5.556.01 4.703.048 3.85.088 3.269.222 2.76.42a3.9 3.9 0 0 0-1.417.923A3.9 3.9 0 0 0 .42 2.76C.222 3.268.087 3.85.048 4.7.01 5.555 0 5.827 0 8.001c0 2.172.01 2.444.048 3.297.04.852.174 1.433.372 1.942.205.526.478.972.923 1.417.444.445.89.719 1.416.923.51.198 1.09.333 1.942.372C5.555 15.99 5.827 16 8 16s2.444-.01 3.298-.048c.851-.04 1.434-.174 1.943-.372a3.9 3.9 0 0 0 1.416-.923c.445-.445.718-.891.923-1.417.197-.509.332-1.09.372-1.942C15.99 10.445 16 10.173 16 8s-.01-2.445-.048-3.299c-.04-.851-.175-1.433-.372-1.941a3.9 3.9 0 0 0-.923-1.417A3.9 3.9 0 0 0 13.24.42c-.51-.198-1.092-.333-1.943-.372C10.443.01 10.172 0 7.998 0zm-.717 1.442h.718c2.136 0 2.389.007 3.232.046.78.035 1.204.166 1.486.275.373.145.64.319.92.599s.453.546.598.92c.11.281.24.705.275 1.485.039.843.047 1.096.047 3.231s-.008 2.389-.047 3.232c-.035.78-.166 1.203-.275 1.485a2.5 2.5 0 0 1-.599.919c-.28.28-.546.453-.92.598-.28.11-.704.24-1.485.276-.843.038-1.096.047-3.232.047s-2.39-.009-3.233-.047c-.78-.036-1.203-.166-1.485-.276a2.5 2.5 0 0 1-.92-.598 2.5 2.5 0 0 1-.6-.92c-.109-.281-.24-.705-.275-1.485-.038-.843-.046-1.096-.046-3.233s.008-2.388.046-3.231c.036-.78.166-1.204.276-1.486.145-.373.319-.64.599-.92s.546-.453.92-.598c.282-.11.705-.24 1.485-.276.738-.034 1.024-.044 2.515-.045zm4.988 1.328a.96.96 0 1 0 0 1.92.96.96 0 0 0 0-1.92m-4.27 1.122a4.109 4.109 0 1 0 0 8.217 4.109 4.109 0 0 0 0-8.217m0 1.441a2.667 2.667 0 1 1 0 5.334 2.667 2.667 0 0 1 0-5.334"/> @DocPage.ai</svg></a>
              </div>
@@ -1177,6 +1248,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
           <div>
              <h4 className="font-bold text-white mb-6 uppercase tracking-wider text-xs">Produto</h4>
              <ul className="space-y-3">
+               <li><button onClick={() => scrollToSection('testimonials')} className="hover:text-blue-400 transition-colors">Depoimentos</button></li>
                <li><button onClick={() => scrollToSection('how-it-works')} className="hover:text-blue-400 transition-colors">Como Funciona</button></li>
                <li><button onClick={() => scrollToSection('examples')} className="hover:text-blue-400 transition-colors">Exemplos</button></li>
                <li><button onClick={() => scrollToSection('pricing')} className="hover:text-blue-400 transition-colors">Planos e Preços</button></li>
@@ -1197,7 +1269,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
              <h4 className="font-bold text-white mb-6 uppercase tracking-wider text-xs">Contato</h4>
              <ul className="space-y-3">
                <li className="flex items-center gap-3">
-                 <span className="text-slate-600 bg-slate-800 p-1.5 rounded">✉</span> suporte@docpage.com.br
+                 <span className="text-slate-600 bg-slate-800 p-1.5 rounded">✉</span> contato@docpage.com.br
                </li>
                <li className="flex items-center gap-3">
                  <span className="text-slate-600 bg-slate-800 p-1.5 rounded">📍</span> São Paulo, SP
@@ -1349,7 +1421,7 @@ export const SaaSLanding: React.FC<Props> = ({ onStart, onDevNavigation, onLogin
                    <section>
                      <h2 className="text-2xl font-semibold text-gray-900 mb-4">8. Contato</h2>
                      <p>
-                       Se você tiver dúvidas sobre esta Política de Privacidade ou sobre como tratamos seus dados pessoais, entre em contato conosco através do email: privacidade@docpage.com.br
+                       Se você tiver dúvidas sobre esta Política de Privacidade ou sobre como tratamos seus dados pessoais, entre em contato conosco através do email: contato@docpage.com.br
                      </p>
                    </section>
                  </div>

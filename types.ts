@@ -79,6 +79,32 @@ export interface Plan {
   cta: string;
 }
 
+export interface LeadData {
+  id: string;
+  name: string;
+  email: string;
+  whatsapp?: string;
+  marketingConsent: boolean;
+  /** Segredo opaco para RPCs anónimas (progresso/status); não expor em URLs. */
+  resumeToken?: string;
+}
+
+/** Snapshot do wizard persistido em leads.progress_data (sem data: URLs nas fotos). */
+export interface LeadProgressPayload {
+  step: number;
+  briefing: BriefingData;
+  theme: ThemeType;
+  designSettings: DesignSettings;
+  sectionVisibility: SectionVisibility;
+  layoutVariant: LayoutVariant;
+  photoUrl: string | null;
+  aboutPhotoUrl: string | null;
+  isPhotoAIEnhanced: boolean;
+  generatedContent: LandingPageContent | null;
+  modificationsLeft: number;
+  pricingViewMode?: 'plans' | 'checkout' | 'success' | 'dashboard';
+}
+
 export interface AppState {
   step: number; 
   briefing: BriefingData;

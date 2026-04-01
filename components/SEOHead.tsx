@@ -13,6 +13,7 @@ interface SEOHeadProps {
   metaDescription?: string | null;
   metaKeywords?: string[] | null;
   customDomain?: string | null;
+  chosenDomain?: string | null;
 }
 
 export const SEOHead: React.FC<SEOHeadProps> = ({
@@ -26,14 +27,16 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   metaDescription,
   metaKeywords,
   customDomain,
+  chosenDomain,
 }) => {
-  const pageUrl = customDomain 
-    ? `https://${customDomain}` 
+  const canonicalDomain = chosenDomain || customDomain;
+  const pageUrl = canonicalDomain 
+    ? `https://${canonicalDomain}` 
     : `https://${subdomain}.docpage.com.br`;
   
   // Base URL para recursos estáticos
-  const baseUrl = customDomain 
-    ? `https://${customDomain}` 
+  const baseUrl = canonicalDomain 
+    ? `https://${canonicalDomain}` 
     : 'https://docpage.com.br';
   
   // Generate SEO-optimized title (50-60 chars ideal)
@@ -234,7 +237,7 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={ogImage} />
       <meta name="twitter:image:alt" content={`${briefing.name} - ${briefing.specialty}`} />
-      <meta name="twitter:domain" content={customDomain || 'docpage.com.br'} />
+      <meta name="twitter:domain" content={canonicalDomain || `${subdomain}.docpage.com.br`} />
       
       {/* ============================================ */}
       {/* Mobile & PWA */}

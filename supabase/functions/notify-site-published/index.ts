@@ -380,7 +380,7 @@ const handler = async (req: Request): Promise<Response> => {
               Este é um email automático enviado pela plataforma DocPage AI.
             </p>
             <p style="color: #a1a1aa; font-size: 12px; text-align: center; margin: 0;">
-              Em caso de dúvidas, entre em contato: <a href="mailto:suporte@docpage.com.br" style="color: #6366f1;">suporte@docpage.com.br</a>
+              Em caso de dúvidas, entre em contato: <a href="mailto:contato@docpage.com.br" style="color: #6366f1;">contato@docpage.com.br</a>
             </p>
           </div>
         </body>

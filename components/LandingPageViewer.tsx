@@ -18,6 +18,7 @@ interface LandingPageData {
   about_photo_url: string | null;
   status: string;
   custom_domain: string | null;
+  chosen_domain: string | null;
   // SEO fields
   meta_title?: string | null;
   meta_description?: string | null;
@@ -326,6 +327,7 @@ export const LandingPageViewer: React.FC = () => {
         metaDescription={landingPage.meta_description}
         metaKeywords={landingPage.meta_keywords}
         customDomain={landingPage.custom_domain}
+        chosenDomain={landingPage.chosen_domain}
       />
       <Preview
         content={landingPage.content_data}
