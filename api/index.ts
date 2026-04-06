@@ -124,28 +124,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('[SSR] Request URL:', req.url);
     console.log('[SSR] Request Host:', host);
     
-    // SEO: Verificar se existe domínio customizado para redirect 301 (antes de servir qualquer conteúdo)
-    if (!hasPreview) {
-      try {
-        const queryClientRedirect = supabaseAdmin || supabase;
-        const { data: lpForRedirect } = await queryClientRedirect
-          .from('landing_pages')
-          .select('chosen_domain, custom_domain, status')
-          .eq('subdomain', subdomain)
-          .single();
-        
-        const seoRedirectDomain = lpForRedirect?.chosen_domain || lpForRedirect?.custom_domain;
-        if (seoRedirectDomain && lpForRedirect?.status === 'published') {
-          const redirectUrl = `https://${seoRedirectDomain}${req.url && req.url !== '/' ? req.url : ''}`;
-          console.log('[SSR] 301 Redirect subdomínio → domínio customizado:', { subdomain, seoRedirectDomain, redirectUrl });
-          res.setHeader('Location', redirectUrl);
-          res.setHeader('Cache-Control', 'public, max-age=3600');
-          res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-          return res.status(301).send('');
-        }
-      } catch (redirectCheckErr: any) {
-        console.log('[SSR] Erro ao verificar redirect de domínio, continuando normalmente:', redirectCheckErr?.message);
-      }
+    // SEO: Query para verificar domínio customizado (usada no redirect 301 e no ramo estático)
+    let lpForRedirect: { chosen_domain: string | null; custom_domain: string | null; status: string } | null = null;
+    try {
+      const queryClientRedirect = supabaseAdmin || supabase;
+      const { data } = await queryClientRedirect
+        .from('landing_pages')
+        .select('chosen_domain, custom_domain, status')
+        .eq('subdomain', subdomain)
+        .single();
+      lpForRedirect = data;
+    } catch (redirectCheckErr: any) {
+      console.log('[SSR] Erro ao buscar dados de redirect/SEO:', redirectCheckErr?.message);
+    }
+
+    const seoRedirectDomain = lpForRedirect?.chosen_domain || lpForRedirect?.custom_domain;
+
+    // SEO: Redirect 301 subdomínio → domínio customizado (antes de servir qualquer conteúdo)
+    if (!hasPreview && seoRedirectDomain && lpForRedirect?.status === 'published') {
+      const redirectUrl = `https://${seoRedirectDomain}${req.url && req.url !== '/' ? req.url : ''}`;
+      console.log('[SSR] 301 Redirect subdomínio → domínio customizado:', { subdomain, seoRedirectDomain, redirectUrl });
+      res.setHeader('Location', redirectUrl);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      return res.status(301).send('');
     }
 
     // Primeiro, verificar se existe HTML estático no Storage
@@ -193,8 +195,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             res.setHeader('X-Content-Type-Options', 'nosniff');
             res.setHeader('X-Served-From', 'static-html');
             res.setHeader('X-Subdomain', subdomain);
-            res.setHeader('Link', `<https://${subdomain}.docpage.com.br>; rel="canonical"`);
-            res.setHeader('X-Robots-Tag', 'index, follow');
+            if (seoRedirectDomain) {
+              res.setHeader('Link', `<https://${seoRedirectDomain}>; rel="canonical"`);
+              res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+            } else {
+              res.setHeader('Link', `<https://${subdomain}.docpage.com.br>; rel="canonical"`);
+              res.setHeader('X-Robots-Tag', 'index, follow');
+            }
             subdomainServedStatic = true;
             return res.status(200).send(htmlText);
           }

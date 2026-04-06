@@ -14,6 +14,7 @@ interface SEOHeadProps {
   metaKeywords?: string[] | null;
   customDomain?: string | null;
   chosenDomain?: string | null;
+  noIndex?: boolean;
 }
 
 export const SEOHead: React.FC<SEOHeadProps> = ({
@@ -28,6 +29,7 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   metaKeywords,
   customDomain,
   chosenDomain,
+  noIndex,
 }) => {
   const canonicalDomain = chosenDomain || customDomain;
   const pageUrl = canonicalDomain 
@@ -195,7 +197,7 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
       <meta name="description" content={description} />
       <meta name="keywords" content={keywords} />
       <meta name="author" content={briefing.name} />
-      <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+      <meta name="robots" content={noIndex ? "noindex, nofollow" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"} />
       <meta name="language" content="pt-BR" />
       <meta name="revisit-after" content="7 days" />
       <meta name="rating" content="general" />

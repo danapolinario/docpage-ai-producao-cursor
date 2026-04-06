@@ -328,6 +328,7 @@ export const LandingPageViewer: React.FC = () => {
         metaKeywords={landingPage.meta_keywords}
         customDomain={landingPage.custom_domain}
         chosenDomain={landingPage.chosen_domain}
+        noIndex={!!(landingPage.chosen_domain || landingPage.custom_domain) && typeof window !== 'undefined' && window.location.hostname.endsWith('.docpage.com.br')}
       />
       <Preview
         content={landingPage.content_data}
