@@ -870,6 +870,27 @@ export const SaaSLanding: React.FC<Props> = ({
          </div>
       </div>
 
+
+{/* Testimonial Section - Mariana Becker */}
+    <section id="testimonials" className="py-24 bg-slate-900 text-white text-center relative overflow-hidden">
+         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-500 to-slate-900"></div>
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500 rounded-full blur-[128px] opacity-20"></div>
+            <div className="max-w-4xl mx-auto px-6 relative z-10">
+              <h2 className="text-4xl md:text-5xl font-bold mb-8 leading-tight">O que dizem nossos médicos</h2>
+              <div className="bg-slate-50 rounded-3xl p-8 md:p-12 border border-slate-100 shadow-sm ">
+                <div className="text-6xl font-serif text-blue-500 ">"</div>
+                  <p className="text-lg md:text-sm text-slate-700 leading-relaxed mb-8 italic">
+              Fiquei muito satisfeita com a experiência de criar meu site pelo DocPage AI. O processo foi simples, rápido e muito intuitivo, mesmo para quem não tem familiaridade com tecnologia.
+              Em pouco tempo consegui ter um site profissional, organizado e alinhado com a forma como gosto de apresentar meu trabalho na geriatria e na medicina do estilo de vida. A plataforma facilita bastante a presença digital do médico de forma prática e elegante.
+              Parabéns à equipe pela proposta inovadora e pelo suporte durante todo o processo. Recomendo a outros médicos que desejam ter um site profissional sem complicação.
+                  </p>
+                  <cite className="not-italic font-sans text-sm font-bold text-slate-600">
+              Mariana Becker Geraldi Quagliato — Geriatra - CRM 143833/SP
+                  </cite>
+                </div>
+        </div>
+      </section>
+
       {/* Arguments Section (Desktop Grid / Mobile Slider) */}
       <div className="py-24 bg-slate-50 border-y border-slate-200">
         <div className="max-w-7xl mx-auto px-6">
@@ -1087,23 +1108,6 @@ export const SaaSLanding: React.FC<Props> = ({
         </div>
       </div>
 
-{/* Testimonial Section - Mariana Becker */}
-      <div id="testimonials" className="py-24 bg-white border-b border-slate-200">
-        <div className="max-w-4xl mx-auto px-6">
-          <h2 className="text-center text-3xl md:text-4xl font-bold mb-16 text-slate-900">O que dizem nossos médicos</h2>
-          <div className="bg-slate-50 rounded-3xl p-8 md:p-12 border border-slate-100 shadow-sm ">
-            <div className="text-6xl font-serif text-slate-300">"</div>
-            <p className="text-lg md:text-sm text-slate-700 leading-relaxed mb-8">
-              Fiquei muito satisfeita com a experiência de criar meu site pelo DocPage AI. O processo foi simples, rápido e muito intuitivo, mesmo para quem não tem familiaridade com tecnologia.
-              Em pouco tempo consegui ter um site profissional, organizado e alinhado com a forma como gosto de apresentar meu trabalho na geriatria e na medicina do estilo de vida. A plataforma facilita bastante a presença digital do médico de forma prática e elegante.
-              Parabéns à equipe pela proposta inovadora e pelo suporte durante todo o processo. Recomendo a outros médicos que desejam ter um site profissional sem complicação.
-            </p>
-            <cite className="not-italic font-sans text-sm font-bold text-slate-600">
-              Mariana Becker Geraldi Quagliato — CRM 143833/SP
-            </cite>
-          </div>
-        </div>
-      </div>
 
       {/* Examples Section */}
       <div id="examples" className="py-24 bg-white border-b border-slate-200 scroll-mt-20">
