@@ -179,10 +179,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             res.setHeader('Cache-Control', 'public, max-age=86400');
             return res.status(200).send(sitemapContent);
           }
+        } else {
+          console.log('[SEO] LP não encontrada para robots/sitemap, retornando fallback');
+          if (requestPath === 'robots.txt') {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('Cache-Control', 'public, max-age=300');
+            return res.status(200).send('User-agent: *\nAllow: /\n');
+          }
+          if (requestPath === 'sitemap.xml') {
+            res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+            res.setHeader('Cache-Control', 'public, max-age=300');
+            return res.status(200).send('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>');
+          }
         }
       } catch (seoErr: any) {
         console.log('[SEO] Erro ao gerar robots.txt/sitemap.xml dinâmico:', seoErr?.message);
+        if (requestPath === 'robots.txt') {
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          res.setHeader('Cache-Control', 'public, max-age=300');
+          return res.status(200).send('User-agent: *\nAllow: /\n');
+        }
+        if (requestPath === 'sitemap.xml') {
+          res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+          res.setHeader('Cache-Control', 'public, max-age=300');
+          return res.status(200).send('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>');
+        }
       }
+    }
+
+    // Safety net: nunca deixar robots.txt/sitemap.xml cair no fluxo HTML
+    if (requestPath === 'robots.txt') {
+      console.log('[SEO] Safety net: retornando robots.txt fallback');
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      return res.status(200).send('User-agent: *\nAllow: /\n');
+    }
+    if (requestPath === 'sitemap.xml') {
+      console.log('[SEO] Safety net: retornando sitemap.xml fallback');
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      return res.status(200).send('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>');
     }
   }
 
