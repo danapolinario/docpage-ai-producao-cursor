@@ -116,7 +116,90 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     parts: host.split(':')[0].split('.')
   });
   console.log('[SSR DEBUG] ============================================');
-  
+
+  // SEO: Interceptar robots.txt e sitemap.xml ANTES de qualquer outro handler
+  const reqUrlRaw = req.url || '/';
+  const reqUrlPath = reqUrlRaw.split('?')[0];
+  const isRobotsTxtReq = reqUrlPath === '/robots.txt' || reqUrlPath.endsWith('/robots.txt');
+  const isSitemapXmlReq = reqUrlPath === '/sitemap.xml' || reqUrlPath.endsWith('/sitemap.xml');
+
+  if (isRobotsTxtReq || isSitemapXmlReq) {
+    console.log('[SEO/INDEX] Interceptado:', reqUrlPath, 'host:', host);
+    const hostHostname = host.split(':')[0].toLowerCase();
+    const isMainDocpage = hostHostname === 'docpage.com.br' || hostHostname === 'www.docpage.com.br';
+    const isLandingPageHost = !!subdomain || !hostHostname.includes('docpage.com.br');
+
+    if (isMainDocpage) {
+      if (isRobotsTxtReq) {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.status(200).send(`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /dashboard\nDisallow: /checkout/\nDisallow: /dev\n\nSitemap: https://docpage.com.br/sitemap.xml\n`);
+      }
+      if (isSitemapXmlReq) {
+        res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>https://docpage.com.br/</loc>\n    <lastmod>2026-02-05</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n  </url>\n</urlset>`);
+      }
+    }
+
+    if (isLandingPageHost) {
+      try {
+        const queryClientSeo = supabaseAdmin || supabase;
+        let lpSeo: any = null;
+
+        if (subdomain) {
+          const { data } = await queryClientSeo
+            .from('landing_pages')
+            .select('chosen_domain, custom_domain, subdomain, status, published_at')
+            .eq('subdomain', subdomain)
+            .single();
+          lpSeo = data;
+        } else {
+          const hostForLookupSeo = (candidates.find((h: string) => h && !h.toLowerCase().includes('docpage.com.br')) || host).split(':')[0].toLowerCase().replace(/^www\./, '');
+          const { data: pages } = await queryClientSeo
+            .rpc('get_landing_page_by_domain', { domain_input: hostForLookupSeo });
+          lpSeo = Array.isArray(pages) ? pages[0] : pages;
+        }
+
+        if (lpSeo) {
+          const seoDomain = lpSeo.chosen_domain || lpSeo.custom_domain || `${lpSeo.subdomain}.docpage.com.br`;
+          const isSubdomainWithCustom = subdomain && (lpSeo.chosen_domain || lpSeo.custom_domain);
+
+          if (isRobotsTxtReq) {
+            const robotsContent = isSubdomainWithCustom
+              ? `User-agent: *\nDisallow: /\n`
+              : `User-agent: *\nAllow: /\n\nSitemap: https://${seoDomain}/sitemap.xml\n`;
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            return res.status(200).send(robotsContent);
+          }
+          if (isSitemapXmlReq) {
+            const lastmod = lpSeo.published_at ? new Date(lpSeo.published_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+            res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            return res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>https://${seoDomain}/</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n  </url>\n</urlset>`);
+          }
+        } else {
+          console.log('[SEO/INDEX] LP não encontrada, retornando fallback');
+        }
+      } catch (seoErr: any) {
+        console.log('[SEO/INDEX] Erro ao gerar robots.txt/sitemap.xml:', seoErr?.message);
+      }
+    }
+
+    // Safety net: sempre retornar resposta válida para robots.txt/sitemap.xml
+    if (isRobotsTxtReq) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      return res.status(200).send('User-agent: *\nAllow: /\n');
+    }
+    if (isSitemapXmlReq) {
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      return res.status(200).send('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>');
+    }
+  }
+
   // Se for subdomínio, verificar se existe HTML estático primeiro
   // Isso garante que subdomínios sempre passem pelo SSR, mesmo que o Vercel tente servir arquivos estáticos
   if (subdomain) {
