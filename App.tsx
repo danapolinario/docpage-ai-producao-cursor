@@ -49,8 +49,8 @@ import {
   trackCheckoutStep,
   trackPaymentComplete,
   trackDashboardView,
-  trackPageView as trackGAPageView,
-  trackEvent,
+  trackProductPageView as trackGAPageView,
+  trackProductEvent as trackEvent,
   trackError,
 } from './services/google-analytics';
 
@@ -520,7 +520,8 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   }, [checkCheckoutRoute]);
 
   useEffect(() => {
-    trackGAPageView('/', 'DocPage AI - Landing Pages para Médicos');
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+    trackGAPageView(currentPath, 'DocPage AI - Landing Pages para Médicos');
   }, []);
 
   // Verificar autenticação ao carregar (sem bloquear o acesso)

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Confetti } from './common/Confetti';
+import { trackHomeClick } from '../services/google-analytics';
 
 interface Props {
   onStart: () => void;
@@ -170,6 +171,7 @@ export const SaaSLanding: React.FC<Props> = ({
   // Refs
   const sectionRef = useRef<HTMLDivElement>(null); 
   const marqueeRef = useRef<HTMLDivElement>(null);
+  const homeRootRef = useRef<HTMLDivElement>(null);
 
   // --- Marquee Logic (Move on Scroll Only) ---
   useEffect(() => {
@@ -291,6 +293,43 @@ export const SaaSLanding: React.FC<Props> = ({
       setMessageIndex(0);
     }
   }, [showNotification]);
+
+  // Rastreamento global de cliques da home (botões e links)
+  useEffect(() => {
+    const root = homeRootRef.current;
+    if (!root) return;
+
+    const clickHandler = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+
+      const clickable = target.closest('a,button') as HTMLAnchorElement | HTMLButtonElement | null;
+      if (!clickable || !root.contains(clickable)) return;
+
+      const tagName = clickable.tagName.toLowerCase();
+      const isLink = tagName === 'a';
+      const href = isLink ? (clickable as HTMLAnchorElement).getAttribute('href') || '' : '';
+      const text = (clickable.textContent || clickable.getAttribute('aria-label') || clickable.getAttribute('title') || 'sem_label')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .slice(0, 120);
+
+      const sectionEl = clickable.closest('section,nav,footer,[id]');
+      const section = (sectionEl?.getAttribute('id') || sectionEl?.tagName?.toLowerCase() || 'home').slice(0, 80);
+      const isExternal = !!href && /^(https?:)?\/\//i.test(href) && !href.includes(window.location.hostname);
+
+      trackHomeClick({
+        element_type: isLink ? 'link' : 'button',
+        element_label: text || 'sem_label',
+        section,
+        destination: href || undefined,
+        is_external: isExternal,
+      });
+    };
+
+    root.addEventListener('click', clickHandler);
+    return () => root.removeEventListener('click', clickHandler);
+  }, []);
 
   const renderSuffix = (text: string) => {
     const parts = text.split('*');
@@ -521,7 +560,7 @@ export const SaaSLanding: React.FC<Props> = ({
   };
 
   return (
-    <div className="min-h-screen bg-white font-startup text-slate-900">
+    <div ref={homeRootRef} className="min-h-screen bg-white font-startup text-slate-900">
       
       {/* Hero Section */}
       <div className="relative overflow-hidden">

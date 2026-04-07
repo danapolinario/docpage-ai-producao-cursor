@@ -1,85 +1,127 @@
 /**
- * Serviço de Google Analytics
- * 
- * Integração com Google Analytics 4 (GA4) usando gtag
- * Código de medição: G-X8RK63KDBN
+ * Serviço de Google Analytics (GA4)
+ *
+ * Separação de streams:
+ * - Produto DocPage (web app)
+ * - Landing pages publicadas
  */
 
 declare global {
   interface Window {
     gtag: (...args: any[]) => void;
     dataLayer: any[];
+    __docpageGaLoaded?: boolean;
   }
 }
 
-const GA_MEASUREMENT_ID = 'G-X8RK63KDBN';
+export type GATarget = 'product' | 'landing';
 
-/**
- * Inicializar Google Analytics
- */
-export function initGoogleAnalytics() {
-  // Verificar se já foi inicializado
-  if (window.gtag) {
-    return;
-  }
+const PRODUCT_GA_ID = import.meta.env.VITE_GA_PRODUCT_ID || 'G-X8RK63KDBN';
+const LANDING_GA_ID = import.meta.env.VITE_GA_LANDING_ID || 'G-CGYZDECJRT';
+const configuredTargets = new Set<GATarget>();
 
-  // Criar script do Google Analytics
-  const script1 = document.createElement('script');
-  script1.async = true;
-  script1.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
-  document.head.appendChild(script1);
+function getMeasurementId(target: GATarget): string {
+  return target === 'landing' ? LANDING_GA_ID : PRODUCT_GA_ID;
+}
 
-  // Inicializar dataLayer e gtag
+export function shouldTrackPath(pathname?: string): boolean {
+  const path = pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
+  return !/^\/(admin|dev)(\/|$)/i.test(path);
+}
+
+function ensureGtagLoaded() {
+  if (typeof window === 'undefined') return;
+
   window.dataLayer = window.dataLayer || [];
-  window.gtag = function() {
+  window.gtag = window.gtag || function () {
     window.dataLayer.push(arguments);
   };
-  window.gtag('js', new Date());
-  window.gtag('config', GA_MEASUREMENT_ID, {
-    send_page_view: false, // Vamos enviar manualmente para ter mais controle
-  });
-}
 
-/**
- * Enviar evento de visualização de página
- */
-export function trackPageView(path: string, title?: string) {
-  if (!window.gtag) {
-    initGoogleAnalytics();
-    // Aguardar um pouco para garantir que o script carregou
-    setTimeout(() => {
-      window.gtag?.('event', 'page_view', {
-        page_path: path,
-        page_title: title || document.title,
-      });
-    }, 100);
-    return;
+  if (!window.__docpageGaLoaded) {
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${PRODUCT_GA_ID}`;
+    document.head.appendChild(script);
+    window.gtag('js', new Date());
+    window.__docpageGaLoaded = true;
   }
+}
 
-  window.gtag('event', 'page_view', {
-    page_path: path,
-    page_title: title || document.title,
+function ensureTargetConfigured(target: GATarget) {
+  ensureGtagLoaded();
+  if (typeof window === 'undefined') return;
+  if (configuredTargets.has(target)) return;
+
+  const measurementId = getMeasurementId(target);
+  window.gtag('config', measurementId, { send_page_view: false });
+  configuredTargets.add(target);
+}
+
+export function initGoogleAnalytics(target: GATarget = 'product') {
+  ensureTargetConfigured(target);
+}
+
+function sendEvent(eventName: string, eventParams: Record<string, any>, target: GATarget) {
+  ensureTargetConfigured(target);
+  if (typeof window === 'undefined' || !window.gtag) return;
+
+  const measurementId = getMeasurementId(target);
+  window.gtag('event', eventName, {
+    ...eventParams,
+    send_to: measurementId,
   });
 }
 
-/**
- * Enviar evento customizado
- */
+export function trackPageView(path: string, title?: string, target: GATarget = 'product') {
+  if (!shouldTrackPath(path)) return;
+  if (!shouldTrackPath(typeof window !== 'undefined' ? window.location.pathname : path)) return;
+
+  sendEvent(
+    'page_view',
+    {
+      page_path: path,
+      page_title: title || (typeof document !== 'undefined' ? document.title : path),
+    },
+    target
+  );
+}
+
 export function trackEvent(
   eventName: string,
   eventParams?: {
     [key: string]: any;
-  }
+  },
+  target: GATarget = 'product'
 ) {
-  if (!window.gtag) {
-    initGoogleAnalytics();
-    setTimeout(() => {
-      window.gtag?.('event', eventName, eventParams || {});
-    }, 100);
-    return;
-  }
+  const pathFromEvent = eventParams?.page_path || eventParams?.pathname;
+  if (!shouldTrackPath(pathFromEvent)) return;
+  if (!shouldTrackPath(typeof window !== 'undefined' ? window.location.pathname : pathFromEvent)) return;
+  sendEvent(eventName, eventParams || {}, target);
+}
 
-  window.gtag('event', eventName, eventParams || {});
+export function trackProductPageView(path: string, title?: string) {
+  trackPageView(path, title, 'product');
+}
+
+export function trackProductEvent(eventName: string, eventParams?: Record<string, any>) {
+  trackEvent(eventName, eventParams, 'product');
+}
+
+export function trackLandingEvent(eventName: string, eventParams?: Record<string, any>) {
+  trackEvent(eventName, eventParams, 'landing');
+}
+
+export function trackHomeClick(params: {
+  element_type: 'button' | 'link';
+  element_label: string;
+  section: string;
+  destination?: string;
+  is_external: boolean;
+}) {
+  trackProductEvent('home_click', {
+    event_category: 'home',
+    ...params,
+  });
 }
 
 /**
@@ -88,7 +130,7 @@ export function trackEvent(
 
 // Step 1: Briefing
 export function trackBriefingStart() {
-  trackEvent('briefing_start', {
+  trackProductEvent('briefing_start', {
     event_category: 'user_journey',
     event_label: 'Briefing iniciado',
   });
@@ -98,7 +140,7 @@ export function trackBriefingComplete(briefingData: {
   specialty?: string;
   name?: string;
 }) {
-  trackEvent('briefing_complete', {
+  trackProductEvent('briefing_complete', {
     event_category: 'user_journey',
     event_label: 'Briefing concluído',
     specialty: briefingData.specialty,
@@ -108,7 +150,7 @@ export function trackBriefingComplete(briefingData: {
 
 // Step 2: Estilo
 export function trackStyleSelect(style: string) {
-  trackEvent('style_select', {
+  trackProductEvent('style_select', {
     event_category: 'user_journey',
     event_label: 'Estilo selecionado',
     style_name: style,
@@ -117,14 +159,14 @@ export function trackStyleSelect(style: string) {
 
 // Step 3: Foto
 export function trackPhotoUpload() {
-  trackEvent('photo_upload', {
+  trackProductEvent('photo_upload', {
     event_category: 'user_journey',
     event_label: 'Foto enviada',
   });
 }
 
 export function trackPhotoEnhance() {
-  trackEvent('photo_enhance', {
+  trackProductEvent('photo_enhance', {
     event_category: 'user_journey',
     event_label: 'Foto melhorada com IA',
   });
@@ -132,14 +174,14 @@ export function trackPhotoEnhance() {
 
 // Step 4: Preview/Editor
 export function trackPreviewView() {
-  trackEvent('preview_view', {
+  trackProductEvent('preview_view', {
     event_category: 'user_journey',
     event_label: 'Preview visualizado',
   });
 }
 
 export function trackContentEdit(section: string) {
-  trackEvent('content_edit', {
+  trackProductEvent('content_edit', {
     event_category: 'user_journey',
     event_label: 'Conteúdo editado',
     section: section,
@@ -148,14 +190,14 @@ export function trackContentEdit(section: string) {
 
 // Step 5: Pricing/Checkout
 export function trackPricingView() {
-  trackEvent('pricing_view', {
+  trackProductEvent('pricing_view', {
     event_category: 'user_journey',
     event_label: 'Página de planos visualizada',
   });
 }
 
 export function trackPlanSelect(planName: string, planPrice: string) {
-  trackEvent('plan_select', {
+  trackProductEvent('plan_select', {
     event_category: 'user_journey',
     event_label: 'Plano selecionado',
     plan_name: planName,
@@ -164,7 +206,7 @@ export function trackPlanSelect(planName: string, planPrice: string) {
 }
 
 export function trackCheckoutStart(planName: string) {
-  trackEvent('checkout_start', {
+  trackProductEvent('checkout_start', {
     event_category: 'conversion',
     event_label: 'Checkout iniciado',
     plan_name: planName,
@@ -172,7 +214,7 @@ export function trackCheckoutStart(planName: string) {
 }
 
 export function trackCheckoutStep(step: number, stepName: string) {
-  trackEvent('checkout_step', {
+  trackProductEvent('checkout_step', {
     event_category: 'conversion',
     event_label: `Checkout - ${stepName}`,
     step_number: step,
@@ -181,7 +223,7 @@ export function trackCheckoutStep(step: number, stepName: string) {
 }
 
 export function trackPaymentComplete(planName: string, value?: number) {
-  trackEvent('purchase', {
+  trackProductEvent('purchase', {
     event_category: 'conversion',
     event_label: 'Pagamento concluído',
     plan_name: planName,
@@ -192,7 +234,7 @@ export function trackPaymentComplete(planName: string, value?: number) {
 
 // Landing Pages - Acessos e Cliques
 export function trackLandingPageView(landingPageId: string, subdomain: string) {
-  trackEvent('landing_page_view', {
+  trackLandingEvent('landing_page_view', {
     event_category: 'landing_page',
     event_label: 'Acesso à landing page',
     landing_page_id: landingPageId,
@@ -200,7 +242,7 @@ export function trackLandingPageView(landingPageId: string, subdomain: string) {
   });
   
   // Também enviar como page_view
-  trackPageView(`/${subdomain}`, `Landing Page - ${subdomain}`);
+  trackPageView(`/${subdomain}`, `Landing Page - ${subdomain}`, 'landing');
 }
 
 export function trackLandingPageClick(
@@ -208,7 +250,7 @@ export function trackLandingPageClick(
   action: string,
   section?: string
 ) {
-  trackEvent('landing_page_click', {
+  trackLandingEvent('landing_page_click', {
     event_category: 'landing_page',
     event_label: 'Clique na landing page',
     landing_page_id: landingPageId,
@@ -218,7 +260,7 @@ export function trackLandingPageClick(
 }
 
 export function trackWhatsAppClick(landingPageId: string, phone?: string) {
-  trackEvent('whatsapp_click', {
+  trackLandingEvent('whatsapp_click', {
     event_category: 'landing_page',
     event_label: 'Clique no WhatsApp',
     landing_page_id: landingPageId,
@@ -227,7 +269,7 @@ export function trackWhatsAppClick(landingPageId: string, phone?: string) {
 }
 
 export function trackPhoneClick(landingPageId: string, phone?: string) {
-  trackEvent('phone_click', {
+  trackLandingEvent('phone_click', {
     event_category: 'landing_page',
     event_label: 'Clique no telefone',
     landing_page_id: landingPageId,
@@ -236,7 +278,7 @@ export function trackPhoneClick(landingPageId: string, phone?: string) {
 }
 
 export function trackEmailClick(landingPageId: string, email?: string) {
-  trackEvent('email_click', {
+  trackLandingEvent('email_click', {
     event_category: 'landing_page',
     event_label: 'Clique no email',
     landing_page_id: landingPageId,
@@ -246,7 +288,7 @@ export function trackEmailClick(landingPageId: string, email?: string) {
 
 // Dashboard
 export function trackDashboardView() {
-  trackEvent('dashboard_view', {
+  trackProductEvent('dashboard_view', {
     event_category: 'user_journey',
     event_label: 'Dashboard visualizado',
   });
@@ -254,7 +296,7 @@ export function trackDashboardView() {
 
 // Erros
 export function trackError(errorType: string, errorMessage: string) {
-  trackEvent('error', {
+  trackProductEvent('error', {
     event_category: 'error',
     event_label: errorType,
     error_message: errorMessage,
