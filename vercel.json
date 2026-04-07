@@ -18,6 +18,14 @@
   },
   "rewrites": [
     {
+      "source": "/robots.txt",
+      "destination": "/api/seo-robots"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/seo-sitemap"
+    },
+    {
       "source": "/admin",
       "destination": "/spa.html"
     },
