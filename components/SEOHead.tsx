@@ -1,6 +1,7 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { BriefingData, LandingPageContent } from '../types';
+import { resolveCanonicalHostname } from '../lib/seo-canonical';
 
 interface SEOHeadProps {
   briefing: BriefingData;
@@ -14,6 +15,8 @@ interface SEOHeadProps {
   metaKeywords?: string[] | null;
   customDomain?: string | null;
   chosenDomain?: string | null;
+  /** Host atual (SSR ou omitido para usar window no cliente). */
+  requestHost?: string | null;
   noIndex?: boolean;
 }
 
@@ -29,12 +32,21 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   metaKeywords,
   customDomain,
   chosenDomain,
+  requestHost,
   noIndex,
 }) => {
-  const canonicalDomain = chosenDomain || customDomain;
-  const pageUrl = canonicalDomain 
-    ? `https://${canonicalDomain}` 
-    : `https://${subdomain}.docpage.com.br`;
+  const hostForCanon =
+    requestHost ??
+    (typeof window !== 'undefined' ? window.location.hostname : undefined);
+  const canonicalDomain = resolveCanonicalHostname(
+    {
+      chosen_domain: chosenDomain,
+      custom_domain: customDomain,
+      subdomain,
+    },
+    hostForCanon ?? null
+  );
+  const pageUrl = `https://${canonicalDomain}`;
   
   // Base URL para recursos estáticos
   const baseUrl = canonicalDomain 

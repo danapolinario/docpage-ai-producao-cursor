@@ -24,10 +24,12 @@ interface LandingPageData {
 
 interface LandingPageViewerSSRProps {
   landingPage: LandingPageData;
+  /** Host da requisição (ex.: www.cliente.com.br) para alinhar canonical ao domínio servido. */
+  requestHost?: string | null;
 }
 
 // Componente SSR-friendly que recebe dados diretamente (sem hooks de fetch)
-export const LandingPageViewerSSR: React.FC<LandingPageViewerSSRProps> = ({ landingPage }) => {
+export const LandingPageViewerSSR: React.FC<LandingPageViewerSSRProps> = ({ landingPage, requestHost }) => {
   return (
     <div className="min-h-screen">
       <SEOHead
@@ -42,6 +44,7 @@ export const LandingPageViewerSSR: React.FC<LandingPageViewerSSRProps> = ({ land
         metaKeywords={landingPage.meta_keywords}
         customDomain={landingPage.custom_domain}
         chosenDomain={landingPage.chosen_domain}
+        requestHost={requestHost}
         noIndex={!!(landingPage.chosen_domain || landingPage.custom_domain) && typeof window !== 'undefined' && window.location.hostname.endsWith('.docpage.com.br')}
       />
       <Preview

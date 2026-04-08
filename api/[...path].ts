@@ -19,6 +19,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { verifyAuthFromRequest } from './auth-utils.js';
+import { resolveCanonicalHostname, stripHostname } from '../lib/seo-canonical.js';
 
 // Para ES modules, precisamos definir __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -157,7 +158,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         if (lpSeo) {
-          const seoDomain = lpSeo.chosen_domain || lpSeo.custom_domain || `${lpSeo.subdomain}.docpage.com.br`;
+          const hostForCanonicalSeo = (
+            candidates.find((h: string) => h && !h.toLowerCase().includes('docpage.com.br')) ||
+            host
+          )
+            .split(':')[0]
+            .toLowerCase();
+          const seoDomain = resolveCanonicalHostname(
+            {
+              chosen_domain: lpSeo.chosen_domain,
+              custom_domain: lpSeo.custom_domain,
+              subdomain: lpSeo.subdomain,
+            },
+            hostForCanonicalSeo
+          );
           const isSubdomainWithCustom = subdomain && (lpSeo.chosen_domain || lpSeo.custom_domain);
 
           if (requestPath === 'robots.txt') {
@@ -240,13 +254,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('[SSR] Erro ao buscar dados de redirect/SEO:', redirectCheckErr?.message);
     }
 
-    const seoRedirectDomain = lpForRedirect?.chosen_domain || lpForRedirect?.custom_domain;
+    const primaryRedirectHost = lpForRedirect
+      ? resolveCanonicalHostname(
+          {
+            chosen_domain: lpForRedirect.chosen_domain,
+            custom_domain: lpForRedirect.custom_domain,
+            subdomain,
+          },
+          null
+        )
+      : null;
+    const subDefaultHost = `${subdomain}.docpage.com.br`;
 
-    // SEO: Redirect 301 subdomínio → domínio customizado (antes de servir qualquer conteúdo)
-    if (!hasPreview && seoRedirectDomain && lpForRedirect?.status === 'published') {
+    // SEO: Redirect 301 subdomínio → domínio canônico (domínio próprio), se diferente do subdomínio DocPage
+    if (
+      !hasPreview &&
+      primaryRedirectHost &&
+      lpForRedirect?.status === 'published' &&
+      stripHostname(primaryRedirectHost) !== stripHostname(subDefaultHost)
+    ) {
       const currentPath = Array.isArray(req.query.path) ? `/${req.query.path.join('/')}` : (req.query.path ? `/${req.query.path}` : '');
-      const redirectUrl = `https://${seoRedirectDomain}${currentPath}`;
-      console.log('[SSR] 301 Redirect subdomínio → domínio customizado:', { subdomain, seoRedirectDomain, redirectUrl });
+      const redirectUrl = `https://${primaryRedirectHost}${currentPath}`;
+      console.log('[SSR] 301 Redirect subdomínio → domínio canônico:', { subdomain, primaryRedirectHost, redirectUrl });
       res.setHeader('Location', redirectUrl);
       res.setHeader('Cache-Control', 'public, max-age=3600');
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -290,11 +319,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
             res.setHeader('Vary', 'Host');
             res.setHeader('X-Served-From', 'static-html');
-            if (seoRedirectDomain) {
-              res.setHeader('Link', `<https://${seoRedirectDomain}>; rel="canonical"`);
+            const staticCanonicalHost = primaryRedirectHost ?? subDefaultHost;
+            const usesOnlyDocpageSubdomain =
+              stripHostname(staticCanonicalHost) === stripHostname(subDefaultHost);
+            if (!usesOnlyDocpageSubdomain) {
+              res.setHeader('Link', `<https://${staticCanonicalHost}>; rel="canonical"`);
               res.setHeader('X-Robots-Tag', 'noindex, nofollow');
             } else {
-              res.setHeader('Link', `<https://${subdomain}.docpage.com.br>; rel="canonical"`);
+              res.setHeader('Link', `<https://${subDefaultHost}>; rel="canonical"`);
               res.setHeader('X-Robots-Tag', 'index, follow');
             }
             pathSubdomainServedStatic = true;
@@ -440,7 +472,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       // noIndex se servindo via subdomínio mas LP tem domínio customizado (cenário preview/draft)
       const subdomainHasCustomDomain = !!(landingPage.chosen_domain || landingPage.custom_domain);
-      const subdomainCanonicalDomain = landingPage.chosen_domain || landingPage.custom_domain || `${subdomain}.docpage.com.br`;
+      const subdomainCanonicalDomain = resolveCanonicalHostname(
+        {
+          chosen_domain: landingPage.chosen_domain,
+          custom_domain: landingPage.custom_domain,
+          subdomain,
+        },
+        host.split(':')[0]
+      );
       const htmlContent = await renderLandingPage(landingPage, mockReq, { noIndex: subdomainHasCustomDomain });
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', hasPreview ? 'no-cache, no-store, must-revalidate, max-age=0, private' : (pathSubdomainServedStatic === false ? 'public, s-maxage=0, max-age=0, must-revalidate' : 'public, max-age=3600, s-maxage=3600'));
@@ -552,7 +591,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             // Tentar HTML estático pelo subdomain
-            const customDomainCanonical = landingPage.chosen_domain || landingPage.custom_domain;
+            const customDomainCanonical = resolveCanonicalHostname(
+              {
+                chosen_domain: landingPage.chosen_domain,
+                custom_domain: landingPage.custom_domain,
+                subdomain: landingPage.subdomain,
+              },
+              requestHostname
+            );
             let pathServedStaticCustom = false;
             try {
               const HTML_FOLDER = 'html';

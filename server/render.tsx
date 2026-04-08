@@ -2,6 +2,7 @@ import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { HelmetProvider } from 'react-helmet-async';
 import { LandingPageViewerSSR } from '../components/LandingPageViewerSSR';
+import { resolveCanonicalHostname } from '../lib/seo-canonical.js';
 import { BriefingData, LandingPageContent, DesignSettings, SectionVisibility } from '../types';
 
 interface LandingPageData {
@@ -25,10 +26,16 @@ interface LandingPageData {
 
 export async function renderLandingPage(landingPage: LandingPageData, req: any): Promise<string> {
   const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const canonicalDomain = landingPage.chosen_domain || landingPage.custom_domain;
-  const pageUrl = canonicalDomain
-    ? `https://${canonicalDomain}` 
-    : `https://${landingPage.subdomain}.docpage.com.br`;
+  const requestHostOnly = req.get('host')?.split(':')[0] ?? null;
+  const canonicalDomain = resolveCanonicalHostname(
+    {
+      chosen_domain: landingPage.chosen_domain,
+      custom_domain: landingPage.custom_domain,
+      subdomain: landingPage.subdomain,
+    },
+    requestHostOnly
+  );
+  const pageUrl = `https://${canonicalDomain}`;
 
   // Função para verificar se meta tag é genérica do DocPage AI
   const isGenericDocPageMeta = (value: string | null | undefined): boolean => {
@@ -218,7 +225,7 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
   // Renderizar componente React para string
   const appHtml = renderToString(
     <HelmetProvider>
-      <LandingPageViewerSSR landingPage={landingPage} />
+      <LandingPageViewerSSR landingPage={landingPage} requestHost={requestHostOnly} />
     </HelmetProvider>
   );
 

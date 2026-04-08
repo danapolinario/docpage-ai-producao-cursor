@@ -12,13 +12,35 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+/** Espelha lib/seo-canonical (Deno): prioriza custom_domain e domínio próprio sobre *.docpage.com.br em chosen_domain. */
+function resolveCanonicalHostnameStatic(lp: {
+  chosen_domain?: string | null;
+  custom_domain?: string | null;
+  subdomain: string;
+}): string {
+  const strip = (d: string | null | undefined) =>
+    d
+      ? d.replace(/^https?:\/\//i, "").split("/")[0].trim().toLowerCase().split(":")[0]
+      : "";
+  const isTenantDocpage = (h: string) =>
+    /\.docpage\.com\.br$/i.test(h) && h !== "docpage.com.br" && h !== "www.docpage.com.br";
+  const chosen = strip(lp.chosen_domain);
+  const custom = strip(lp.custom_domain);
+  const fallbackSub = `${lp.subdomain}.docpage.com.br`;
+  const ext =
+    (custom && !isTenantDocpage(custom) ? custom : null) ||
+    (chosen && !isTenantDocpage(chosen) ? chosen : null);
+  if (ext) return ext;
+  if (custom) return custom;
+  if (chosen) return chosen;
+  return fallbackSub;
+}
+
 // Função para renderizar HTML (simplificada, baseada em api/render.ts)
 async function renderLandingPageHTML(landingPage: any): Promise<string> {
   const baseUrl = "https://docpage.com.br";
-  const canonicalDomain = landingPage.chosen_domain || landingPage.custom_domain;
-  const pageUrl = canonicalDomain
-    ? `https://${canonicalDomain}` 
-    : `https://${landingPage.subdomain}.docpage.com.br`;
+  const canonicalDomain = resolveCanonicalHostnameStatic(landingPage);
+  const pageUrl = `https://${canonicalDomain}`;
 
   const briefing = landingPage.briefing_data || {};
   const content = landingPage.content_data || {};
@@ -232,7 +254,7 @@ async function renderLandingPageHTML(landingPage: any): Promise<string> {
     <meta name="twitter:description" content="${escapeHtml(description)}" />
     <meta name="twitter:image" content="${escapeHtml(ogImage)}" />
     <meta name="twitter:image:alt" content="${escapeHtml(briefing.name || 'Médico')} - ${escapeHtml(briefing.specialty || 'Especialista')}" />
-    <meta name="twitter:domain" content="${escapeHtml(canonicalDomain || `${landingPage.subdomain}.docpage.com.br`)}" />
+    <meta name="twitter:domain" content="${escapeHtml(canonicalDomain)}" />
     
     <!-- Mobile & PWA -->
     <meta name="theme-color" content="#3B82F6" />
@@ -447,8 +469,8 @@ serve(async (req) => {
     );
 
     // SEO: Substituir URLs de subdomínio pelo domínio customizado se disponível
-    const canonicalDomainForReplace = landingPage.chosen_domain || landingPage.custom_domain;
-    if (canonicalDomainForReplace) {
+    const canonicalDomainForReplace = resolveCanonicalHostnameStatic(landingPage);
+    if (canonicalDomainForReplace !== `${landingPage.subdomain}.docpage.com.br`) {
       const subdomainUrl = `https://${landingPage.subdomain}.docpage.com.br`;
       const customUrl = `https://${canonicalDomainForReplace}`;
       html = html.split(subdomainUrl).join(customUrl);

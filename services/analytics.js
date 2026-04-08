@@ -1,0 +1,251 @@
+/**
+ * Serviço de Analytics
+ *
+ * Gerencia eventos de analytics das landing pages:
+ * - Registro de visualizações
+ * - Registro de cliques em botões
+ * - Rastreamento de canais de origem
+ * - Estatísticas e métricas
+ */
+import { supabase } from '../lib/supabase';
+import { trackLandingPageView as trackGAPageView, trackLandingPageClick as trackGAClick, trackWhatsAppClick as trackGAWhatsApp, trackPhoneClick as trackGAPhone, trackEmailClick as trackGAEmail, } from './google-analytics';
+/**
+ * Registrar evento de analytics
+ * Pode ser chamado sem autenticação (para tracking público)
+ */
+export async function trackEvent(landingPageId, eventType, eventData, metadata) {
+    try {
+        const { error } = await supabase
+            .from('analytics_events')
+            .insert({
+            landing_page_id: landingPageId,
+            event_type: eventType,
+            event_data: eventData || {},
+            ip_address: metadata?.ip_address,
+            user_agent: metadata?.user_agent,
+            referrer: metadata?.referrer,
+            country: metadata?.country,
+            city: metadata?.city,
+        });
+        if (error) {
+            console.error('Erro ao registrar evento de analytics:', error);
+            // Não lançar erro para não quebrar o fluxo do usuário
+        }
+    }
+    catch (error) {
+        console.error('Erro ao registrar evento de analytics:', error);
+        // Não lançar erro para não quebrar o fluxo do usuário
+    }
+}
+/**
+ * Registrar visualização de página
+ */
+export async function trackPageView(landingPageId, metadata) {
+    // Também atualizar view_count na landing_page
+    try {
+        // Registrar evento primeiro
+        await trackEvent(landingPageId, 'page_view', undefined, metadata);
+        // Enviar para Google Analytics
+        if (metadata?.subdomain) {
+            trackGAPageView(landingPageId, metadata.subdomain);
+        }
+        // Atualizar contador na landing_page
+        // Primeiro obter valor atual
+        const { data: current } = await supabase
+            .from('landing_pages')
+            .select('view_count')
+            .eq('id', landingPageId)
+            .single();
+        if (current) {
+            // Atualizar com novo valor
+            await supabase
+                .from('landing_pages')
+                .update({
+                view_count: (current.view_count || 0) + 1,
+                last_viewed_at: new Date().toISOString(),
+            })
+                .eq('id', landingPageId);
+        }
+    }
+    catch (error) {
+        console.error('Erro ao registrar visualização:', error);
+    }
+}
+/**
+ * Registrar clique em botão/ação
+ */
+export async function trackClick(landingPageId, action, section, metadata) {
+    await trackEvent(landingPageId, 'click', {
+        action,
+        section,
+    }, metadata);
+    // Enviar para Google Analytics
+    trackGAClick(landingPageId, action, section);
+    // Detectar tipo específico de clique
+    if (action.toLowerCase().includes('whatsapp') || action.toLowerCase().includes('wa')) {
+        const phone = metadata?.ip_address; // Pode ser ajustado para pegar o telefone real
+        trackGAWhatsApp(landingPageId, phone);
+    }
+    else if (action.toLowerCase().includes('telefone') || action.toLowerCase().includes('phone') || action.toLowerCase().includes('ligar')) {
+        const phone = metadata?.ip_address; // Pode ser ajustado para pegar o telefone real
+        trackGAPhone(landingPageId, phone);
+    }
+    else if (action.toLowerCase().includes('email') || action.toLowerCase().includes('mail')) {
+        const email = metadata?.ip_address; // Pode ser ajustado para pegar o email real
+        trackGAEmail(landingPageId, email);
+    }
+}
+/**
+ * Obter eventos de uma landing page
+ */
+export async function getEvents(landingPageId, options) {
+    // Verificar autenticação
+    const { data: { user }, error: getUserError } = await supabase.auth.getUser();
+    if (!user || !user.id) {
+        // Tentar refresh
+        await supabase.auth.refreshSession();
+        const { data: { user: refreshedUser } } = await supabase.auth.getUser();
+        if (!refreshedUser || !refreshedUser.id) {
+            throw new Error('Usuário não autenticado');
+        }
+    }
+    let query = supabase
+        .from('analytics_events')
+        .select('*')
+        .eq('landing_page_id', landingPageId);
+    if (options?.eventType) {
+        query = query.eq('event_type', options.eventType);
+    }
+    if (options?.startDate) {
+        query = query.gte('created_at', options.startDate.toISOString());
+    }
+    if (options?.endDate) {
+        query = query.lte('created_at', options.endDate.toISOString());
+    }
+    query = query.order('created_at', { ascending: false });
+    if (options?.limit) {
+        query = query.limit(options.limit);
+    }
+    if (options?.offset) {
+        query = query.range(options.offset, options.offset + (options.limit || 100) - 1);
+    }
+    const { data, error } = await query;
+    if (error) {
+        // Se não houver eventos ainda (tabela vazia ou RLS bloqueando), retornar array vazio
+        if (error.code === 'PGRST116' || error.message?.includes('permission denied')) {
+            console.warn('Sem eventos ou sem permissão para ver eventos:', error.message);
+            return [];
+        }
+        throw error;
+    }
+    return data || [];
+}
+export async function getDashboardStats(landingPageId, days = 30) {
+    // Verificar autenticação
+    const { data: { user }, error: getUserError } = await supabase.auth.getUser();
+    if (!user || !user.id) {
+        // Tentar refresh
+        await supabase.auth.refreshSession();
+        const { data: { user: refreshedUser } } = await supabase.auth.getUser();
+        if (!refreshedUser || !refreshedUser.id) {
+            throw new Error('Usuário não autenticado');
+        }
+    }
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    // Obter todos os eventos do período (pode retornar array vazio se não houver eventos)
+    let events = [];
+    try {
+        events = await getEvents(landingPageId, {
+            startDate,
+            endDate,
+        });
+    }
+    catch (eventsError) {
+        console.warn('Erro ao obter eventos (pode ser normal se não houver eventos ainda):', eventsError);
+        // Se falhar (ex: tabela vazia, sem permissões), retornar estrutura vazia
+        events = [];
+    }
+    // Calcular estatísticas
+    const pageViews = events.filter((e) => e.event_type === 'page_view');
+    const clicks = events.filter((e) => e.event_type === 'click');
+    // Agrupar por dia
+    const visitsByDayMap = new Map();
+    const clicksByDayMap = new Map();
+    for (let i = 0; i < days; i++) {
+        const date = new Date(endDate);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        visitsByDayMap.set(dateStr, 0);
+        clicksByDayMap.set(dateStr, 0);
+    }
+    pageViews.forEach((event) => {
+        if (event.created_at) {
+            const dateStr = event.created_at.split('T')[0];
+            visitsByDayMap.set(dateStr, (visitsByDayMap.get(dateStr) || 0) + 1);
+        }
+    });
+    clicks.forEach((event) => {
+        if (event.created_at) {
+            const dateStr = event.created_at.split('T')[0];
+            clicksByDayMap.set(dateStr, (clicksByDayMap.get(dateStr) || 0) + 1);
+        }
+    });
+    // Converter mapas para arrays ordenados
+    const visitsByDay = Array.from(visitsByDayMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, count]) => ({ date, count }));
+    const clicksByDay = Array.from(clicksByDayMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, count]) => ({ date, count }));
+    // Agrupar cliques por ação
+    const clicksByActionMap = new Map();
+    clicks.forEach((event) => {
+        const action = event.event_data?.action || 'Desconhecido';
+        clicksByActionMap.set(action, (clicksByActionMap.get(action) || 0) + 1);
+    });
+    const clicksByAction = Array.from(clicksByActionMap.entries())
+        .map(([action, count]) => ({ action, count }))
+        .sort((a, b) => b.count - a.count);
+    // Agrupar cliques por canal (baseado no referrer)
+    const clicksByChannelMap = new Map();
+    clicks.forEach((event) => {
+        const referrer = event.referrer || 'Direto';
+        let channel = 'Direto';
+        if (referrer.includes('google'))
+            channel = 'Google Ads';
+        else if (referrer.includes('instagram'))
+            channel = 'Instagram';
+        else if (referrer.includes('facebook'))
+            channel = 'Facebook';
+        else if (referrer !== 'Direto')
+            channel = 'Indicação';
+        clicksByChannelMap.set(channel, (clicksByChannelMap.get(channel) || 0) + 1);
+    });
+    const clicksByChannel = Array.from(clicksByChannelMap.entries())
+        .map(([channel, count]) => ({ channel, count }))
+        .sort((a, b) => b.count - a.count);
+    // Calcular taxa de conversão
+    const totalVisits = pageViews.length;
+    const totalClicks = clicks.length;
+    const conversionRate = totalVisits > 0 ? (totalClicks / totalVisits) * 100 : 0;
+    // Eventos recentes (últimos 10 cliques)
+    const recentEvents = clicks
+        .sort((a, b) => {
+        const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return bDate - aDate;
+    })
+        .slice(0, 10);
+    return {
+        totalVisits,
+        totalClicks,
+        conversionRate,
+        visitsByDay,
+        clicksByDay,
+        clicksByAction,
+        clicksByChannel,
+        recentEvents,
+    };
+}

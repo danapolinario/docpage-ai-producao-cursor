@@ -52,6 +52,7 @@ interface LandingPageData {
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { resolveCanonicalHostname } from '../lib/seo-canonical.js';
 
 // Para ES modules, precisamos definir __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -147,10 +148,16 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any, 
     });
     
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const canonicalDomain = landingPage.chosen_domain || landingPage.custom_domain;
-    const pageUrl = canonicalDomain
-      ? `https://${canonicalDomain}` 
-      : `https://${landingPage.subdomain}.docpage.com.br`;
+    const requestHostOnly = req.get('host')?.split(':')[0] ?? null;
+    const canonicalDomain = resolveCanonicalHostname(
+      {
+        chosen_domain: landingPage.chosen_domain,
+        custom_domain: landingPage.custom_domain,
+        subdomain: landingPage.subdomain,
+      },
+      requestHostOnly
+    );
+    const pageUrl = `https://${canonicalDomain}`;
     
     // Descobrir assets compilados
     const assets = getCompiledAssets();
