@@ -624,7 +624,6 @@ export function generateSchemaMarkup(
       "name": briefing.specialty
     },
     "telephone": briefing.contactPhone || content.contactPhone,
-    "email": briefing.contactEmail || content.contactEmail,
     "address": briefing.addresses?.length > 0 ? {
       "@type": "PostalAddress",
       "streetAddress": briefing.addresses[0],

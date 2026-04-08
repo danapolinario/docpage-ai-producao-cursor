@@ -36,6 +36,14 @@ function resolveCanonicalHostnameStatic(lp: {
   return fallbackSub;
 }
 
+/** Espelha lib/sanitize-public-landing — não expor CPF/user_id no HTML público. */
+function sanitizeLandingPageForPublicHtml(lp: Record<string, unknown>): Record<string, unknown> {
+  const o = { ...lp };
+  delete o.cpf;
+  delete o.user_id;
+  return o;
+}
+
 // Função para renderizar HTML (simplificada, baseada em api/render.ts)
 async function renderLandingPageHTML(landingPage: any): Promise<string> {
   const baseUrl = "https://docpage.com.br";
@@ -153,7 +161,6 @@ async function renderLandingPageHTML(landingPage: any): Promise<string> {
       "name": briefing.specialty || 'Especialista'
     },
     "telephone": briefing.contactPhone || content.contactPhone,
-    "email": briefing.contactEmail || content.contactEmail,
     "address": briefing.addresses?.length > 0 ? briefing.addresses.map((addr: string) => ({
       "@type": "PostalAddress",
       "streetAddress": addr,
@@ -246,7 +253,6 @@ async function renderLandingPageHTML(landingPage: any): Promise<string> {
     <meta property="og:locale" content="pt_BR" />
     <meta property="og:locale:alternate" content="pt_PT" />
     ${briefing.contactPhone ? `<meta property="og:phone_number" content="${escapeHtml(briefing.contactPhone)}" />` : ''}
-    ${briefing.contactEmail ? `<meta property="og:email" content="${escapeHtml(briefing.contactEmail)}" />` : ''}
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -363,7 +369,7 @@ async function renderLandingPageHTML(landingPage: any): Promise<string> {
     <div id="root">${appHtml}</div>
     <script>
       // Injetar dados da landing page no window para hidratação
-      window.__LANDING_PAGE_DATA__ = ${JSON.stringify(landingPage)};
+      window.__LANDING_PAGE_DATA__ = ${JSON.stringify(sanitizeLandingPageForPublicHtml(landingPage as Record<string, unknown>))};
     </script>
     <script type="module" src="/index.tsx"></script>
   </body>

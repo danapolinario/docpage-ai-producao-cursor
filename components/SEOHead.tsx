@@ -96,7 +96,6 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
       "name": briefing.specialty
     },
     "telephone": briefing.contactPhone || content.contactPhone,
-    "email": briefing.contactEmail || content.contactEmail,
     "address": briefing.addresses?.length > 0 ? briefing.addresses.map((addr: string) => ({
       "@type": "PostalAddress",
       "streetAddress": addr,
@@ -238,9 +237,6 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
       <meta property="og:locale:alternate" content="pt_PT" />
       {briefing.contactPhone && (
         <meta property="og:phone_number" content={briefing.contactPhone} />
-      )}
-      {briefing.contactEmail && (
-        <meta property="og:email" content={briefing.contactEmail} />
       )}
       
       {/* ============================================ */}

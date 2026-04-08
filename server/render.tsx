@@ -3,6 +3,7 @@ import { renderToString } from 'react-dom/server';
 import { HelmetProvider } from 'react-helmet-async';
 import { LandingPageViewerSSR } from '../components/LandingPageViewerSSR';
 import { resolveCanonicalHostname } from '../lib/seo-canonical.js';
+import { sanitizeLandingPageForPublicHtml } from '../lib/sanitize-public-landing.js';
 import { BriefingData, LandingPageContent, DesignSettings, SectionVisibility } from '../types';
 
 interface LandingPageData {
@@ -147,7 +148,6 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
       "name": landingPage.briefing_data.specialty
     },
     "telephone": landingPage.briefing_data.contactPhone || landingPage.content_data.contactPhone,
-    "email": landingPage.briefing_data.contactEmail || landingPage.content_data.contactEmail,
     "address": landingPage.briefing_data.addresses?.length > 0 ? landingPage.briefing_data.addresses.map((addr: string) => ({
       "@type": "PostalAddress",
       "streetAddress": addr,
@@ -195,7 +195,6 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
       ...(landingPage.photo_url && !isPhotoBase64 ? [landingPage.photo_url] : [])
     ].filter(Boolean),
     "telephone": landingPage.briefing_data.contactPhone || landingPage.content_data.contactPhone,
-    "email": landingPage.briefing_data.contactEmail || landingPage.content_data.contactEmail,
     "address": landingPage.briefing_data.addresses.map((addr: string) => ({
       "@type": "PostalAddress",
       "streetAddress": addr,
@@ -276,7 +275,6 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     <meta property="og:locale:alternate" content="pt_PT" />
     <meta property="og:site_name" content="${escapeHtml(landingPage.briefing_data.name)}" />
     ${landingPage.briefing_data.contactPhone ? `<meta property="og:phone_number" content="${escapeHtml(landingPage.briefing_data.contactPhone)}" />` : ''}
-    ${landingPage.briefing_data.contactEmail ? `<meta property="og:email" content="${escapeHtml(landingPage.briefing_data.contactEmail)}" />` : ''}
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -410,7 +408,7 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any):
     <div id="root">${appHtml}</div>
     <script>
       // Injetar dados da landing page no window para hidratação
-      window.__LANDING_PAGE_DATA__ = ${JSON.stringify(landingPage)};
+      window.__LANDING_PAGE_DATA__ = ${JSON.stringify(sanitizeLandingPageForPublicHtml(landingPage))};
     </script>
     <script type="module" src="/index.tsx"></script>
   </body>

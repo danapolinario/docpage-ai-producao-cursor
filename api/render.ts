@@ -53,6 +53,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { resolveCanonicalHostname } from '../lib/seo-canonical.js';
+import { sanitizeLandingPageForPublicHtml } from '../lib/sanitize-public-landing.js';
 
 // Para ES modules, precisamos definir __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -333,7 +334,6 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any, 
       "name": briefing.specialty || 'Especialista'
     },
     "telephone": briefing.contactPhone || content.contactPhone,
-    "email": briefing.contactEmail || content.contactEmail,
     "address": briefing.addresses?.length > 0 ? briefing.addresses.map((addr: string) => ({
       "@type": "PostalAddress",
       "streetAddress": addr,
@@ -417,7 +417,6 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any, 
     <meta property="og:locale" content="pt_BR" />
     <meta property="og:locale:alternate" content="pt_PT" />
     ${briefing.contactPhone ? `<meta property="og:phone_number" content="${escapeHtml(briefing.contactPhone)}" />` : ''}
-    ${briefing.contactEmail ? `<meta property="og:email" content="${escapeHtml(briefing.contactEmail)}" />` : ''}
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -534,7 +533,7 @@ export async function renderLandingPage(landingPage: LandingPageData, req: any, 
     <div id="root">${appHtml}</div>
     <script>
       // Injetar dados da landing page no window para hidratação
-      window.__LANDING_PAGE_DATA__ = ${JSON.stringify(landingPage)};
+      window.__LANDING_PAGE_DATA__ = ${JSON.stringify(sanitizeLandingPageForPublicHtml(landingPage))};
     </script>
     ${assets.css ? `<link rel="stylesheet" href="${assets.css}" />` : ''}
     <script type="module" src="${assets.js}"></script>
