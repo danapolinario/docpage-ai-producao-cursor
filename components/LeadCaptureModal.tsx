@@ -105,7 +105,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
         <div className="p-6 border-b border-gray-100">
           <div className="flex justify-between items-center">
             <h2 className="purple-500  text-2xl font-bold text-slate-800 ">
-              Pronto para começar?
+              Vamos começar?
             </h2>
             {onClose && (
               <button
@@ -122,6 +122,10 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
           <p className="text-sm text-slate-500 mt-1">
             Preencha seus dados básicos para não perder o histórico de criação do seu site.
           </p>
+          <p className="text-xs text-slate-500 mt-1">
+            <span className="font-bold text-purple-700">Atenção!</span> Criar seu site é totalmente gratuito. Não pedimos cartão. Você só assina se gostar e depois de ver o resultado.
+          </p>
+
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
