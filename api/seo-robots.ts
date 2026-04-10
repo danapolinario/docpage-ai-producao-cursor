@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { resolveCanonicalHostname } from '../lib/seo-canonical.js';
 
 interface VercelRequest {
   method?: string;
@@ -75,7 +76,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (lp) {
-      const seoDomain = lp.chosen_domain || lp.custom_domain || `${lp.subdomain}.docpage.com.br`;
+      const seoDomain = resolveCanonicalHostname(
+        {
+          chosen_domain: lp.chosen_domain,
+          custom_domain: lp.custom_domain,
+          subdomain: lp.subdomain,
+        },
+        hostname
+      );
       const isSubWithCustom = isSubdomain && (lp.chosen_domain || lp.custom_domain);
 
       if (isSubWithCustom) {

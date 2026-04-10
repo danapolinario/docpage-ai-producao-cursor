@@ -8,12 +8,20 @@
   "trailingSlash": false,
   "functions": {
     "api/index.ts": {
-      "includeFiles": "api/render.ts",
+      "includeFiles": "api/render.ts,lib/*.ts",
       "maxDuration": 25
     },
     "api/[...path].ts": {
-      "includeFiles": "api/render.ts",
+      "includeFiles": "api/render.ts,lib/*.ts",
       "maxDuration": 25
+    },
+    "api/seo-robots.ts": {
+      "includeFiles": "lib/*.ts",
+      "maxDuration": 10
+    },
+    "api/seo-sitemap.ts": {
+      "includeFiles": "lib/*.ts",
+      "maxDuration": 10
     }
   },
   "rewrites": [
