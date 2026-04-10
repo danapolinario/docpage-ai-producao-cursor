@@ -87,6 +87,27 @@ export function trackHomeClick(params) {
         ...params,
     });
 }
+/** Modal de captura de lead na home SaaS */
+export function trackLeadModalOpen() {
+    trackProductEvent('lead_modal_open', {
+        event_category: 'home',
+        event_label: 'Modal de lead exibida',
+    });
+}
+export function trackLeadModalFill(firstField) {
+    trackProductEvent('lead_modal_fill', {
+        event_category: 'home',
+        event_label: 'Utilizador começou a preencher a modal de lead',
+        first_field: firstField,
+    });
+}
+export function trackLeadModalClose(reason) {
+    trackProductEvent('lead_modal_close', {
+        event_category: 'home',
+        event_label: 'Modal de lead fechada',
+        close_reason: reason,
+    });
+}
 /**
  * Eventos específicos do fluxo de criação
  */

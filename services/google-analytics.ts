@@ -124,6 +124,33 @@ export function trackHomeClick(params: {
   });
 }
 
+/** Modal de captura de lead na home SaaS */
+export type LeadModalCloseReason = 'dismiss' | 'submit_success' | 'duplicate_email';
+
+export function trackLeadModalOpen() {
+  trackProductEvent('lead_modal_open', {
+    event_category: 'home',
+    event_label: 'Modal de lead exibida',
+  });
+}
+
+/** Primeira interação com o formulário (nome, e-mail, WhatsApp ou checkboxes). */
+export function trackLeadModalFill(firstField: 'name' | 'email' | 'whatsapp' | 'terms' | 'marketing') {
+  trackProductEvent('lead_modal_fill', {
+    event_category: 'home',
+    event_label: 'Utilizador começou a preencher a modal de lead',
+    first_field: firstField,
+  });
+}
+
+export function trackLeadModalClose(reason: LeadModalCloseReason) {
+  trackProductEvent('lead_modal_close', {
+    event_category: 'home',
+    event_label: 'Modal de lead fechada',
+    close_reason: reason,
+  });
+}
+
 /**
  * Eventos específicos do fluxo de criação
  */

@@ -1,6 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createLead, DUPLICATE_LEAD_EMAIL_MESSAGE } from '../services/leads';
+import {
+  trackLeadModalClose,
+  trackLeadModalFill,
+  trackLeadModalOpen,
+} from '../services/google-analytics';
 import type { LeadData } from '../types';
 
 interface LeadCaptureModalProps {
@@ -45,6 +50,17 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
   const [marketingConsent, setMarketingConsent] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasTrackedFill = useRef(false);
+
+  useEffect(() => {
+    trackLeadModalOpen();
+  }, []);
+
+  const onFirstFill = (field: Parameters<typeof trackLeadModalFill>[0]) => {
+    if (hasTrackedFill.current) return;
+    hasTrackedFill.current = true;
+    trackLeadModalFill(field);
+  };
 
   const canSubmit =
     name.trim().length > 0 &&
@@ -73,6 +89,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
         privacyAccepted,
       });
 
+      trackLeadModalClose('submit_success');
       onSuccess({
         id,
         name: data.name,
@@ -89,6 +106,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
       ) {
         const addr = email.trim().toLowerCase();
         if (onDuplicateEmail) {
+          trackLeadModalClose('duplicate_email');
           onDuplicateEmail(addr);
           return;
         }
@@ -109,7 +127,10 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
             </h2>
             {onClose && (
               <button
-                onClick={onClose}
+                onClick={() => {
+                  trackLeadModalClose('dismiss');
+                  onClose();
+                }}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors text-slate-500"
                 aria-label="Fechar"
               >
@@ -144,7 +165,10 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
               id="lead-name"
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                onFirstFill('name');
+                setName(e.target.value);
+              }}
               placeholder="Seu nome"
               className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
               required
@@ -161,7 +185,10 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
               id="lead-email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                onFirstFill('email');
+                setEmail(e.target.value);
+              }}
               placeholder="seu@email.com"
               className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
               required
@@ -181,7 +208,10 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
               type="tel"
               inputMode="numeric"
               value={whatsapp}
-              onChange={(e) => setWhatsapp(formatBrazilMobileMask(e.target.value))}
+              onChange={(e) => {
+                onFirstFill('whatsapp');
+                setWhatsapp(formatBrazilMobileMask(e.target.value));
+              }}
               placeholder="(11) 98765-4321"
               maxLength={15}
               className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
@@ -196,6 +226,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
                 type="checkbox"
                 checked={termsAccepted && privacyAccepted}
                 onChange={(e) => {
+                  onFirstFill('terms');
                   const v = e.target.checked;
                   setTermsAccepted(v);
                   setPrivacyAccepted(v);
@@ -219,7 +250,10 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
               <input
                 type="checkbox"
                 checked={marketingConsent}
-                onChange={(e) => setMarketingConsent(e.target.checked)}
+                onChange={(e) => {
+                  onFirstFill('marketing');
+                  setMarketingConsent(e.target.checked);
+                }}
                 className={LEAD_CHECKBOX_CLASS}
               />
               <span className="text-sm text-slate-600">
