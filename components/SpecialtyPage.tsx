@@ -2,6 +2,9 @@ import React from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 
+/** Home com modal de captura de lead (evita retomar briefing salvo). */
+const HOME_WITH_LEAD_MODAL = '/?openLead=1';
+
 interface BenefitBlock {
   icon: string;
   title: string;
@@ -727,7 +730,7 @@ export const SpecialtyPage: React.FC = () => {
   const specialty = key ? SPECIALTIES[key] : undefined;
 
   const handleStart = () => {
-    navigate('/');
+    navigate(HOME_WITH_LEAD_MODAL);
   };
 
   if (!specialty) {
@@ -789,7 +792,7 @@ export const SpecialtyPage: React.FC = () => {
         {/* Navbar */}
         <nav className="sticky top-0 z-50 bg-white border-b border-slate-200">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
-            <Link to="/" className="flex items-center gap-2 text-slate-900 hover:text-blue-600 transition-colors">
+            <Link to={HOME_WITH_LEAD_MODAL} className="flex items-center gap-2 text-slate-900 hover:text-blue-600 transition-colors">
               <DocPageLogo />
               <span className="font-bold text-xl tracking-tight">DocPage AI</span>
             </Link>
@@ -960,7 +963,7 @@ export const SpecialtyPage: React.FC = () => {
                 <span className="font-bold text-xl text-white">DocPage AI</span>
               </div>
               <div className="flex flex-wrap justify-center gap-6">
-                <Link to="/" className="hover:text-white transition-colors">Início</Link>
+                <Link to={HOME_WITH_LEAD_MODAL} className="hover:text-white transition-colors">Início</Link>
                 <Link to="/termos-de-uso" className="hover:text-white transition-colors">Termos de Uso</Link>
                 <Link to="/politica-de-privacidade" className="hover:text-white transition-colors">Política de Privacidade</Link>
               </div>

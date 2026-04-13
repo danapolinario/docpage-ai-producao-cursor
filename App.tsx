@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { SaaSLanding } from './components/SaaSLanding';
 import { Auth } from './components/Auth';
 import { LeadCaptureModal } from './components/LeadCaptureModal';
@@ -203,12 +203,16 @@ interface AppProps {
 
 const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   const location = useLocation();
-  
+  const navigate = useNavigate();
+
   // Verificar se está na rota /checkout ao inicializar
   const [showSaaSIntro, setShowSaaSIntro] = useState(() => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
       const searchParams = new URLSearchParams(window.location.search);
+      if (path === '/' && searchParams.get('openLead') === '1') {
+        return true;
+      }
       const fromDashboard = searchParams.get('from') === 'dashboard';
       const hasLandingPageId = localStorage.getItem('checkout_landing_page_id');
       // Se está em /checkout vindo do dashboard, não mostrar a home
@@ -236,6 +240,9 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
       const searchParams = new URLSearchParams(window.location.search);
+      if (path === '/' && searchParams.get('openLead') === '1') {
+        return INITIAL_STATE;
+      }
       const fromDashboard = searchParams.get('from') === 'dashboard';
       const hasLandingPageId = localStorage.getItem('checkout_landing_page_id');
       if (path === '/checkout' && (fromDashboard || hasLandingPageId)) {
@@ -275,6 +282,10 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
   const [leadCaptureEnabled, setLeadCaptureEnabled] = useState(true);
   const [leadData, setLeadData] = useState<LeadData | null>(() => {
     if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (window.location.pathname === '/' && searchParams.get('openLead') === '1') {
+        return null;
+      }
       const stored = localStorage.getItem('lead_data');
       if (stored) {
         try {
@@ -371,6 +382,34 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
       cancelled = true;
     };
   }, []);
+
+  // Páginas /site-para/...: ?openLead=1 = home com modal de lead (sem retomar briefing do localStorage)
+  useEffect(() => {
+    if (location.pathname !== '/') return;
+    const sp = new URLSearchParams(location.search);
+    if (sp.get('openLead') !== '1') return;
+
+    clearLeadResumeLocalStorage();
+    setLeadData(null);
+    setShowSaaSIntro(true);
+    setState(INITIAL_STATE);
+    setPricingViewMode('plans');
+    setShowConfetti(false);
+    setHasAppliedRecommendedTheme(false);
+
+    (async () => {
+      try {
+        const enabled = await getLeadCaptureSetting();
+        setShowLeadCapture(enabled);
+      } catch {
+        setShowLeadCapture(true);
+      }
+    })();
+
+    sp.delete('openLead');
+    const qs = sp.toString();
+    navigate({ pathname: '/', search: qs ? `?${qs}` : '' }, { replace: true });
+  }, [location.pathname, location.search, navigate]);
 
   /** Home: utilizador logado tem alguma LP com status `published`? (para CTA / Painel) */
   type HomePublishedState = 'idle' | 'loading' | 'published' | 'not_published';
@@ -984,6 +1023,10 @@ const App: React.FC<AppProps> = ({ isDevMode = false }) => {
     const fromDashboard = searchParams.get('from') === 'dashboard';
     const hasLandingPageId = localStorage.getItem('checkout_landing_page_id');
     if (path === '/checkout' && (fromDashboard || hasLandingPageId)) {
+      return undefined;
+    }
+
+    if (searchParams.get('openLead') === '1') {
       return undefined;
     }
 
