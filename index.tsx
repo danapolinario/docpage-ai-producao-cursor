@@ -1,7 +1,7 @@
 import '@/index.css';
 import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
 import App from './App';
 
@@ -74,6 +74,16 @@ const CheckoutRoute: React.FC = () => {
   return <App />;
 };
 
+/** Um segmento /site-para-xxx era capturado por /:subdomain — redireciona para /site-para/xxx */
+const MainDomainLandingBySlug: React.FC = () => {
+  const { subdomain } = useParams<{ subdomain: string }>();
+  const m = subdomain?.match(/^site-para-(.+)$/);
+  if (m) {
+    return <Navigate to={`/site-para/${m[1]}`} replace />;
+  }
+  return <LandingPageViewer />;
+};
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
@@ -96,7 +106,7 @@ root.render(
             <Route path="/marketing-medico-primeiros-passos" element={<GuiaSucessoPage />} />
             <Route path="/dev" element={<DevRoute />} />
             <Route path="/site-para/:especialidade" element={<SpecialtyPage />} />
-            <Route path="/:subdomain" element={<LandingPageViewer />} />
+            <Route path="/:subdomain" element={<MainDomainLandingBySlug />} />
             <Route path="/" element={<RootRoute />} />
           </Routes>
         </Suspense>

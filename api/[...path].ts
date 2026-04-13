@@ -119,6 +119,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const hostHostname = host.split(':')[0].toLowerCase();
   const isLandingPageHost = !!subdomain || !hostHostname.includes('docpage.com.br');
   const isMainDocpage = hostHostname === 'docpage.com.br' || hostHostname === 'www.docpage.com.br';
+
+  // Legado: /site-para-cardiologista (um segmento) ia parar em /:subdomain → 301 para /site-para/cardiologista
+  if (isMainDocpage && requestPath && !requestPath.includes('/')) {
+    const legacySitePara = /^site-para-(.+)$/.exec(requestPath);
+    if (legacySitePara) {
+      const proto = getHeaderStr(req.headers['x-forwarded-proto']) || 'https';
+      const hostOnly = host.split(':')[0];
+      res.setHeader('Location', `${proto}://${hostOnly}/site-para/${legacySitePara[1]}`);
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+      return res.status(301).send('');
+    }
+  }
   
   if (requestPath === 'robots.txt' || requestPath === 'sitemap.xml') {
     // Domínio principal docpage.com.br

@@ -6,6 +6,13 @@
   "framework": "vite",
   "cleanUrls": false,
   "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/site-para-:especialidade",
+      "destination": "/site-para/:especialidade",
+      "permanent": true
+    }
+  ],
   "functions": {
     "api/index.ts": {
       "includeFiles": "api/render.ts,lib/*.ts",
@@ -51,6 +58,14 @@
     },
     {
       "source": "/checkout",
+      "destination": "/spa.html"
+    },
+    {
+      "source": "/site-para/:path*",
+      "destination": "/spa.html"
+    },
+    {
+      "source": "/marketing-medico-primeiros-passos",
       "destination": "/spa.html"
     },
     {
