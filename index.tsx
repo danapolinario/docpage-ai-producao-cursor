@@ -12,6 +12,7 @@ const StripeSuccess = lazy(() => import('./components/StripeSuccess'));
 const TermsOfService = lazy(() => import('./components/TermsOfService').then(m => ({ default: m.TermsOfService })));
 const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicy })));
 const GuiaSucessoPage = lazy(() => import('./components/GuiaSucessoPage').then(m => ({ default: m.GuiaSucessoPage })));
+const SpecialtyPage = lazy(() => import('./components/SpecialtyPage').then(m => ({ default: m.SpecialtyPage })));
 
 const PageFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -94,6 +95,7 @@ root.render(
             <Route path="/guiadesucesso" element={<GuiaSucessoPage />} />
             <Route path="/marketing-medico-primeiros-passos" element={<GuiaSucessoPage />} />
             <Route path="/dev" element={<DevRoute />} />
+            <Route path="/site-para/:especialidade" element={<SpecialtyPage />} />
             <Route path="/:subdomain" element={<LandingPageViewer />} />
             <Route path="/" element={<RootRoute />} />
           </Routes>
