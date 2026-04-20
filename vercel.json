@@ -22,6 +22,10 @@
       "includeFiles": "api/render.ts,lib/*.ts",
       "maxDuration": 25
     },
+    "api/site-para/[especialidade].ts": {
+      "includeFiles": "lib/*.ts",
+      "maxDuration": 25
+    },
     "api/seo-robots.ts": {
       "includeFiles": "lib/*.ts",
       "maxDuration": 10
@@ -65,8 +69,8 @@
       "destination": "/spa.html"
     },
     {
-      "source": "/site-para/:path*",
-      "destination": "/api/site-para/:path*"
+      "source": "/site-para/:especialidade",
+      "destination": "/api/site-para/:especialidade"
     },
     {
       "source": "/",
