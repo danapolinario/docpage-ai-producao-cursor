@@ -54,6 +54,36 @@ function normalizeHostForDomainLookup(host: string): string {
   return host.split(':')[0].toLowerCase().replace(/^www\./, '').trim();
 }
 
+/** path após /api/ (ex.: site-para/cardiologista). req.query.path às vezes vem vazio na Vercel com rotas aninhadas. */
+function getPathParamFromRequest(req: VercelRequest): string {
+  const q = req.query.path;
+  if (Array.isArray(q) && q.length > 0) {
+    return q
+      .map((s) => String(s).replace(/^\/+|\/+$/g, ''))
+      .filter(Boolean)
+      .join('/');
+  }
+  if (typeof q === 'string' && q.trim()) {
+    return q.replace(/^\/+|\/+$/g, '');
+  }
+  const raw = req.url || '';
+  let pathname = raw.split('?')[0];
+  try {
+    if (raw.startsWith('http')) pathname = new URL(raw).pathname;
+  } catch {
+    /* ignore */
+  }
+  const m = pathname.match(/^\/api\/+(.+)$/);
+  if (m?.[1]) {
+    try {
+      return decodeURIComponent(m[1].replace(/\/+$/, ''));
+    } catch {
+      return m[1].replace(/\/+$/, '');
+    }
+  }
+  return '';
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log('[API/[...PATH]] Handler chamado para:', req.url);
   
@@ -117,7 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log('[SSR DEBUG] ============================================');
   
   // SEO: Servir robots.txt e sitemap.xml dinâmicos para todos os domínios
-  const requestPath = Array.isArray(req.query.path) ? req.query.path.join('/') : (req.query.path || '');
+  const requestPath = getPathParamFromRequest(req);
   const hostHostname = host.split(':')[0].toLowerCase();
   const isLandingPageHost = !!subdomain || !hostHostname.includes('docpage.com.br');
   const isMainDocpage = hostHostname === 'docpage.com.br' || hostHostname === 'www.docpage.com.br';
@@ -287,7 +317,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       lpForRedirect?.status === 'published' &&
       stripHostname(primaryRedirectHost) !== stripHostname(subDefaultHost)
     ) {
-      const currentPath = Array.isArray(req.query.path) ? `/${req.query.path.join('/')}` : (req.query.path ? `/${req.query.path}` : '');
+      const p = getPathParamFromRequest(req);
+      const currentPath = p ? `/${p}` : '';
       const redirectUrl = `https://${primaryRedirectHost}${currentPath}`;
       console.log('[SSR] 301 Redirect subdomínio → domínio canônico:', { subdomain, primaryRedirectHost, redirectUrl });
       res.setHeader('Location', redirectUrl);
@@ -515,8 +546,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   
   // Se não for subdomínio, verificar se é arquivo estático ou rota do SPA
-  const pathArray = req.query.path;
-  const path = Array.isArray(pathArray) ? pathArray.join('/') : (pathArray || '');
+  const path = getPathParamFromRequest(req);
   
   // IMPORTANTE: Se a rota for `/` (vazia) e o host for um subdomínio .docpage.com.br,
   // mas não foi detectado acima, pode ser um problema de header. Tentar novamente.
