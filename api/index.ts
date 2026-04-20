@@ -33,6 +33,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
 const supabaseAdmin = serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
 
+const RESERVED_MARKETING_SUBDOMAIN = 'site-para';
+
 function extractSubdomain(host: string): string | null {
   const hostname = host.split(':')[0].toLowerCase();
   if (hostname.endsWith('.docpage.com.br')) {
@@ -214,9 +216,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  // site-para.docpage.com.br/ → só chega aqui via / → /api (index). Demais paths usam api/[...path].
+  {
+    const hostH = host.split(':')[0].toLowerCase();
+    if (
+      subdomain === RESERVED_MARKETING_SUBDOMAIN &&
+      !hasPreview &&
+      hostH.endsWith('.docpage.com.br')
+    ) {
+      const proto = getHeaderStr(req.headers['x-forwarded-proto']) || 'https';
+      res.setHeader('Location', `${proto}://www.docpage.com.br/`);
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+      return res.status(301).send('');
+    }
+  }
+
   // Se for subdomínio, verificar se existe HTML estático primeiro
   // Isso garante que subdomínios sempre passem pelo SSR, mesmo que o Vercel tente servir arquivos estáticos
-  if (subdomain) {
+  if (subdomain && subdomain !== RESERVED_MARKETING_SUBDOMAIN) {
     console.log('[SSR] ✓ Subdomínio detectado:', subdomain);
     console.log('[SSR] Request URL:', req.url);
     console.log('[SSR] Request Host:', host);

@@ -65,8 +65,8 @@
       "destination": "/spa.html"
     },
     {
-      "source": "/site-para/(.*)",
-      "destination": "/api/site-para/$1"
+      "source": "/site-para/:path*",
+      "destination": "/api/site-para/:path*"
     },
     {
       "source": "/",

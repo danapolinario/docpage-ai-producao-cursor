@@ -35,6 +35,9 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
 const supabaseAdmin = serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
 
+/** Prefixo de marketing no domínio principal; nunca deve ser tratado como subdomínio de landing do cliente. */
+const RESERVED_MARKETING_SUBDOMAIN = 'site-para';
+
 function extractSubdomain(host: string): string | null {
   const hostname = host.split(':')[0].toLowerCase();
   if (hostname.endsWith('.docpage.com.br')) {
@@ -151,6 +154,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const hostHostname = host.split(':')[0].toLowerCase();
   const isLandingPageHost = !!subdomain || !hostHostname.includes('docpage.com.br');
   const isMainDocpage = hostHostname === 'docpage.com.br' || hostHostname === 'www.docpage.com.br';
+
+  // site-para.docpage.com.br é rota de marketing, não landing de cliente — canónico em www
+  if (
+    subdomain === RESERVED_MARKETING_SUBDOMAIN &&
+    !hasPreview &&
+    hostHostname.endsWith('.docpage.com.br') &&
+    requestPath !== 'robots.txt' &&
+    requestPath !== 'sitemap.xml'
+  ) {
+    const proto = getHeaderStr(req.headers['x-forwarded-proto']) || 'https';
+    const rest = requestPath.replace(/^\/?/, '');
+    const loc = rest
+      ? `${proto}://www.docpage.com.br/site-para/${rest.replace(/^site-para\//, '')}`
+      : `${proto}://www.docpage.com.br/`;
+    res.setHeader('Location', loc);
+    res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+    return res.status(301).send('');
+  }
 
   // Legado: /site-para-cardiologista (um segmento) ia parar em /:subdomain → 301 para /site-para/cardiologista
   if (isMainDocpage && requestPath && !requestPath.includes('/')) {
@@ -281,7 +302,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Se for subdomínio, verificar se existe HTML estático primeiro
-  if (subdomain) {
+  if (subdomain && subdomain !== RESERVED_MARKETING_SUBDOMAIN) {
     console.log('[SUBDOMAIN DEBUG] Subdomain detected:', subdomain);
     
     // SEO: Query para verificar domínio customizado (usada no redirect 301 e no ramo estático)

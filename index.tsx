@@ -40,6 +40,17 @@ function extractSubdomainFromHost(): string | null {
 // Componente wrapper para rota raiz - detecta subdomínio ou domínio customizado e renderiza componente apropriado
 const RootRoute: React.FC = () => {
   const subdomain = extractSubdomainFromHost();
+
+  if (subdomain === 'site-para') {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname.replace(/^\/+|\/+$/g, '');
+      const q = window.location.search || '';
+      window.location.replace(
+        p ? `https://www.docpage.com.br/site-para/${p}${q}` : `https://www.docpage.com.br/${q}`
+      );
+    }
+    return <PageFallback />;
+  }
   
   // Se houver subdomínio docpage (ex: drastellamardegan.docpage.com.br), renderizar LandingPageViewer
   if (subdomain) {
@@ -80,6 +91,9 @@ const MainDomainLandingBySlug: React.FC = () => {
   const m = subdomain?.match(/^site-para-(.+)$/);
   if (m) {
     return <Navigate to={`/site-para/${m[1]}`} replace />;
+  }
+  if (subdomain === 'site-para') {
+    return <Navigate to="/" replace />;
   }
   return <LandingPageViewer />;
 };
