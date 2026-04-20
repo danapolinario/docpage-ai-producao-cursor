@@ -13,28 +13,36 @@ function escapeHtmlText(s: string): string {
 }
 
 function buildSchemaJson(spec: SpecialtyConfig, canonicalUrl: string): object {
+  const faqEntities = spec.faq.map((item) => ({
+    '@type': 'Question' as const,
+    name: item.question,
+    acceptedAnswer: {
+      '@type': 'Answer' as const,
+      text: item.answer,
+    },
+  }));
   return {
     '@context': 'https://schema.org',
-    '@type': 'WebPage',
-    name: spec.titulo,
-    description: spec.descricao,
-    url: canonicalUrl,
-    publisher: {
-      '@type': 'Organization',
-      name: 'DocPage AI',
-      url: 'https://docpage.com.br',
-    },
-    mainEntity: {
-      '@type': 'FAQPage',
-      mainEntity: spec.faq.map((item) => ({
-        '@type': 'Question',
-        name: item.question,
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: item.answer,
+    '@graph': [
+      {
+        '@type': 'WebPage',
+        '@id': `${canonicalUrl}#webpage`,
+        url: canonicalUrl,
+        name: spec.titulo,
+        description: spec.descricao,
+        isPartOf: {
+          '@type': 'WebSite',
+          name: 'DocPage AI',
+          url: 'https://docpage.com.br',
         },
-      })),
-    },
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': `${canonicalUrl}#faq`,
+        name: `Perguntas frequentes — site para ${spec.nomeProfissional}`,
+        mainEntity: faqEntities,
+      },
+    ],
   };
 }
 

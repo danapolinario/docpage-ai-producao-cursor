@@ -1,8 +1,50 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Confetti } from './common/Confetti';
 import { trackHomeClick } from '../services/google-analytics';
+
+/** Só na home — evita dois FAQPage no HTML quando o SPA serve /site-para/... a partir do mesmo shell. */
+const HOME_FAQ_JSON_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  name: 'Perguntas frequentes — DocPage AI',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'Preciso saber programar?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Não. É como usar o WhatsApp. Você conversa, clica e pronto.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'E se o CFM não aprovar meu conteúdo?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Impossível. Nossa IA bloqueia automaticamente qualquer termo proibido pela Resolução 2.336/2023.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Posso cancelar a qualquer momento?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Sim. Sem multas, sem burocracia. Seu site fica no ar até o fim do mês pago.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'O domínio é meu?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Sim. Se você cancelar, pode transferir o domínio para onde quiser.',
+      },
+    },
+  ],
+} as const;
 
 interface Props {
   onStart: () => void;
@@ -561,6 +603,9 @@ export const SaaSLanding: React.FC<Props> = ({
 
   return (
     <div ref={homeRootRef} className="min-h-screen bg-white font-startup text-slate-900">
+      <Helmet>
+        <script type="application/ld+json">{JSON.stringify(HOME_FAQ_JSON_LD)}</script>
+      </Helmet>
       
       {/* Hero Section */}
       <div className="relative overflow-hidden">

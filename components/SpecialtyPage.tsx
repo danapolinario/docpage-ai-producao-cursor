@@ -52,28 +52,38 @@ export const SpecialtyPage: React.FC = () => {
 
   const canonicalUrl = `https://docpage.com.br/site-para/${specialty.slug}`;
 
+  const faqEntities = specialty.faq.map((item) => ({
+    '@type': 'Question' as const,
+    name: item.question,
+    acceptedAnswer: {
+      '@type': 'Answer' as const,
+      text: item.answer,
+    },
+  }));
+
+  /** Um único FAQPage nomeado; WebPage em paralelo (sem FAQ aninhado) — exige Google Search Console. */
   const schemaOrg = {
     '@context': 'https://schema.org',
-    '@type': 'WebPage',
-    name: specialty.titulo,
-    description: specialty.descricao,
-    url: canonicalUrl,
-    publisher: {
-      '@type': 'Organization',
-      name: 'DocPage AI',
-      url: 'https://docpage.com.br',
-    },
-    mainEntity: {
-      '@type': 'FAQPage',
-      mainEntity: specialty.faq.map((item) => ({
-        '@type': 'Question',
-        name: item.question,
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: item.answer,
+    '@graph': [
+      {
+        '@type': 'WebPage',
+        '@id': `${canonicalUrl}#webpage`,
+        url: canonicalUrl,
+        name: specialty.titulo,
+        description: specialty.descricao,
+        isPartOf: {
+          '@type': 'WebSite',
+          name: 'DocPage AI',
+          url: 'https://docpage.com.br',
         },
-      })),
-    },
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': `${canonicalUrl}#faq`,
+        name: `Perguntas frequentes — site para ${specialty.nomeProfissional}`,
+        mainEntity: faqEntities,
+      },
+    ],
   };
 
   return (
