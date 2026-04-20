@@ -61,10 +61,6 @@
       "destination": "/spa.html"
     },
     {
-      "source": "/site-para/:path*",
-      "destination": "/spa.html"
-    },
-    {
       "source": "/marketing-medico-primeiros-passos",
       "destination": "/spa.html"
     },

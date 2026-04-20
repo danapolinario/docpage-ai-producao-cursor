@@ -20,6 +20,8 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { verifyAuthFromRequest } from './auth-utils.js';
 import { resolveCanonicalHostname, stripHostname } from '../lib/seo-canonical.js';
+import { getSpecialtyByUrlPath } from '../lib/specialties-data.js';
+import { injectSpecialtyPrerender } from '../lib/specialty-inject-html.js';
 
 // Para ES modules, precisamos definir __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -725,6 +727,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     if (indexHtml) {
+      if (isMainDocpage && path) {
+        const spec = getSpecialtyByUrlPath(path);
+        if (spec) {
+          indexHtml = injectSpecialtyPrerender(indexHtml, spec);
+          res.setHeader('X-Served-From', 'spa-specialty-prerender');
+          res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+        }
+      }
       res.setHeader('Content-Type', 'text/html');
       return res.send(indexHtml);
     } else {
