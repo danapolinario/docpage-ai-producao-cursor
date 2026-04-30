@@ -66,7 +66,7 @@
     },
     {
       "source": "/site-para/:especialidade",
-      "destination": "/spa.html"
+      "destination": "/site-para/:especialidade/index.html"
     },
     {
       "source": "/",
